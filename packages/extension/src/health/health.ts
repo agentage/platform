@@ -24,12 +24,26 @@ const RANK: Record<HealthStatus, number> = { ok: 0, degraded: 1, unavailable: 2 
 export const worstOf = (statuses: HealthStatus[]): HealthStatus =>
   statuses.reduce<HealthStatus>((worst, s) => (RANK[s] > RANK[worst] ? s : worst), 'ok');
 
+// Under the recipe's HEALTHCHECK --timeout=3s: a hung check reads unavailable, never a hung probe.
+export const CHECK_TIMEOUT_MS = 1000;
+
+const settle = async (check: HealthCheck): Promise<HealthStatus> => {
+  let timer: NodeJS.Timeout | undefined;
+  const expiry = new Promise<HealthStatus>((resolve) => {
+    timer = setTimeout(() => resolve('unavailable'), CHECK_TIMEOUT_MS).unref();
+  });
+  try {
+    return await Promise.race([check(), expiry]);
+  } catch {
+    return 'unavailable';
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
 const runChecks = async (checks: Record<string, HealthCheck>) => {
   const entries = await Promise.all(
-    Object.entries(checks).map(async ([name, check]) => {
-      const status = await check().catch((): HealthStatus => 'unavailable');
-      return [name, status] as const;
-    })
+    Object.entries(checks).map(async ([name, check]) => [name, await settle(check)] as const)
   );
   return Object.fromEntries(entries) as Record<string, HealthStatus>;
 };
