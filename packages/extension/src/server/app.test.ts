@@ -106,6 +106,12 @@ describe('api app: envelope and headers', () => {
     expect(res.headers.get('x-content-type-options')).toBe('nosniff');
   });
 
+  it('sends an agcid on every response, kit routes and misses included', async () => {
+    const { get } = await start();
+    const paths = ['/health', '/.well-known/agentage-extension.json', '/api/v1/echo', '/x'];
+    for (const path of paths) expect((await get(path)).headers.get('agcid'), path).toMatch(UUID_V7);
+  });
+
   it('keeps a valid incoming agcid and replaces an invalid one', async () => {
     const { get } = await start();
     const kept = await get('/api/v1/echo', { headers: { agcid: 'caller-chosen-id' } });
