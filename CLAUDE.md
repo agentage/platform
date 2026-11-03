@@ -20,6 +20,9 @@ security, backend); this file only adds what the tree does not say.
   `dist/runtime/main.js <part>`), `context/` (ctx and `createTestContext`), `testing/`
 - `tool/` the build tool, exported as `@agentage/extension/tool`; it must not import the server
   stack (`tool-imports.test.ts` guards it, the cli loads it)
+- `index.test.ts` pins both public surfaces: authors get the envelope, schemas, `createTestContext`
+  and `startTestServer`, never the server, port or record loader (sealing); the cli gets `build`
+  and `buildLines`
 - `schemas/` JSON Schema generation; `test-support/` fixtures, excluded from the build
 
 ## Gotchas

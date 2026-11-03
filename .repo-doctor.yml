@@ -1,0 +1,11 @@
+# repo-doctor config for this repo; schema in agentage/automation scripts/repo-doctor/README.md.
+class: node-lib
+waive:
+  - id: cicd-no-npm-token
+    reason: 'temporary first-publish token for a new npm name; removed once @agentage/widget is on npm'
+  - id: rb-published-files
+    reason: 'tag-driven release in feature 1; prepare-release.yml arrives with the release loop (feature 2)'
+  - id: ts-published-build
+    reason: 'monorepo: tsc -b over packages/extension/tsconfig.json (composite, tests excluded, maps off) is the build config'
+  - id: ts-nodenext-ext
+    reason: "the only hits are JSON fixtures imported with { type: 'json' }; tsc enforces .js on every .ts import"

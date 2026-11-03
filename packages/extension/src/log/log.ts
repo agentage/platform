@@ -30,7 +30,6 @@ const line = (level: LogLevel, message: string, tags: LogTags, fields: LogFields
 
 const stderrWrite: LogWrite = (text) => void process.stderr.write(text);
 
-// JSON lines on stderr, tagged with extension, part and the request's agcid.
 export const createLog = (tags: LogTags, write: LogWrite = stderrWrite): Log => ({
   info: (message, fields = {}) => write(line('info', message, tags, fields)),
   warn: (message, fields = {}) => write(line('warn', message, tags, fields)),

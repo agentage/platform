@@ -2,10 +2,10 @@ import { randomBytes } from 'node:crypto';
 
 export const AGCID_HEADER = 'agcid';
 
-const AGCID = /^[A-Za-z0-9._:-]{8,128}$/;
+export const AGCID_PATTERN = /^[A-Za-z0-9._:-]{8,128}$/;
 
 export const isAgcid = (value: unknown): value is string =>
-  typeof value === 'string' && AGCID.test(value);
+  typeof value === 'string' && AGCID_PATTERN.test(value);
 
 const hyphenate = (hex: string): string =>
   [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20)].join(

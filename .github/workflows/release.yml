@@ -1,7 +1,7 @@
 name: Release
 
 # Tag-driven: a v* tag publishes every workspace package whose version is not on npm yet, through
-# OIDC trusted publishing (npmjs.com trusted publisher = this file). No NPM_TOKEN anywhere.
+# OIDC trusted publishing (npmjs.com trusted publisher = this file).
 on:
   push:
     tags: ['v*']
@@ -38,20 +38,16 @@ jobs:
       - name: Verify
         run: npm run verify
 
-      - name: TEMPORARY - token for the first (staged) publish of a new name (delete once trusted publishing is configured)
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          if [ -n "${NPM_TOKEN}" ]; then
-            echo '//registry.npmjs.org/:_authToken=${NPM_TOKEN}' >> ~/.npmrc
-            echo "first-publish token in use" >> "$GITHUB_STEP_SUMMARY"
-          fi
-
       - name: Publish versions not on npm yet
         env:
+          # TEMPORARY: stages the first publish of a new name; delete once @agentage/widget is on npm
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
+          if [ -n "${NPM_TOKEN:-}" ]; then
+            echo '//registry.npmjs.org/:_authToken=${NPM_TOKEN}' >> ~/.npmrc
+            echo "first-publish token in use" >> "$GITHUB_STEP_SUMMARY"
+          fi
           for manifest in packages/*/package.json; do
             name=$(node -p "require('./${manifest}').name")
             version=$(node -p "require('./${manifest}').version")

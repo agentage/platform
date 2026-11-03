@@ -7,10 +7,11 @@ export interface ServeOptions {
   app: Express;
   port: number;
   log: Log;
-  graceMs?: number;
   exit?: (code: number) => void;
   signals?: NodeJS.Signals[];
 }
+
+const GRACE_MS = 10_000;
 
 export const listen = (app: Express, port: number, host?: string): Promise<Server> =>
   new Promise((resolve, reject) => {
@@ -25,7 +26,7 @@ export const shutdownOn = (server: Server, options: ServeOptions): (() => void) 
     options.log.info('shutting down');
     server.close(() => exit(0));
     server.closeIdleConnections();
-    setTimeout(() => exit(0), options.graceMs ?? 10_000).unref();
+    setTimeout(() => exit(0), GRACE_MS).unref();
   };
   for (const signal of options.signals ?? ['SIGTERM', 'SIGINT']) process.once(signal, stop);
   return stop;

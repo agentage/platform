@@ -53,10 +53,8 @@ const healthHandler = (options: ApiAppOptions): RequestHandler =>
     build: options.build,
   });
 
-// The kit owns the app: agcid, helmet, CORS, /health, discovery, the body limit, 404 and errors.
 export const createApiApp = (options: ApiAppOptions): Express => {
   const app = express();
-  app.disable('x-powered-by');
   app.set('trust proxy', 'loopback, linklocal, uniquelocal');
   app.use(agcidMiddleware, helmet());
   app.get('/health', healthHandler(options));

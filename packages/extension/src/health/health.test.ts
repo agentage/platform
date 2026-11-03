@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import contractExample from '../test-support/fixtures/health-memory.json' with { type: 'json' };
 import withHostname from '../test-support/fixtures/neg-health-hostname.json' with { type: 'json' };
-import { healthBody, isLoopback, worstOf, type HealthOptions } from './health.js';
+import { healthBody, isLoopback, worstOf, type ResolvedHealth } from './health.js';
 import { HealthSchema } from './health.schema.js';
 
-const OPTIONS: HealthOptions = {
+const OPTIONS: ResolvedHealth = {
   extension: 'probe',
   part: 'api',
   version: '0.1.0',

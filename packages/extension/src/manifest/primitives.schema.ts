@@ -59,7 +59,9 @@ export const PackagePathSchema = z
 
 export const StoreKindSchema = z.enum(['postgres', 'git', 'signoz']);
 
-export const CommitSchema = z.string().regex(/^[0-9a-f]{40}$/, { message: 'full 40-hex git sha' });
+export const FULL_SHA = /^[0-9a-f]{40}$/;
+
+export const CommitSchema = z.string().regex(FULL_SHA, { message: 'full 40-hex git sha' });
 
 export const PrefixedToolNameSchema = z
   .string()

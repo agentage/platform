@@ -33,6 +33,16 @@ const parse = (argv: string[]) =>
     },
   });
 
+const runBuild = async (options: BuildOptions, deps: MainDeps): Promise<number> => {
+  try {
+    for (const line of buildLines(await deps.build(options))) deps.out(line);
+    return 0;
+  } catch (err) {
+    deps.err(`build failed: ${(err as Error).message}`);
+    return 1;
+  }
+};
+
 // Exit codes: 0 ok, 1 the build failed, 2 usage.
 export const main = async (argv: string[], deps: MainDeps = defaultDeps): Promise<number> => {
   let parsed: ReturnType<typeof parse>;
@@ -45,16 +55,5 @@ export const main = async (argv: string[], deps: MainDeps = defaultDeps): Promis
   const { positionals, values } = parsed;
   if (values.help) return (deps.out(USAGE), 0);
   if (positionals[0] !== 'build' || positionals.length !== 1) return (deps.err(USAGE), 2);
-  try {
-    const result = await deps.build({
-      push: values.push,
-      dir: values.dir,
-      registry: values.registry,
-    });
-    for (const line of buildLines(result)) deps.out(line);
-    return 0;
-  } catch (err) {
-    deps.err(`build failed: ${(err as Error).message}`);
-    return 1;
-  }
+  return runBuild({ push: values.push, dir: values.dir, registry: values.registry }, deps);
 };

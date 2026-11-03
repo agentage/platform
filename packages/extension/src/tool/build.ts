@@ -21,7 +21,6 @@ export interface BuildOptions {
   push?: boolean;
   registry?: string;
   env?: Env;
-  now?: Date;
 }
 
 export interface BuildDeps {
@@ -114,13 +113,14 @@ const writeRecord = async (
 
 const buildParts = async (
   base: Omit<PartJob, 'part' | 'tag'>,
+  parts: ImagePartKind[],
   options: BuildOptions,
   deps: BuildDeps
 ): Promise<BuiltImage[]> => {
   const docker = deps.docker ?? createDocker(deps.run);
   const registry = options.registry ?? DEFAULT_REGISTRY;
   const images: BuiltImage[] = [];
-  for (const part of partsToBuild(base.pkg)) {
+  for (const part of parts) {
     const job = { ...base, part, tag: imageTag(registry, base.pkg, part) };
     await buildImage(job, docker, deps.tmpRoot);
     images.push(options.push ? await pushImage(job, docker) : { part, tag: job.tag });
@@ -128,17 +128,16 @@ const buildParts = async (
   return images;
 };
 
-// One image per server part from the kit recipe; with push, the digests go into the build record.
 export const build = async (
   options: BuildOptions = {},
   deps: BuildDeps = { run: runCommand }
 ): Promise<BuildResult> => {
   const dir = resolve(options.dir ?? '.');
   const pkg = await readManifest(dir);
-  partsToBuild(pkg);
-  const info = await resolveBuildInfo(dir, options.env ?? process.env, deps.run, options.now);
+  const parts = partsToBuild(pkg);
+  const info = await resolveBuildInfo(dir, options.env ?? process.env, deps.run);
   await compile(dir, pkg, deps.run);
-  const images = await buildParts({ dir, pkg, info }, options, deps);
+  const images = await buildParts({ dir, pkg, info }, parts, options, deps);
   const recordFile = options.push ? await writeRecord(dir, pkg, info, images) : undefined;
   const result: BuildResult = { id: pkg.agentage.id, version: pkg.version, ...info, images };
   return recordFile ? { ...result, recordFile } : result;

@@ -1,10 +1,7 @@
 import { type BuildInfo } from '../discovery/discovery.js';
-import { type Env } from '../runtime/build-info.js';
+import { FULL_SHA } from '../manifest/primitives.schema.js';
+import { isoSeconds, type Env } from '../runtime/build-info.js';
 import { mustRun, type Run } from './exec.js';
-
-const FULL_SHA = /^[0-9a-f]{40}$/;
-
-const isoSeconds = (date: Date): string => `${date.toISOString().slice(0, 19)}Z`;
 
 const commitOf = async (dir: string, env: Env, run: Run): Promise<string> => {
   const given = env['COMMIT_SHA'] || env['GITHUB_SHA'];
