@@ -39,6 +39,20 @@ describe('stage', () => {
     expect(await readFile(join(root, 'Dockerfile'), 'utf8')).toContain('FROM node:26-alpine');
   });
 
+  it('needs the part entry built under dist/', async () => {
+    const dir = await tempPackage({ 'package.json': json(API_MANIFEST) });
+    await expect(stageContext(dir, API_MANIFEST, 'api', dir)).rejects.toThrow(
+      'dist/api/index.js not found: the package build must write the api entry there'
+    );
+    const outside = validateManifest({
+      ...API_MANIFEST,
+      agentage: { id: 'probe', parts: { api: { entry: './build/api.js' } } },
+    });
+    await expect(stageContext(dir, outside, 'api', dir)).rejects.toThrow(
+      'the api entry build/api.js is not in dist/'
+    );
+  });
+
   it('needs a lockfile, since the image runs npm ci', async () => {
     const dir = await tempPackage({ 'package.json': json(API_MANIFEST), 'dist/api/index.js': '' });
     await expect(stageContext(dir, API_MANIFEST, 'api', dir)).rejects.toThrow(/package-lock/);
