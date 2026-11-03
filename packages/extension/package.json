@@ -1,6 +1,6 @@
 {
   "name": "@agentage/extension",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The agentage extension kit: create(ctx) per part, the server, /health, discovery, the envelope, and the build tool",
   "type": "module",
   "license": "MIT",
@@ -30,9 +30,6 @@
     },
     "./schemas/*": "./schemas/*",
     "./package.json": "./package.json"
-  },
-  "bin": {
-    "agentage-extension": "./dist/tool/cli.js"
   },
   "files": [
     "dist",
