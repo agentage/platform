@@ -1,7 +1,8 @@
 import { z } from 'zod';
+import { AGCID_PATTERN } from '../agcid/agcid.js';
 import { ERROR_CODES } from './codes.js';
 
-export const AgcidSchema = z.string().regex(/^[A-Za-z0-9._:-]{8,128}$/);
+export const AgcidSchema = z.string().regex(AGCID_PATTERN);
 
 export const ErrorCodeSchema = z.enum(ERROR_CODES as [string, ...string[]]);
 

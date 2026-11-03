@@ -2,7 +2,6 @@ import { spawn } from 'node:child_process';
 
 export interface RunOptions {
   cwd?: string;
-  env?: NodeJS.ProcessEnv;
   echo?: boolean;
 }
 
@@ -16,11 +15,7 @@ export type Run = (command: string, args: string[], options?: RunOptions) => Pro
 // stdout is captured (and echoed to stderr with `echo`); stderr streams through as progress.
 export const runCommand: Run = (command, args, options = {}) =>
   new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      cwd: options.cwd,
-      env: options.env ?? process.env,
-      stdio: ['ignore', 'pipe', 'inherit'],
-    });
+    const child = spawn(command, args, { cwd: options.cwd, stdio: ['ignore', 'pipe', 'inherit'] });
     let stdout = '';
     child.stdout.on('data', (chunk: Buffer) => {
       stdout += chunk.toString();

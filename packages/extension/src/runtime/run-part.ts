@@ -1,10 +1,11 @@
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { type Server } from 'node:http';
-import { createContext } from '../context/context.js';
+import { createContext, type PartContext } from '../context/context.js';
 import { DEFAULT_RECORD_FILE, loadRecord } from '../discovery/discovery.js';
 import { createLog, type Log } from '../log/log.js';
 import { entryOf } from '../manifest/parts.js';
+import { type ExtensionPackage } from '../manifest/manifest.schema.js';
 import { readManifest } from '../manifest/read-manifest.js';
 import { createApiApp } from '../server/app.js';
 import { type ApiCreate } from '../server/part.types.js';
@@ -34,7 +35,12 @@ const recordFor = async (env: Env, log: Log) => {
   return record;
 };
 
-// The image entry for a server part: manifest, ctx, create(ctx), then the kit's own server.
+const createRouter = async (options: RunPartOptions, ctx: PartContext, pkg: ExtensionPackage) => {
+  const file = join(options.dir, entryOf(pkg, 'api'));
+  const mod = await (options.importModule ?? importFile)(file);
+  return createOf(mod, file)(ctx);
+};
+
 export const runPart = async (options: RunPartOptions): Promise<Server> => {
   if (options.part !== 'api') throw new Error(`part ${options.part} is not served by kit 0.1`);
   const { env } = options;
@@ -48,19 +54,10 @@ export const runPart = async (options: RunPartOptions): Promise<Server> => {
     origin: origin ?? `http://127.0.0.1:${port}`,
     log,
   });
-  const file = join(options.dir, entryOf(pkg, 'api'));
-  const mod = await (options.importModule ?? importFile)(file);
-  const router = await createOf(mod, file)(ctx);
+  const router = await createRouter(options, ctx, pkg);
   const build = buildInfoFromEnv(env);
   const record = await recordFor(env, log);
-  const app = createApiApp({
-    pkg,
-    build,
-    router,
-    log,
-    record,
-    origin,
-    ownImage: env['AGENTAGE_IMAGE'],
-  });
+  const ownImage = env['AGENTAGE_IMAGE'];
+  const app = createApiApp({ pkg, build, router, log, record, origin, ownImage });
   return serve({ app, port, log, ...options.serve });
 };

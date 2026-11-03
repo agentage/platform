@@ -2,13 +2,15 @@ import { randomBytes } from 'node:crypto';
 import { type RequestHandler } from 'express';
 import { type BuildInfo } from '../discovery/discovery.js';
 import { fail } from '../envelope/envelope.js';
+import { type ImagePartKind } from '../manifest/primitives.schema.js';
+import { isoSeconds } from '../runtime/build-info.js';
 import { type HealthBody, type HealthStatus } from './health.schema.js';
 
 export type HealthCheck = () => Promise<HealthStatus>;
 
 export interface HealthOptions {
   extension: string;
-  part: 'api' | 'mcp' | 'worker' | 'pages' | 'ui';
+  part: ImagePartKind;
   version: string;
   build: BuildInfo;
   checks?: Record<string, HealthCheck>;
@@ -32,18 +34,19 @@ const runChecks = async (checks: Record<string, HealthCheck>) => {
   return Object.fromEntries(entries) as Record<string, HealthStatus>;
 };
 
-const isoSeconds = (date: Date): string => `${date.toISOString().slice(0, 19)}Z`;
-
 export const isLoopback = (address: string | undefined): boolean =>
   address !== undefined && /^(127\.|::1$|::ffff:127\.)/.test(address);
 
-export const healthBody = async (options: HealthOptions): Promise<HealthBody> => {
+export type ResolvedHealth = HealthOptions &
+  Required<Pick<HealthOptions, 'instance' | 'startedAt'>>;
+
+export const healthBody = async (options: ResolvedHealth): Promise<HealthBody> => {
   const now = (options.now ?? (() => new Date()))();
   const checks = await runChecks(options.checks ?? {});
   const status = worstOf(Object.values(checks));
-  const { extension, part, version, build } = options;
-  const uptimeSeconds = Math.max(0, Math.floor((now.getTime() - (options.startedAt ?? 0)) / 1000));
-  const data = { status, extension, part, version, ...build, instance: options.instance ?? '' };
+  const { extension, part, version, build, instance } = options;
+  const uptimeSeconds = Math.max(0, Math.floor((now.getTime() - options.startedAt) / 1000));
+  const data = { status, extension, part, version, ...build, instance };
   return {
     success: status !== 'unavailable',
     data: { ...data, uptimeSeconds, checkedAt: isoSeconds(now), checks },
@@ -52,7 +55,7 @@ export const healthBody = async (options: HealthOptions): Promise<HealthBody> =>
 
 // Answers only on loopback: the container HEALTHCHECK and an operator on the node, never the gateway.
 export const createHealthHandler = (options: HealthOptions): RequestHandler => {
-  const resolved = {
+  const resolved: ResolvedHealth = {
     ...options,
     instance: options.instance ?? randomBytes(4).toString('hex'),
     startedAt: options.startedAt ?? Date.now(),

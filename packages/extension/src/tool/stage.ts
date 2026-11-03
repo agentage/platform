@@ -41,7 +41,6 @@ const copyDeps = async (dir: string, root: string, pkg: ExtensionPackage): Promi
 
 const copyApp = async (dir: string, root: string): Promise<void> => {
   await copyInto(join(dir, 'package.json'), join(root, 'app', 'package.json'));
-  await mkdir(join(root, 'app'), { recursive: true });
   await cp(join(dir, 'dist'), join(root, 'app', 'dist'), {
     recursive: true,
     filter: (source) => basename(source) !== RECORD_FILE,

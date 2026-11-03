@@ -14,11 +14,6 @@ export type PartImages = Partial<Record<ImagePartKind, string>>;
 
 export const DEFAULT_RECORD_FILE = '/run/agentage/agentage-extension.json';
 
-const commandNames = (pkg: ExtensionPackage): string[] | undefined => {
-  const names = (pkg.agentage.commands ?? []).map((command) => command.name);
-  return names.length > 0 ? names : undefined;
-};
-
 const partsOf = (pkg: ExtensionPackage, images: PartImages): ExtensionRecord['parts'] => {
   const parts: Record<string, unknown> = {};
   for (const [kind, image] of Object.entries(images)) parts[kind] = { image };
@@ -28,16 +23,15 @@ const partsOf = (pkg: ExtensionPackage, images: PartImages): ExtensionRecord['pa
 };
 
 // From the manifest, the build and the pushed images by digest; OpenAPI, tools, widgets come later.
-export const recordOf = (pkg: ExtensionPackage, build: BuildInfo, images: PartImages) => {
-  const record = {
-    id: pkg.agentage.id,
-    version: pkg.version,
-    commit: build.commit,
-    buildTime: build.buildTime,
-    parts: partsOf(pkg, images),
-    commands: commandNames(pkg),
-  };
-  return JSON.parse(JSON.stringify(record)) as ExtensionRecord;
+export const recordOf = (
+  pkg: ExtensionPackage,
+  build: BuildInfo,
+  images: PartImages
+): ExtensionRecord => {
+  const { id, commands } = pkg.agentage;
+  const { commit, buildTime } = build;
+  const record = { id, version: pkg.version, commit, buildTime, parts: partsOf(pkg, images) };
+  return commands ? { ...record, commands: commands.map((command) => command.name) } : record;
 };
 
 export const validateRecord = (value: unknown): ExtensionRecord => {
