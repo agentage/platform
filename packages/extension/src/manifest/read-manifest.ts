@@ -18,7 +18,12 @@ export const validateManifest = (value: unknown): ExtensionPackage => {
 
 // The manifest is the `agentage` block of package.json, read as data without running code.
 export const readManifest = async (dir: string): Promise<ExtensionPackage> => {
-  const file = join(dir, 'package.json');
-  const text = await readFile(file, 'utf8');
+  let text: string;
+  try {
+    text = await readFile(join(dir, 'package.json'), 'utf8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+    throw new Error(`no package.json in ${dir}: run in an extension package folder or pass --dir`);
+  }
   return validateManifest(JSON.parse(text) as unknown);
 };

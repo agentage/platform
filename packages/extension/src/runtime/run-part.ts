@@ -41,6 +41,9 @@ const createRouter = async (options: RunPartOptions, ctx: PartContext, pkg: Exte
   return createOf(mod, file)(ctx);
 };
 
+const contextFor = (pkg: ExtensionPackage, origin: string | undefined, port: number, log: Log) =>
+  createContext({ pkg, part: 'api', origin: origin ?? `http://127.0.0.1:${port}`, log });
+
 export const runPart = async (options: RunPartOptions): Promise<Server> => {
   if (options.part !== 'api') throw new Error(`part ${options.part} is not served by kit 0.1`);
   const { env } = options;
@@ -48,13 +51,7 @@ export const runPart = async (options: RunPartOptions): Promise<Server> => {
   const log = createLog({ extension: pkg.agentage.id, part: 'api' });
   const port = portFromEnv(env);
   const origin = env['AGENTAGE_ORIGIN'] || undefined;
-  const ctx = createContext({
-    pkg,
-    part: 'api',
-    origin: origin ?? `http://127.0.0.1:${port}`,
-    log,
-  });
-  const router = await createRouter(options, ctx, pkg);
+  const router = await createRouter(options, contextFor(pkg, origin, port, log), pkg);
   const build = buildInfoFromEnv(env);
   const record = await recordFor(env, log);
   const ownImage = env['AGENTAGE_IMAGE'];

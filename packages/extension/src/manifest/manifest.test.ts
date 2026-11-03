@@ -88,6 +88,14 @@ describe('readManifest', () => {
     await expect(readManifest(dir)).resolves.toMatchObject({ agentage: { id: 'probe' } });
   });
 
+  it('says which folder has no package.json, and passes any other read error through', async () => {
+    await expect(readManifest('/nonexistent/ext')).rejects.toThrow(
+      'no package.json in /nonexistent/ext: run in an extension package folder or pass --dir'
+    );
+    const dir = await tempPackage({ 'package.json/x': '' });
+    await expect(readManifest(dir)).rejects.toThrow(/EISDIR/);
+  });
+
   it('names the failing field', async () => {
     const dir = await tempPackage({ 'package.json': json(withAgentage({ id: 'www' })) });
     await expect(readManifest(dir)).rejects.toThrow(/agentage\.id/);

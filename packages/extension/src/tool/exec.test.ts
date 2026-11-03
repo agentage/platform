@@ -15,6 +15,8 @@ describe('exec', () => {
     await expect(mustRun(runCommand, process.execPath, ['-e', 'process.exit(2)'])).rejects.toThrow(
       /exit code 2/
     );
-    await expect(runCommand('agentage-no-such-binary', [])).rejects.toThrow(/ENOENT/);
+    await expect(runCommand('agentage-no-such-binary', [])).rejects.toThrow(
+      'agentage-no-such-binary is not installed or not on PATH'
+    );
   });
 });

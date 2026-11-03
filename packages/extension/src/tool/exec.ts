@@ -21,7 +21,9 @@ export const runCommand: Run = (command, args, options = {}) =>
       stdout += chunk.toString();
       if (options.echo) process.stderr.write(chunk);
     });
-    child.on('error', reject);
+    child.on('error', (err: NodeJS.ErrnoException) =>
+      reject(err.code === 'ENOENT' ? new Error(`${command} is not installed or not on PATH`) : err)
+    );
     child.on('close', (code) => resolve({ code: code ?? 1, stdout }));
   });
 

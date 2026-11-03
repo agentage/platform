@@ -1,5 +1,5 @@
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
-import { createLog, type Log, type LogFields, type LogLevel } from '../log/log.js';
+import { createLog, messageOf, type Log, type LogFields, type LogLevel } from '../log/log.js';
 
 export type ServerPartKind = 'pages' | 'api' | 'mcp' | 'worker';
 
@@ -57,10 +57,14 @@ const recordingLog = (logs: LogEntry[]): Log => ({
   info: (message, fields = {}) => void logs.push({ level: 'info', message, fields }),
   warn: (message, fields = {}) => void logs.push({ level: 'warn', message, fields }),
   error: (error, fields = {}) =>
-    void logs.push({ level: 'error', message: String(error), fields: { ...fields, err: error } }),
+    void logs.push({
+      level: 'error',
+      message: messageOf(error),
+      fields: { ...fields, err: error },
+    }),
 });
 
-// A ctx for unit tests: fixed identity, settings as given, a log that records instead of printing.
+// A ctx for unit tests: fixed identity, settings as given, a log that records what it would print.
 export const createTestContext = (options: TestContextOptions = {}): TestContext => {
   const logs: LogEntry[] = [];
   const extension = {

@@ -1,8 +1,18 @@
-import { describe, expect, it } from 'vitest';
+import { type AddressInfo } from 'node:net';
+import express from 'express';
+import { describe, expect, it, vi } from 'vitest';
+import { listen } from '../server/serve.js';
 import contractExample from '../test-support/fixtures/health-memory.json' with { type: 'json' };
 import withHostname from '../test-support/fixtures/neg-health-hostname.json' with { type: 'json' };
-import { healthBody, isLoopback, worstOf, type ResolvedHealth } from './health.js';
-import { HealthSchema } from './health.schema.js';
+import {
+  CHECK_TIMEOUT_MS,
+  createHealthHandler,
+  healthBody,
+  isLoopback,
+  worstOf,
+  type ResolvedHealth,
+} from './health.js';
+import { HealthSchema, type HealthStatus } from './health.schema.js';
 
 const OPTIONS: ResolvedHealth = {
   extension: 'probe',
@@ -43,6 +53,34 @@ describe('health', () => {
     expect(body).toMatchObject({ success: false, data: { status: 'unavailable' } });
     expect(body.data.checks).toEqual({ store: 'unavailable' });
     expect(worstOf([])).toBe('ok');
+  });
+
+  it('a check still pending after CHECK_TIMEOUT_MS reads unavailable', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const hung = () => new Promise<HealthStatus>(() => undefined);
+      const pending = healthBody({ ...OPTIONS, checks: { store: hung, auth: async () => 'ok' } });
+      await vi.advanceTimersByTimeAsync(CHECK_TIMEOUT_MS);
+      expect((await pending).data.checks).toEqual({ store: 'unavailable', auth: 'ok' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('the handler answers 503, no-store, with data, when the worst check is unavailable', async () => {
+    const app = express();
+    const checks = { store: async (): Promise<HealthStatus> => 'unavailable' };
+    app.get('/health', createHealthHandler({ ...OPTIONS, checks }));
+    const server = await listen(app, 0, '127.0.0.1');
+    try {
+      const res = await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/health`);
+      expect(res.status).toBe(503);
+      expect(res.headers.get('cache-control')).toBe('no-store');
+      const body = HealthSchema.parse(await res.json());
+      expect(body).toMatchObject({ success: false, data: { status: 'unavailable', part: 'api' } });
+    } finally {
+      server.close();
+    }
   });
 
   it('the schema takes the contract example and refuses a hostname', () => {

@@ -1,7 +1,8 @@
 import { access, cp, mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { basename, dirname, isAbsolute, join, normalize } from 'node:path';
+import { basename, dirname, isAbsolute, join, normalize, sep } from 'node:path';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
+import { entryOf } from '../manifest/parts.js';
 import { type ImagePartKind } from '../manifest/primitives.schema.js';
 import { serverPartRecipe } from './recipe.js';
 
@@ -47,6 +48,18 @@ const copyApp = async (dir: string, root: string): Promise<void> => {
   });
 };
 
+// The image carries dist/ only, so an entry outside it, or never built, would not start.
+const assertBuiltEntry = async (dir: string, pkg: ExtensionPackage, part: ImagePartKind) => {
+  const entry = normalize(entryOf(pkg, part));
+  if (!entry.startsWith(`dist${sep}`))
+    throw new Error(`the ${part} entry ${entry} is not in dist/`);
+  try {
+    await access(join(dir, entry));
+  } catch {
+    throw new Error(`${entry} not found: the package build must write the ${part} entry there`);
+  }
+};
+
 // A clean build context per part: only the manifest, the lockfile, local tarballs and dist/.
 export const stageContext = async (
   dir: string,
@@ -54,6 +67,7 @@ export const stageContext = async (
   part: ImagePartKind,
   tmpRoot: string = tmpdir()
 ): Promise<string> => {
+  await assertBuiltEntry(dir, pkg, part);
   const root = await mkdtemp(join(tmpRoot, `agentage-${pkg.agentage.id}-${part}-`));
   await copyDeps(dir, root, pkg);
   await copyApp(dir, root);

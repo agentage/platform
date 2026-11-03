@@ -83,5 +83,7 @@ npm run verify
 
 ## Release
 
-A `v*` tag runs `.github/workflows/release.yml`, which publishes every package version not yet on
-npm with OIDC trusted publishing and provenance.
+A `v*` tag (or a manual dispatch) runs `.github/workflows/release.yml`, which publishes every
+package version not yet on npm with OIDC trusted publishing and provenance. Before that, CI builds
+[extension-probe](https://github.com/agentage/extension-probe) on the packed kit and runs its smoke
+suite against the image, so a kit change is proven in a container before it ships.
