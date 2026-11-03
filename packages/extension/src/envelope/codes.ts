@@ -1,0 +1,20 @@
+export const ERROR_STATUS = {
+  VALIDATION_ERROR: 400,
+  UNAUTHORIZED: 401,
+  FORBIDDEN: 403,
+  NOT_FOUND: 404,
+  CONFLICT: 409,
+  PRECONDITION_FAILED: 412,
+  PAYLOAD_TOO_LARGE: 413,
+  RATE_LIMITED: 429,
+  INTERNAL: 500,
+  UNAVAILABLE: 503,
+} as const;
+
+export type ErrorCode = keyof typeof ERROR_STATUS;
+
+export const ERROR_CODES = Object.keys(ERROR_STATUS) as ErrorCode[];
+
+export const RETRY_AFTER_CODES: readonly ErrorCode[] = ['RATE_LIMITED', 'UNAVAILABLE'];
+
+export const DEFAULT_RETRY_AFTER_SECONDS = 30;

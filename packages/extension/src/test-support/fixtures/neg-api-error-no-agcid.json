@@ -1,0 +1,13 @@
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid body",
+    "details": [
+      {
+        "field": "name",
+        "message": "Required"
+      }
+    ]
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "name": "@agentage/extension",
+  "version": "0.1.0",
+  "description": "The agentage extension kit: create(ctx) per part, the server, /health, discovery, the envelope, and the build tool",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/agentage/platform.git",
+    "directory": "packages/extension"
+  },
+  "homepage": "https://agentage.io",
+  "bugs": {
+    "url": "https://github.com/agentage/platform/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./tool": {
+      "types": "./dist/tool/index.d.ts",
+      "default": "./dist/tool/index.js"
+    },
+    "./schemas/*": "./schemas/*",
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "agentage-extension": "./dist/tool/cli.js"
+  },
+  "files": [
+    "dist",
+    "schemas",
+    "!dist/**/*.test.*",
+    "!dist/test-support"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "schemas": "node dist/schemas/write-schemas.js schemas",
+    "verify": "npm run verify --prefix ../..",
+    "prepublishOnly": "npm run verify"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "helmet": "^8.1.0",
+    "zod": "^4.2.0"
+  },
+  "peerDependencies": {
+    "express": "^5.1.0"
+  },
+  "peerDependenciesMeta": {
+    "express": {
+      "optional": true
+    }
+  },
+  "keywords": [
+    "agentage",
+    "extension"
+  ]
+}

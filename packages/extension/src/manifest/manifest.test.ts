@@ -1,0 +1,95 @@
+import { describe, expect, it } from 'vitest';
+import cloud from '../test-support/fixtures/neg-package-commands-no-cli.json' with { type: 'json' };
+import memory from '../test-support/fixtures/package-memory.json' with { type: 'json' };
+import { API_MANIFEST, json, SPEC_MANIFEST, tempPackage } from '../test-support/packages.js';
+import { PackageSchema } from './manifest.schema.js';
+import { entryOf, imageParts, normalizeParts } from './parts.js';
+import { readManifest, validateManifest } from './read-manifest.js';
+
+const withAgentage = (agentage: Record<string, unknown>) => ({
+  ...API_MANIFEST,
+  agentage: { ...API_MANIFEST.agentage, ...agentage },
+});
+
+const issuesOf = (value: unknown): string[] => {
+  const result = PackageSchema.safeParse(value);
+  return result.success ? [] : result.error.issues.map((issue) => issue.message);
+};
+
+describe('manifest schema', () => {
+  it('takes the full probe manifest of the spec and the api-only form', () => {
+    expect(issuesOf(SPEC_MANIFEST)).toEqual([]);
+    expect(issuesOf(API_MANIFEST)).toEqual([]);
+  });
+
+  it('takes the contract form of parts ({} and store.kind) too', () => {
+    expect(issuesOf(memory)).toEqual([]);
+  });
+
+  it('refuses commands without the cli part, and the reverse', () => {
+    expect(issuesOf(cloud)).toContain('commands need the cli part');
+    const cli = withAgentage({ parts: { api: true, cli: true } });
+    expect(issuesOf(cli)).toContain('the cli part needs commands');
+  });
+
+  it('refuses reserved ids, no routed part and duplicate commands', () => {
+    expect(issuesOf(withAgentage({ id: 'auth' }))).toHaveLength(1);
+    expect(issuesOf(withAgentage({ id: 'Probe' }))).toHaveLength(1);
+    expect(issuesOf(withAgentage({ parts: { worker: true } }))).toContain(
+      'at least one routed part (pages, ui, api or mcp)'
+    );
+    const ping = { name: 'ping', summary: 'p' };
+    const dup = withAgentage({ parts: { api: true, cli: true }, commands: [ping, ping] });
+    expect(issuesOf(dup)).toContain('command names must be unique');
+  });
+
+  it('checks settings: mcp.listing needs mcp, default matches type', () => {
+    const listing = { 'mcp.listing': { type: 'string', default: 'open' } };
+    expect(issuesOf(withAgentage({ settings: listing }))).toContain(
+      'mcp.listing needs the mcp part'
+    );
+    const bad = { 'probe.every': { type: 'integer', default: 1.5 } };
+    expect(issuesOf(withAgentage({ settings: bad }))).toContain('default does not match type');
+  });
+
+  it('keeps first-party ids to the @agentage scope', () => {
+    const squat = { ...withAgentage({ id: 'memory' }), name: 'extension-memory' };
+    expect(issuesOf(squat)).toContain('a first-party id is claimed only by an @agentage/ package');
+  });
+
+  it('refuses unknown keys in the manifest block', () => {
+    expect(issuesOf(withAgentage({ contributes: {} }))).toHaveLength(1);
+  });
+});
+
+describe('parts', () => {
+  it('normalizes both forms to one shape', () => {
+    expect(normalizeParts(SPEC_MANIFEST.agentage.parts as never)).toEqual({
+      code: { pages: {}, ui: {}, api: {}, mcp: {}, worker: {}, cli: {} },
+      store: 'postgres',
+    });
+    expect(normalizeParts({ api: { entry: './build/api.js' }, ui: false })).toEqual({
+      code: { api: { entry: './build/api.js' } },
+    });
+  });
+
+  it('lists image parts and resolves entries', () => {
+    const spec = validateManifest(SPEC_MANIFEST);
+    expect(imageParts(spec)).toEqual(['pages', 'ui', 'api', 'mcp', 'worker']);
+    expect(entryOf(spec, 'api')).toBe('./dist/api/index.js');
+    const custom = validateManifest(withAgentage({ parts: { api: { entry: './out/a.js' } } }));
+    expect(entryOf(custom, 'api')).toBe('./out/a.js');
+  });
+});
+
+describe('readManifest', () => {
+  it('reads and validates package.json from a folder', async () => {
+    const dir = await tempPackage({ 'package.json': json(API_MANIFEST) });
+    await expect(readManifest(dir)).resolves.toMatchObject({ agentage: { id: 'probe' } });
+  });
+
+  it('names the failing field', async () => {
+    const dir = await tempPackage({ 'package.json': json(withAgentage({ id: 'www' })) });
+    await expect(readManifest(dir)).rejects.toThrow(/agentage\.id/);
+  });
+});

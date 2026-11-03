@@ -1,0 +1,74 @@
+import { describe, expect, it } from 'vitest';
+import {
+  API_MANIFEST,
+  DIGEST,
+  json,
+  SHA,
+  SPEC_MANIFEST,
+  tempPackage,
+} from '../test-support/packages.js';
+import { validateManifest } from '../manifest/read-manifest.js';
+import { discoveryDocument, loadRecord, recordOf, validateRecord } from './discovery.js';
+import { DiscoveryDocumentSchema, ExtensionRecordSchema } from './discovery.schema.js';
+
+const BUILD = { commit: SHA, buildTime: '2026-11-03T20:00:00Z' };
+const API_IMAGE = `ghcr.io/agentage/probe-api@${DIGEST}`;
+
+describe('build record', () => {
+  it('is built from the manifest, the build and the digests', () => {
+    expect(recordOf(API_MANIFEST, BUILD, { api: API_IMAGE })).toEqual({
+      id: 'probe',
+      version: '0.1.0',
+      commit: SHA,
+      buildTime: '2026-11-03T20:00:00Z',
+      parts: { api: { image: API_IMAGE } },
+    });
+  });
+
+  it('carries the store kind and command names of the full probe', () => {
+    const record = recordOf(validateManifest(SPEC_MANIFEST), BUILD, { api: API_IMAGE });
+    expect(record.parts.store).toEqual({ kind: 'postgres' });
+    expect(record.commands).toEqual(['ping']);
+    expect(ExtensionRecordSchema.safeParse(record).success).toBe(true);
+  });
+
+  it('refuses images by tag, a short commit and an image of another extension', () => {
+    const tag = recordOf(API_MANIFEST, BUILD, { api: 'ghcr.io/agentage/probe-api:0.1.0' });
+    expect(() => validateRecord(tag)).toThrow(/parts\.api\.image/);
+    const short = recordOf(API_MANIFEST, { ...BUILD, commit: '9f2c3e1' }, { api: API_IMAGE });
+    expect(() => validateRecord(short)).toThrow(/commit/);
+    const other = { api: `ghcr.io/agentage/memory-api@${DIGEST}` };
+    expect(() => validateRecord(recordOf(API_MANIFEST, BUILD, other))).toThrow(/\{id\}-\{part\}/);
+  });
+});
+
+describe('discovery document', () => {
+  it('is the record plus the host, in the order of the spec', () => {
+    const record = validateRecord(recordOf(API_MANIFEST, BUILD, { api: API_IMAGE }));
+    const doc = discoveryDocument(record, 'https://probe.next.agentage.io');
+    expect(Object.keys(doc)).toEqual(['id', 'version', 'commit', 'buildTime', 'host', 'parts']);
+    expect(DiscoveryDocumentSchema.safeParse(doc).success).toBe(true);
+  });
+
+  it('takes an https host or a loopback one, nothing else', () => {
+    const record = validateRecord(recordOf(API_MANIFEST, BUILD, { api: API_IMAGE }));
+    const valid = (host: string) =>
+      DiscoveryDocumentSchema.safeParse(discoveryDocument(record, host)).success;
+    expect(valid('http://127.0.0.1:3000')).toBe(true);
+    expect(valid('http://probe.next.agentage.io')).toBe(false);
+    expect(valid('https://probe.next.agentage.io/')).toBe(false);
+  });
+});
+
+describe('loadRecord', () => {
+  it('is null when no record is mounted', async () => {
+    await expect(loadRecord('/nonexistent/agentage-extension.json')).resolves.toBeNull();
+  });
+
+  it('reads a valid record and refuses an invalid one', async () => {
+    const record = recordOf(API_MANIFEST, BUILD, { api: API_IMAGE });
+    const dir = await tempPackage({ 'good.json': json(record), 'bad.json': json({ id: 'x' }) });
+    await expect(loadRecord(`${dir}/good.json`)).resolves.toEqual(record);
+    await expect(loadRecord(`${dir}/bad.json`)).rejects.toThrow(/invalid extension record/);
+  });
+});

@@ -1,0 +1,309 @@
+{
+  "$id": "https://agentage.io/schemas/extension-package.schema.json",
+  "title": "agentage extension package.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "maxLength": 214,
+      "pattern": "^(?:@[a-z0-9][a-z0-9._~-]*\\/)?[a-z0-9][a-z0-9._~-]*$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?(\\+[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+    },
+    "engines": {
+      "type": "object",
+      "properties": {
+        "agentage": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[0-9xX*^~<>=| .-]+[0-9A-Za-z.-]*$"
+        }
+      },
+      "required": [
+        "agentage"
+      ],
+      "additionalProperties": {}
+    },
+    "agentage": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 32,
+          "pattern": "^(?!(?:auth|www|api|sync|mail|mcp|ui|git|setup|status|update|extension|add|remove|help|con|prn|aux|nul|com[0-9]|lpt[0-9])$)[a-z][a-z0-9-]*$"
+        },
+        "parts": {
+          "type": "object",
+          "properties": {
+            "pages": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "entry": {
+                      "type": "string",
+                      "maxLength": 256,
+                      "pattern": "^\\.\\/[A-Za-z0-9._/-]+$"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "ui": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "entry": {
+                      "type": "string",
+                      "maxLength": 256,
+                      "pattern": "^\\.\\/[A-Za-z0-9._/-]+$"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "api": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "entry": {
+                      "type": "string",
+                      "maxLength": 256,
+                      "pattern": "^\\.\\/[A-Za-z0-9._/-]+$"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "mcp": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "entry": {
+                      "type": "string",
+                      "maxLength": 256,
+                      "pattern": "^\\.\\/[A-Za-z0-9._/-]+$"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "worker": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "entry": {
+                      "type": "string",
+                      "maxLength": 256,
+                      "pattern": "^\\.\\/[A-Za-z0-9._/-]+$"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "cli": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "entry": {
+                      "type": "string",
+                      "maxLength": 256,
+                      "pattern": "^\\.\\/[A-Za-z0-9._/-]+$"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "store": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "postgres",
+                    "git",
+                    "signoz"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "postgres",
+                        "git",
+                        "signoz"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "commands": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "maxLength": 32,
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "summary": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "maxLength": 32,
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "string",
+                        "integer",
+                        "number",
+                        "boolean"
+                      ]
+                    },
+                    "required": {
+                      "type": "boolean"
+                    },
+                    "description": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "type"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "name",
+              "summary"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "settings": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[a-z][A-Za-z0-9]*(\\.[a-z][A-Za-z0-9]*)*$"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "string",
+                  "integer",
+                  "number",
+                  "boolean"
+                ]
+              },
+              "default": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ]
+              },
+              "enum": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "required": [
+              "type",
+              "default"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "secrets": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 48,
+            "pattern": "^[a-z][a-z0-9-]*$"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "parts"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "name",
+    "version",
+    "engines",
+    "agentage"
+  ],
+  "additionalProperties": {}
+}

@@ -1,0 +1,54 @@
+name: Release
+
+# Tag-driven: a v* tag publishes every workspace package whose version is not on npm yet, through
+# OIDC trusted publishing (npmjs.com trusted publisher = this file). No NPM_TOKEN anywhere.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Upgrade npm
+        run: npm install -g npm@latest && npm --version # OIDC needs npm >= 11.5.1
+
+      - name: Install
+        run: npm ci
+
+      - name: Verify
+        run: npm run verify
+
+      - name: Publish versions not on npm yet
+        run: |
+          set -euo pipefail
+          for manifest in packages/*/package.json; do
+            name=$(node -p "require('./${manifest}').name")
+            version=$(node -p "require('./${manifest}').version")
+            if [ "$(node -p "require('./${manifest}').private === true")" = "true" ]; then continue; fi
+            if npm view "${name}@${version}" version >/dev/null 2>&1; then
+              echo "${name}@${version} is already on npm"
+              continue
+            fi
+            npm publish -w "${name}" --access public --provenance
+            echo "published ${name}@${version}" >> "$GITHUB_STEP_SUMMARY"
+          done

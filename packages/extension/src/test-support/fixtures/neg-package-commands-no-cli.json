@@ -1,0 +1,57 @@
+{
+  "name": "@agentage/extension-cloud",
+  "version": "0.3.0",
+  "description": "Keeps the running setup equal to estate.yaml.",
+  "repository": "https://github.com/agentage/extension-cloud",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22",
+    "agentage": "^1.0.0"
+  },
+  "agentage": {
+    "id": "cloud",
+    "parts": {
+      "pages": {},
+      "ui": {},
+      "api": {},
+      "mcp": {},
+      "worker": {},
+      "store": {
+        "kind": "postgres"
+      }
+    },
+    "commands": [
+      {
+        "name": "apply",
+        "summary": "Make the Swarm equal to estate.yaml and commit estate.lock.",
+        "args": [
+          {
+            "name": "dry-run",
+            "type": "boolean",
+            "required": false,
+            "description": "Show what would change, change nothing."
+          }
+        ]
+      },
+      {
+        "name": "drift",
+        "summary": "Show the difference between estate.yaml and what runs."
+      }
+    ],
+    "settings": {
+      "mcp.listing": {
+        "type": "string",
+        "enum": ["open", "token"],
+        "default": "token",
+        "description": "cloud ships closed: tools/list needs cloud:read."
+      },
+      "apply.everyMinutes": {
+        "type": "integer",
+        "default": 5,
+        "description": "Worker loop interval."
+      }
+    },
+    "secrets": ["registry-read-token", "estate-push-key"]
+  }
+}

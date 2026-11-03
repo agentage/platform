@@ -1,0 +1,36 @@
+{
+  "name": "@agentage/extension-memory",
+  "version": "1.4.2",
+  "description": "One markdown memory every AI reads and writes.",
+  "repository": "https://github.com/agentage/extension-memory",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22",
+    "agentage": "^1.0.0"
+  },
+  "agentage": {
+    "id": "memory",
+    "parts": {
+      "ui": {},
+      "api": {},
+      "mcp": {},
+      "store": {
+        "kind": "git"
+      }
+    },
+    "settings": {
+      "mcp.listing": {
+        "type": "string",
+        "enum": ["open", "token"],
+        "default": "open",
+        "description": "Anonymous tools/list stays open for MCP clients."
+      },
+      "memory.maxMemories": {
+        "type": "integer",
+        "default": 20,
+        "description": "Memories per user until plans have a source."
+      }
+    }
+  }
+}
