@@ -32,7 +32,7 @@ describe('ctx', () => {
     expect(ctx.logs.map((entry) => [entry.level, entry.message])).toEqual([
       ['info', 'hello'],
       ['warn', 'careful'],
-      ['error', 'Error: boom'],
+      ['error', 'boom'],
     ]);
   });
 
