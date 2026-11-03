@@ -44,3 +44,38 @@ jobs:
           grep -qx 'package/schemas/extension-discovery.schema.json' /tmp/pack/files.txt
           if grep -q '\.test\.' /tmp/pack/files.txt; then echo 'test files in the tarball'; exit 1; fi
           node packages/extension/dist/tool/cli.js --help
+
+      - name: Image smoke - build extension-probe on this kit
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/agentage/extension-probe.git /tmp/probe
+          mkdir -p /tmp/probe/.kit
+          cp /tmp/pack/agentage-extension-*.tgz /tmp/probe/.kit/kit.tgz
+          cd /tmp/probe
+          npm ci --no-audit --no-fund
+          npm install --no-audit --no-fund ./.kit/kit.tgz
+          node node_modules/@agentage/extension/dist/tool/cli.js build
+
+      - name: Image smoke - start it, wait for its HEALTHCHECK
+        run: |
+          set -euo pipefail
+          image="ghcr.io/agentage/probe-api:$(node -p "require('/tmp/probe/package.json').version")"
+          docker run -d --name probe-api --network host "$image"
+          for i in $(seq 1 30); do
+            state=$(docker inspect -f '{{.State.Health.Status}}' probe-api)
+            echo "attempt $i/30: $state"
+            [ "$state" = "healthy" ] && break
+            sleep 2
+          done
+          test "$state" = "healthy"
+
+      - name: Image smoke - the probe's e2e/smoke.spec.ts against the container
+        working-directory: /tmp/probe
+        env:
+          PROBE_BASE_URL: http://127.0.0.1:3000
+          COMMIT_SHA: ${{ github.sha }}
+        run: npm run test:e2e
+
+      - name: Container log on failure
+        if: failure()
+        run: docker logs probe-api || true
