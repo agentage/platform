@@ -32,4 +32,6 @@ security, backend); this file only adds what the tree does not say.
 - `/health` checks the socket's local address, so a published Docker port answers 404 by design;
   use `--network host` or `docker exec` to read it.
 - Kit 0.1 serves and builds the api part only; other parts fail loudly in `build` and `runPart`.
+- CI's image smoke clones extension-probe master and installs the packed kit into it: a probe
+  change can turn this CI red, and a kit change that breaks the probe never reaches npm.
 - Public repo: no secrets, no internal hosts, no provider names, no roadmap in code or docs.
