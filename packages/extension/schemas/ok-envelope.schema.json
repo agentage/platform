@@ -1,0 +1,25 @@
+{
+  "$id": "https://agentage.io/schemas/ok-envelope.schema.json",
+  "title": "REST success envelope",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "success": {
+      "type": "boolean",
+      "const": true
+    },
+    "data": {},
+    "meta": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    }
+  },
+  "required": [
+    "success",
+    "data"
+  ],
+  "additionalProperties": false
+}

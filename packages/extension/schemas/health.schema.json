@@ -1,0 +1,100 @@
+{
+  "$id": "https://agentage.io/schemas/health.schema.json",
+  "title": "GET /health of every part container",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "success": {
+      "type": "boolean"
+    },
+    "data": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "degraded",
+            "unavailable"
+          ]
+        },
+        "extension": {
+          "type": "string",
+          "maxLength": 32,
+          "pattern": "^(?!(?:auth|www|api|sync|mail|mcp|ui|git|setup|status|update|extension|add|remove|help|con|prn|aux|nul|com[0-9]|lpt[0-9])$)[a-z][a-z0-9-]*$"
+        },
+        "part": {
+          "type": "string",
+          "enum": [
+            "pages",
+            "ui",
+            "api",
+            "mcp",
+            "worker",
+            "store"
+          ]
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?(\\+[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{7,40}$"
+        },
+        "buildTime": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+        },
+        "instance": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8,32}$"
+        },
+        "uptimeSeconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "checkedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+        },
+        "checks": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded",
+              "unavailable"
+            ]
+          }
+        }
+      },
+      "required": [
+        "status",
+        "extension",
+        "part",
+        "version",
+        "commit",
+        "buildTime",
+        "instance",
+        "uptimeSeconds",
+        "checkedAt",
+        "checks"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "success",
+    "data"
+  ],
+  "additionalProperties": false
+}

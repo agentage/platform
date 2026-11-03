@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci
+
+      - name: Verify (type-check, lint, format, test with coverage, build)
+        run: npm run verify
+
+      - name: Pack smoke
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/pack
+          npm pack -w @agentage/extension --pack-destination /tmp/pack
+          tar -tzf /tmp/pack/agentage-extension-*.tgz > /tmp/pack/files.txt
+          grep -qx 'package/dist/tool/cli.js' /tmp/pack/files.txt
+          grep -qx 'package/dist/runtime/main.js' /tmp/pack/files.txt
+          grep -qx 'package/schemas/extension-discovery.schema.json' /tmp/pack/files.txt
+          if grep -q '\.test\.' /tmp/pack/files.txt; then echo 'test files in the tarball'; exit 1; fi
+          node packages/extension/dist/tool/cli.js --help

@@ -1,0 +1,176 @@
+{
+  "$id": "https://agentage.io/schemas/extension-record.schema.json",
+  "title": "agentage-extension.json build record (in the package and the release asset)",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "maxLength": 32,
+      "pattern": "^(?!(?:auth|www|api|sync|mail|mcp|ui|git|setup|status|update|extension|add|remove|help|con|prn|aux|nul|com[0-9]|lpt[0-9])$)[a-z][a-z0-9-]*$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?(\\+[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+    },
+    "commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "buildTime": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+    },
+    "parts": {
+      "type": "object",
+      "properties": {
+        "pages": {
+          "type": "object",
+          "properties": {
+            "image": {
+              "type": "string",
+              "maxLength": 256,
+              "pattern": "^[a-z0-9][a-z0-9.-]*(:[0-9]{1,5})?\\/[a-z0-9][a-z0-9-]*\\/[a-z][a-z0-9-]*-(pages|ui|api|mcp|worker)@sha256:[0-9a-f]{64}$"
+            }
+          },
+          "required": [
+            "image"
+          ],
+          "additionalProperties": false
+        },
+        "ui": {
+          "type": "object",
+          "properties": {
+            "image": {
+              "type": "string",
+              "maxLength": 256,
+              "pattern": "^[a-z0-9][a-z0-9.-]*(:[0-9]{1,5})?\\/[a-z0-9][a-z0-9-]*\\/[a-z][a-z0-9-]*-(pages|ui|api|mcp|worker)@sha256:[0-9a-f]{64}$"
+            }
+          },
+          "required": [
+            "image"
+          ],
+          "additionalProperties": false
+        },
+        "api": {
+          "type": "object",
+          "properties": {
+            "image": {
+              "type": "string",
+              "maxLength": 256,
+              "pattern": "^[a-z0-9][a-z0-9.-]*(:[0-9]{1,5})?\\/[a-z0-9][a-z0-9-]*\\/[a-z][a-z0-9-]*-(pages|ui|api|mcp|worker)@sha256:[0-9a-f]{64}$"
+            }
+          },
+          "required": [
+            "image"
+          ],
+          "additionalProperties": false
+        },
+        "mcp": {
+          "type": "object",
+          "properties": {
+            "image": {
+              "type": "string",
+              "maxLength": 256,
+              "pattern": "^[a-z0-9][a-z0-9.-]*(:[0-9]{1,5})?\\/[a-z0-9][a-z0-9-]*\\/[a-z][a-z0-9-]*-(pages|ui|api|mcp|worker)@sha256:[0-9a-f]{64}$"
+            }
+          },
+          "required": [
+            "image"
+          ],
+          "additionalProperties": false
+        },
+        "worker": {
+          "type": "object",
+          "properties": {
+            "image": {
+              "type": "string",
+              "maxLength": 256,
+              "pattern": "^[a-z0-9][a-z0-9.-]*(:[0-9]{1,5})?\\/[a-z0-9][a-z0-9-]*\\/[a-z][a-z0-9-]*-(pages|ui|api|mcp|worker)@sha256:[0-9a-f]{64}$"
+            }
+          },
+          "required": [
+            "image"
+          ],
+          "additionalProperties": false
+        },
+        "store": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "postgres",
+                "git",
+                "signoz"
+              ]
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "openapi": {
+      "type": "string",
+      "pattern": "^\\/api\\/v[1-9][0-9]*\\/openapi\\.json$"
+    },
+    "tools": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 64,
+        "pattern": "^[a-z][a-z0-9-]*__[a-z][a-z0-9_-]*$"
+      }
+    },
+    "widgets": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "element": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*-[a-z0-9-]+$"
+          },
+          "module": {
+            "type": "string",
+            "pattern": "^\\/ui\\/[^/]+\\/[^/]+\\.m?js$"
+          }
+        },
+        "required": [
+          "name",
+          "element",
+          "module"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "commands": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 32,
+        "pattern": "^[a-z][a-z0-9-]*$"
+      }
+    }
+  },
+  "required": [
+    "id",
+    "version",
+    "commit",
+    "buildTime",
+    "parts"
+  ],
+  "additionalProperties": false
+}
