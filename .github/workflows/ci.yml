@@ -42,5 +42,5 @@ jobs:
           grep -qx 'package/dist/tool/cli.js' /tmp/pack/files.txt
           grep -qx 'package/dist/runtime/main.js' /tmp/pack/files.txt
           grep -qx 'package/schemas/extension-discovery.schema.json' /tmp/pack/files.txt
-          ! grep -q '\.test\.' /tmp/pack/files.txt
+          if grep -q '\.test\.' /tmp/pack/files.txt; then echo 'test files in the tarball'; exit 1; fi
           node packages/extension/dist/tool/cli.js --help

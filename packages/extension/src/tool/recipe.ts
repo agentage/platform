@@ -14,7 +14,7 @@ export const serverPartRecipe = (part: ImagePartKind): string =>
     'FROM node:26-alpine AS deps',
     'WORKDIR /app',
     'COPY deps/ ./',
-    'RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force',
+    'RUN npm ci --omit=dev --no-audit --no-fund',
     '',
     'FROM node:26-alpine AS runner',
     'ARG COMMIT_SHA',
