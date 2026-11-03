@@ -38,7 +38,18 @@ jobs:
       - name: Verify
         run: npm run verify
 
+      - name: TEMPORARY - token for the first publish of a new name (delete once trusted publishing is configured)
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -n "${NPM_TOKEN}" ]; then
+            echo '//registry.npmjs.org/:_authToken=${NPM_TOKEN}' >> ~/.npmrc
+            echo "first-publish token in use" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Publish versions not on npm yet
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
           for manifest in packages/*/package.json; do
