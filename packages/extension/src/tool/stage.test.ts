@@ -42,14 +42,14 @@ describe('stage', () => {
   it('needs the part entry built under dist/', async () => {
     const dir = await tempPackage({ 'package.json': json(API_MANIFEST) });
     await expect(stageContext(dir, API_MANIFEST, 'api', dir)).rejects.toThrow(
-      'dist/api/index.js not found: the package build must write the api entry there'
+      'dist/api/index.js not found: the package build must write the api part there'
     );
     const outside = validateManifest({
       ...API_MANIFEST,
       agentage: { id: 'probe', parts: { api: { entry: './build/api.js' } } },
     });
     await expect(stageContext(dir, outside, 'api', dir)).rejects.toThrow(
-      'the api entry build/api.js is not in dist/'
+      'the api entry build/api.js is not in dist/api/'
     );
   });
 

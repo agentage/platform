@@ -22,6 +22,9 @@ const deps = (result: BuildResult | Error = RESULT) => {
       if (result instanceof Error) throw result;
       return result;
     },
+    up: async () => undefined,
+    down: async () => undefined,
+    token: async () => 'aga_x',
     out: (line) => void out.push(line),
     err: (line) => void err.push(line),
   };
@@ -45,7 +48,7 @@ describe('tool cli', () => {
     expect(await main(['build', '--nope'], deps().d)).toBe(2);
     const help = deps();
     expect(await main(['--help'], help.d)).toBe(0);
-    expect(help.out[0]).toMatch(/^usage: agentage-extension build/);
+    expect(help.out[0]).toMatch(/^usage: agentage-extension <build\|up\|down\|token>/);
   });
 });
 

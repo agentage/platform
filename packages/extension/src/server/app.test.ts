@@ -2,7 +2,7 @@ import { type AddressInfo } from 'node:net';
 import { type Server } from 'node:http';
 import { Router, type Request, type Response } from 'express';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createTestContext } from '../context/context.js';
+import { createTestContext } from '../context/test-context.js';
 import { DiscoveryDocumentSchema } from '../discovery/discovery.schema.js';
 import { fail } from '../envelope/envelope.js';
 import { ErrorEnvelopeSchema } from '../envelope/envelope.schema.js';

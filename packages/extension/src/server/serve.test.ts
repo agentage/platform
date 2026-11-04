@@ -1,6 +1,6 @@
 import express from 'express';
 import { describe, expect, it, vi } from 'vitest';
-import { createTestContext } from '../context/context.js';
+import { createTestContext } from '../context/test-context.js';
 import { listen, serve, shutdownOn } from './serve.js';
 
 describe('serve', () => {

@@ -3,9 +3,8 @@
 Everything an agentage extension author imports or runs, and no product code. Two packages:
 
 - [`@agentage/extension`](packages/extension): the extension kit (a part exports only
-  `create(ctx)`; the kit owns the server, `/health`, discovery, the correlation id and the response
-  envelope) and its build tool (one image per part from the kit's recipe, pushed to GitHub
-  Container Registry, with a build record of the image digests).
+  `create(ctx)`; the kit owns servers, `/health`, discovery, the correlation id, the envelope, the
+  store and the scheduler) and its tool (one image per part, `up` on a laptop, dev tokens).
 - [`@agentage/widget`](packages/widget): the ui part. React widgets as custom elements in a
   shadow root, the host bridge (`useHost`), design-system `Button` and `Card`, and the bundler
   with its harness page.
@@ -17,63 +16,95 @@ npm ci
 npm run build
 ```
 
-## Write an api part
+## Write the parts
+
+Each part of an extension package exports only `create(ctx)`; the kit owns servers, ports,
+`/health`, discovery, the envelope, the store connection, the scheduler and argument parsing.
 
 ```ts
-// src/api/index.ts of an extension package; the kit mounts it at /api/v1/
-import { Router } from 'express';
-import { ok, parse, type PartContext } from '@agentage/extension';
-import { z } from 'zod';
-
-const EchoQuery = z.object({ msg: z.string().min(1) });
-
-export const create = (_ctx: PartContext): Router => {
-  const router = Router();
-  router.get('/echo', (req, res) => {
-    const { msg } = parse(EchoQuery, req.query);
-    res.json(ok({ msg }));
-  });
-  return router;
+// src/api/index.ts: an Express router mounted at /api/v1/
+export const create = (ctx: PartContext): Router => {
+  /* ctx.store.query(...) */
 };
-```
-
-The manifest is the `agentage` block of the extension's `package.json`:
-
-```json
-{
-  "name": "@agentage/extension-probe",
-  "version": "0.1.0",
-  "engines": { "agentage": "^0.1" },
-  "agentage": { "id": "probe", "parts": { "api": true } }
+// src/mcp/index.ts: tools served as {id}__{name} on POST /mcp (SDK v2, stateless)
+export function create(ctx: McpContext) {
+  ctx.tool(
+    'echo',
+    { description, input: z.object({ msg: z.string() }), output: z.object({ msg: z.string() }) },
+    async ({ msg }) => ({ msg: `pong ${msg}` })
+  );
 }
+// src/worker/index.ts: five-field cron, never twice at once, every run saved with its log
+export function create({ schedule, store, log }: WorkerContext) {
+  schedule(
+    'tick',
+    '* * * * *',
+    async () => {
+      /* ... */
+    },
+    { timeout: '30s' }
+  );
+}
+// src/cli/index.ts: one handler per command in agentage.commands
+export function create({ out, args }: CliContext) {
+  return { ping: async () => (out.log('pong'), 0) };
+}
+// src/pages/index.ts: path -> HTML (a static page in kit 0.2)
+export const create = (ctx: PagesContext): PagesSite => ({ '/': versionPage(ctx) });
 ```
 
-Unit tests run the part inside the kit's real app: `startTestServer({ create, ctx: createTestContext() })`.
+The ui part is a `widgets` map on [`@agentage/widget`](packages/widget). A postgres store adds
+`migrations/NNN-name.sql` (applied in order, each once, recorded in `_migrations`) and `seeds/`
+(applied once, only on an empty store); `ctx.store` is a ready pool. Worker runs land in
+`agentage_job_runs` (job, start, end, status, log capped at 64 KB, the last 50 per job; in memory
+without a store), and `/health` reports `job:{name}`. Commands answer `out.log/warn/error/table/json/
+fail`; exit codes 0 ok, 2 usage, 1 failure; `--json` routes only `out.json` to stdout.
 
-## Build the images
+The manifest is the `agentage` block of the extension's `package.json` (see
+[extension-probe](https://github.com/agentage/extension-probe) for every part kind).
+
+Unit tests: `createTestContext()` (a recording log, scheduled jobs you run with `runJob`, tools,
+`{ store: true }` for a throwaway in-process postgres with the package's migrations and seeds,
+`{ args }` for a command ctx that records its output), `startTestServer({ create })` for an api
+part and `startTestMcp({ create })` with `mcpSnapshot(url, '2025-11-25' | '2026-07-28')` for the
+committed `{id}.mcpc.json`.
+
+## The tool: build, up, token
 
 ```bash
-node packages/extension/dist/tool/cli.js build --dir ../extension-probe          # build only
-node packages/extension/dist/tool/cli.js build --dir ../extension-probe --push   # push + record
+node packages/extension/dist/tool/cli.js build [--push] [--dir <ext>] [--registry <host/owner>]
+node packages/extension/dist/tool/cli.js up [--dir <ext>]       # agentage extension up
+node packages/extension/dist/tool/cli.js down [--keep-data]
+node packages/extension/dist/tool/cli.js token --scope probe:read
 ```
 
 `build` validates the manifest, runs the package's `npm run build`, then builds one image per part
-from the kit recipe (multi-stage `node:26-alpine`, `npm ci --omit=dev`, `USER node`,
-`COMMIT_SHA`/`BUILD_TIME` as `ENV`, a `HEALTHCHECK` on `127.0.0.1`) tagged
-`ghcr.io/agentage/{id}-{part}:{version}`, with the OCI labels `org.opencontainers.image.revision`
-(the full commit sha) and `org.opencontainers.image.created`. `--push` pushes each image and writes
-`dist/agentage-extension.json`, the build record with every image by digest. `--registry` points at
-another registry (a local one for tests). The cli runs the same code as `agentage extension build`
-through the `@agentage/extension/tool` exports.
+(pages, ui, api, mcp, worker) from the kit recipe (multi-stage `node:26-alpine`, `npm ci
+--omit=dev`, `USER node`, `COMMIT_SHA`/`BUILD_TIME`, a `HEALTHCHECK` on `127.0.0.1`), tagged
+`ghcr.io/agentage/{id}-{part}:{version}` with the OCI revision and created labels. Each image
+carries only `dist/{part}` and `dist/lib`; the api image also carries `openapi.json`,
+`migrations/`, `seeds/` and the migrate entry `node dist/store/migrate.js`. `--push` pushes and
+writes `dist/agentage-extension.json` (images by digest, tools, commands, widgets, the store and
+its migration count, the OpenAPI path).
+
+`up` builds the same images, writes `.agentage/record.json` from the local digests, renders one
+compose file (postgres 18 with the migrate job first, a dev token issuer on `localhost:4281`, a
+Traefik gateway on `localhost:4280` with the deployment URL layout, one container per part) and
+prints one line per step, ending `ready N parts healthy`. `down` removes it all (`--keep-data`
+keeps the store volume). `token` mints a dev token (`aga_` + EdDSA JWT, `{id}:{verb}` scopes) that
+nothing verifies yet. The cli runs the same code as `agentage extension build|up|down|token`
+through `@agentage/extension/tool`, plus `runCommand` and `checkCli` for installed commands.
 
 ## Run a part image
 
-|                                        |                                                                                                                                                                  |
-| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Port                                   | `3000` (`PORT` overrides)                                                                                                                                        |
-| `/health`                              | answers on loopback only (the container `HEALTHCHECK`, an operator inside the node); `404` from any other address                                                |
-| `/.well-known/agentage-extension.json` | the build record mounted at `/run/agentage/agentage-extension.json` (`AGENTAGE_RECORD_FILE` overrides) plus the host; without a record it lists the image by tag |
-| `AGENTAGE_ORIGIN`                      | the deployment's origin, e.g. `https://probe.example.com`; else taken from the request                                                                           |
+|                                        |                                                                                                     |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Entry                                  | `node node_modules/@agentage/extension/dist/runtime/main.js <part>`; port `3000` (`PORT` overrides) |
+| `/health`                              | loopback only (the container `HEALTHCHECK`, an operator on the node); `404` from any other address  |
+| `/.well-known/agentage-extension.json` | the record at `/run/agentage/agentage-extension.json` (`AGENTAGE_RECORD_FILE`) plus the host        |
+| `AGENTAGE_ORIGIN`                      | the deployment's origin; else taken from the request                                                |
+| `AGENTAGE_SETTINGS`                    | JSON of setting values over the manifest defaults                                                   |
+| `AGENTAGE_STORE_URL` / `_FILE`         | the postgres connection (or a file holding it); else libpq `PG*` variables                          |
 
 Schemas for the manifest, the build record, the discovery document, `/health` and the envelope are
 in [`packages/extension/schemas`](packages/extension/schemas), generated from the kit's Zod schemas
@@ -117,5 +148,6 @@ npm run test:e2e      # widget harness and screenshots, Chromium; baselines come
 
 A `v*` tag (or a manual dispatch) runs `.github/workflows/release.yml`, which publishes every
 package version not yet on npm with OIDC trusted publishing and provenance. Before that, CI builds
-[extension-probe](https://github.com/agentage/extension-probe) on the packed kit and runs its smoke
-suite against the image, so a kit change is proven in a container before it ships.
+[extension-probe](https://github.com/agentage/extension-probe) on the packed packages, runs `up`,
+and checks every part image and the served discovery document, so a kit change is proven in
+containers before it ships.

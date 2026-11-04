@@ -1,16 +1,19 @@
-import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { type Server } from 'node:http';
-import { createContext, type PartContext } from '../context/context.js';
+import { createContext, type ServerPartKind } from '../context/context.js';
+import { settingsFromEnv } from '../context/settings.js';
 import { DEFAULT_RECORD_FILE, loadRecord } from '../discovery/discovery.js';
+import { type HealthCheck } from '../health/health.js';
 import { createLog, type Log } from '../log/log.js';
-import { entryOf } from '../manifest/parts.js';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
+import { imageParts, normalizeParts } from '../manifest/parts.js';
+import { type ImagePartKind } from '../manifest/primitives.schema.js';
 import { readManifest } from '../manifest/read-manifest.js';
-import { createApiApp } from '../server/app.js';
-import { type ApiCreate } from '../server/part.types.js';
 import { serve, type ServeOptions } from '../server/serve.js';
+import { createStore, storeCheck } from '../store/store.js';
 import { buildInfoFromEnv, portFromEnv, type Env } from './build-info.js';
+import { RUNNERS, type RunnerInput } from './part-runners.js';
+
+export { createOf } from './part-runners.js';
 
 export interface RunPartOptions {
   dir: string;
@@ -20,14 +23,6 @@ export interface RunPartOptions {
   serve?: Pick<ServeOptions, 'signals' | 'exit'>;
 }
 
-const importFile = (file: string): Promise<unknown> => import(pathToFileURL(file).href);
-
-export const createOf = (mod: unknown, file: string): ApiCreate => {
-  const create = (mod as { create?: unknown } | null)?.create;
-  if (typeof create !== 'function') throw new Error(`${file} does not export create(ctx)`);
-  return create as ApiCreate;
-};
-
 const recordFor = async (env: Env, log: Log) => {
   const file = env['AGENTAGE_RECORD_FILE'] || DEFAULT_RECORD_FILE;
   const record = await loadRecord(file);
@@ -35,26 +30,59 @@ const recordFor = async (env: Env, log: Log) => {
   return record;
 };
 
-const createRouter = async (options: RunPartOptions, ctx: PartContext, pkg: ExtensionPackage) => {
-  const file = join(options.dir, entryOf(pkg, 'api'));
-  const mod = await (options.importModule ?? importFile)(file);
-  return createOf(mod, file)(ctx);
+export const partOf = (pkg: ExtensionPackage, part: string): ImagePartKind => {
+  const parts: string[] = imageParts(pkg);
+  if (!parts.includes(part)) throw new Error(`part ${part} is not an image part of this manifest`);
+  return part as ImagePartKind;
 };
 
-const contextFor = (pkg: ExtensionPackage, origin: string | undefined, port: number, log: Log) =>
-  createContext({ pkg, part: 'api', origin: origin ?? `http://127.0.0.1:${port}`, log });
+// ui serves files and gets no ctx; every other part gets the store when the manifest has postgres.
+const storeFor = (pkg: ExtensionPackage, part: ImagePartKind, env: Env, log: Log) =>
+  part !== 'ui' && normalizeParts(pkg.agentage.parts).store === 'postgres'
+    ? createStore(env, log)
+    : undefined;
+
+const inputFor = async (
+  options: RunPartOptions,
+  pkg: ExtensionPackage,
+  part: ImagePartKind,
+  log: Log
+) => {
+  const { env } = options;
+  const origin = env['AGENTAGE_ORIGIN'] || undefined;
+  const build = buildInfoFromEnv(env);
+  const store = storeFor(pkg, part, env, log);
+  const settings = settingsFromEnv(pkg, env, log);
+  const ctxOrigin = origin ?? `http://127.0.0.1:${portFromEnv(env)}`;
+  const ctxPart = (part === 'ui' ? 'pages' : part) as ServerPartKind;
+  const ctx = createContext({
+    pkg,
+    part: ctxPart,
+    origin: ctxOrigin,
+    commit: build.commit,
+    log,
+    settings,
+    store,
+  });
+  const record = await recordFor(env, log);
+  const checks: Record<string, HealthCheck> = store ? { store: storeCheck(store) } : {};
+  const base = { pkg, build, log, record, origin, ownImage: env['AGENTAGE_IMAGE'], checks };
+  return {
+    dir: options.dir,
+    pkg,
+    ctx,
+    base,
+    importModule: options.importModule,
+  } satisfies RunnerInput;
+};
 
 export const runPart = async (options: RunPartOptions): Promise<Server> => {
-  if (options.part !== 'api') throw new Error(`part ${options.part} is not served by kit 0.1`);
-  const { env } = options;
   const pkg = await readManifest(options.dir);
-  const log = createLog({ extension: pkg.agentage.id, part: 'api' });
-  const port = portFromEnv(env);
-  const origin = env['AGENTAGE_ORIGIN'] || undefined;
-  const router = await createRouter(options, contextFor(pkg, origin, port, log), pkg);
-  const build = buildInfoFromEnv(env);
-  const record = await recordFor(env, log);
-  const ownImage = env['AGENTAGE_IMAGE'];
-  const app = createApiApp({ pkg, build, router, log, record, origin, ownImage });
-  return serve({ app, port, log, ...options.serve });
+  const part = partOf(pkg, options.part);
+  const log = createLog({ extension: pkg.agentage.id, part });
+  const { app, stop } = await RUNNERS[part](await inputFor(options, pkg, part, log));
+  if (stop)
+    for (const signal of options.serve?.signals ?? ['SIGTERM', 'SIGINT'])
+      process.once(signal, stop);
+  return serve({ app, port: portFromEnv(options.env), log, ...options.serve });
 };

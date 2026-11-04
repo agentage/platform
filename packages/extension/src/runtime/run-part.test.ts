@@ -61,8 +61,10 @@ describe('runPart', () => {
     });
   });
 
-  it('refuses parts other than api and modules without create', async () => {
-    await expect(runPart({ dir: '/x', part: 'mcp', env: {} })).rejects.toThrow(/not served/);
+  it('refuses a part the manifest does not have, and modules without create', async () => {
+    const dir = await tempPackage({ 'package.json': json(API_MANIFEST) });
+    await expect(runPart({ dir, part: 'mcp', env: {} })).rejects.toThrow(/not an image part/);
+    await expect(runPart({ dir, part: 'store', env: {} })).rejects.toThrow(/not an image part/);
     expect(() => createOf({ default: () => null }, 'dist/api/index.js')).toThrow(/create\(ctx\)/);
     expect(() => createOf(null, 'x.js')).toThrow(/create\(ctx\)/);
   });

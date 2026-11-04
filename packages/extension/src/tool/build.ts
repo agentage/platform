@@ -1,6 +1,7 @@
 import { rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { recordOf, validateRecord, type BuildInfo } from '../discovery/discovery.js';
+import { type ExtensionRecord } from '../discovery/discovery.schema.js';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
 import { imageParts } from '../manifest/parts.js';
 import { type ImagePartKind } from '../manifest/primitives.schema.js';
@@ -10,11 +11,10 @@ import { resolveBuildInfo } from './build-info.js';
 import { createDocker, type Docker } from './docker.js';
 import { mustRun, runCommand, type Run } from './exec.js';
 import { labelsOf } from './labels.js';
+import { recordExtras } from './record-extras.js';
 import { RECORD_FILE, stageContext } from './stage.js';
 
-const DEFAULT_REGISTRY = 'ghcr.io/agentage';
-
-const SUPPORTED_PARTS: readonly ImagePartKind[] = ['api'];
+export const DEFAULT_REGISTRY = 'ghcr.io/agentage';
 
 export interface BuildOptions {
   dir?: string;
@@ -56,17 +56,6 @@ interface PartJob {
 export const imageTag = (registry: string, pkg: ExtensionPackage, part: ImagePartKind): string =>
   `${registry}/${pkg.agentage.id}-${part}:${pkg.version}`;
 
-const partsToBuild = (pkg: ExtensionPackage): ImagePartKind[] => {
-  const parts = imageParts(pkg);
-  const unsupported = parts.filter((part) => !SUPPORTED_PARTS.includes(part));
-  if (unsupported.length > 0) {
-    throw new Error(
-      `@agentage/extension 0.1 builds the api part only, not: ${unsupported.join(', ')}`
-    );
-  }
-  return parts;
-};
-
 const compile = async (dir: string, pkg: ExtensionPackage, run: Run): Promise<void> => {
   const scripts = (pkg as { scripts?: Record<string, unknown> }).scripts;
   if (typeof scripts?.['build'] === 'string')
@@ -81,12 +70,8 @@ const buildImage = async (job: PartJob, docker: Docker, tmpRoot?: string): Promi
       BUILD_TIME: job.info.buildTime,
       IMAGE: job.tag,
     };
-    await docker.build({
-      context,
-      tag: job.tag,
-      buildArgs,
-      labels: labelsOf(job.pkg, job.part, job.info),
-    });
+    const labels = labelsOf(job.pkg, job.part, job.info);
+    await docker.build({ context, tag: job.tag, buildArgs, labels });
   } finally {
     await rm(context, { recursive: true, force: true });
   }
@@ -98,29 +83,35 @@ const pushImage = async (job: PartJob, docker: Docker): Promise<BuiltImage> => {
   return { part: job.part, tag: job.tag, digest, image: `${repository}@${digest}` };
 };
 
-const writeRecord = async (
+// The record from the code and the images by digest; `up` writes the same shape from local digests.
+export const recordFor = async (
   dir: string,
   pkg: ExtensionPackage,
   info: BuildInfo,
   images: BuiltImage[]
-) => {
+): Promise<ExtensionRecord> => {
   const byPart = Object.fromEntries(images.map((built) => [built.part, built.image]));
-  const record = validateRecord(recordOf(pkg, info, byPart));
-  const file = join(dir, 'dist', RECORD_FILE);
+  return validateRecord(recordOf(pkg, info, byPart, await recordExtras(dir, pkg)));
+};
+
+const writeRecord = async (
+  dir: string,
+  record: ExtensionRecord,
+  file = join(dir, 'dist', RECORD_FILE)
+) => {
   await writeFile(file, `${JSON.stringify(record, null, 2)}\n`);
   return file;
 };
 
 const buildParts = async (
   base: Omit<PartJob, 'part' | 'tag'>,
-  parts: ImagePartKind[],
   options: BuildOptions,
   deps: BuildDeps
 ): Promise<BuiltImage[]> => {
   const docker = deps.docker ?? createDocker(deps.run);
   const registry = options.registry ?? DEFAULT_REGISTRY;
   const images: BuiltImage[] = [];
-  for (const part of parts) {
+  for (const part of imageParts(base.pkg)) {
     const job = { ...base, part, tag: imageTag(registry, base.pkg, part) };
     await buildImage(job, docker, deps.tmpRoot);
     images.push(options.push ? await pushImage(job, docker) : { part, tag: job.tag });
@@ -128,17 +119,19 @@ const buildParts = async (
   return images;
 };
 
+// Validate, compile, one image per part from the kit recipe; --push pushes and writes the record.
 export const build = async (
   options: BuildOptions = {},
   deps: BuildDeps = { run: runCommand }
 ): Promise<BuildResult> => {
   const dir = resolve(options.dir ?? '.');
   const pkg = await readManifest(dir);
-  const parts = partsToBuild(pkg);
   const info = await resolveBuildInfo(dir, options.env ?? process.env, deps.run);
   await compile(dir, pkg, deps.run);
-  const images = await buildParts({ dir, pkg, info }, parts, options, deps);
-  const recordFile = options.push ? await writeRecord(dir, pkg, info, images) : undefined;
+  const images = await buildParts({ dir, pkg, info }, options, deps);
   const result: BuildResult = { id: pkg.agentage.id, version: pkg.version, ...info, images };
-  return recordFile ? { ...result, recordFile } : result;
+  if (!options.push) return result;
+  return { ...result, recordFile: await writeRecord(dir, await recordFor(dir, pkg, info, images)) };
 };
+
+export { writeRecord };

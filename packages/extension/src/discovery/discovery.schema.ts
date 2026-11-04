@@ -26,7 +26,9 @@ const PartsRecordSchema = z
     api: PartImageSchema.optional(),
     mcp: PartImageSchema.optional(),
     worker: PartImageSchema.optional(),
-    store: z.strictObject({ kind: StoreKindSchema }).optional(),
+    store: z
+      .strictObject({ kind: StoreKindSchema, migrations: z.int().min(0).optional() })
+      .optional(),
   })
   .refine((parts) => IMAGE_PART_KINDS.some((kind) => parts[kind] !== undefined), {
     message: 'at least one part with an image',

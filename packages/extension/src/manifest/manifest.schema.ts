@@ -45,6 +45,7 @@ const CommandSchema = z.strictObject({
       z.strictObject({
         name: CommandNameSchema,
         type: ArgTypeSchema,
+        optional: z.boolean().optional(),
         required: z.boolean().optional(),
         description: z.string().min(1).max(200).optional(),
       })
@@ -89,6 +90,7 @@ export const PackageSchema = z
   });
 
 export type CodePart = z.infer<typeof CodePartSchema>;
+export type CommandSpec = z.infer<typeof CommandSchema>;
 export type Parts = z.infer<typeof PartsSchema>;
 export type ExtensionPackage = z.infer<typeof PackageSchema>;
 
