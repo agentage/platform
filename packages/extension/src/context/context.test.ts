@@ -3,17 +3,24 @@ import { describe, expect, it } from 'vitest';
 import { validateManifest } from '../manifest/read-manifest.js';
 import { SPEC_MANIFEST } from '../test-support/packages.js';
 import { startTestServer } from '../testing/test-server.js';
-import { createContext, createTestContext, settingDefaults } from './context.js';
+import { createContext, settingDefaults } from './context.js';
+import { createTestContext } from './test-context.js';
 
 describe('ctx', () => {
   it('carries identity and the declared settings with defaults filled, frozen', () => {
     const pkg = validateManifest(SPEC_MANIFEST);
-    const ctx = createContext({ pkg, part: 'api', origin: 'https://probe.next.agentage.io' });
+    const ctx = createContext({
+      pkg,
+      part: 'api',
+      origin: 'https://probe.next.agentage.io',
+      commit: 'a'.repeat(40),
+    });
     expect(ctx.extension).toEqual({
       id: 'probe',
       version: '0.1.0',
       part: 'api',
       origin: 'https://probe.next.agentage.io',
+      commit: 'a'.repeat(40),
     });
     expect(ctx.settings).toEqual({ 'mcp.listing': 'open' });
     expect(Object.isFrozen(ctx.settings)).toBe(true);

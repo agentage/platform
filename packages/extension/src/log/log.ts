@@ -1,4 +1,4 @@
-import { currentAgcid } from '../agcid/scope.js';
+import { currentAgcid } from '../agcid/current.js';
 
 export type LogLevel = 'info' | 'warn' | 'error';
 

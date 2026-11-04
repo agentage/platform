@@ -1,5 +1,6 @@
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
-import { createLog, messageOf, type Log, type LogFields, type LogLevel } from '../log/log.js';
+import { createLog, type Log } from '../log/log.js';
+import { type Store } from '../store/store.types.js';
 
 export type ServerPartKind = 'pages' | 'api' | 'mcp' | 'worker';
 
@@ -10,14 +11,23 @@ export interface ExtensionInfo {
   version: string;
   part: ServerPartKind;
   origin: string;
+  commit: string;
 }
 
-// The kit 0.1 subset of the host ctx; auth, store, secrets and spans arrive in later versions.
+// The kit 0.2 subset of the host ctx; auth, secrets and spans arrive in later versions.
 export interface PartContext {
   readonly extension: Readonly<ExtensionInfo>;
   readonly log: Log;
   readonly settings: Readonly<Record<string, SettingValue>>;
+  readonly store: Store;
 }
+
+// ctx.store is always there; without a store part in the manifest it says so on first use.
+export const NO_STORE: Store = {
+  query: async () => {
+    throw new Error('this extension declares no store: add parts.store to the manifest');
+  },
+};
 
 export const settingDefaults = (pkg: ExtensionPackage): Record<string, SettingValue> =>
   Object.fromEntries(
@@ -28,51 +38,22 @@ export interface ContextInput {
   pkg: ExtensionPackage;
   part: ServerPartKind;
   origin: string;
+  commit: string;
   log?: Log;
-}
-
-export const createContext = ({ pkg, part, origin, log }: ContextInput): PartContext =>
-  Object.freeze({
-    extension: Object.freeze({ id: pkg.agentage.id, version: pkg.version, part, origin }),
-    log: log ?? createLog({ extension: pkg.agentage.id, part }),
-    settings: Object.freeze(settingDefaults(pkg)),
-  });
-
-export interface LogEntry {
-  level: LogLevel;
-  message: string;
-  fields: LogFields;
-}
-
-export interface TestContext extends PartContext {
-  readonly logs: LogEntry[];
-}
-
-export interface TestContextOptions {
-  extension?: Partial<ExtensionInfo>;
   settings?: Record<string, SettingValue>;
+  store?: Store;
 }
 
-const recordingLog = (logs: LogEntry[]): Log => ({
-  info: (message, fields = {}) => void logs.push({ level: 'info', message, fields }),
-  warn: (message, fields = {}) => void logs.push({ level: 'warn', message, fields }),
-  error: (error, fields = {}) =>
-    void logs.push({
-      level: 'error',
-      message: messageOf(error),
-      fields: { ...fields, err: error },
-    }),
-});
-
-// A ctx for unit tests: fixed identity, settings as given, a log that records what it would print.
-export const createTestContext = (options: TestContextOptions = {}): TestContext => {
-  const logs: LogEntry[] = [];
-  const extension = {
-    id: 'test',
-    version: '0.0.0',
-    part: 'api' as const,
-    origin: 'http://127.0.0.1',
-    ...options.extension,
-  };
-  return { extension, log: recordingLog(logs), settings: { ...options.settings }, logs };
+export const createContext = (input: ContextInput): PartContext => {
+  const { pkg, part, origin, commit, store } = input;
+  const extension = Object.freeze({
+    id: pkg.agentage.id,
+    version: pkg.version,
+    part,
+    origin,
+    commit,
+  });
+  const log = input.log ?? createLog({ extension: pkg.agentage.id, part });
+  const settings = Object.freeze({ ...settingDefaults(pkg), ...input.settings });
+  return Object.freeze({ extension, log, settings, store: store ?? NO_STORE });
 };

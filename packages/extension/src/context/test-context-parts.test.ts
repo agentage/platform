@@ -1,0 +1,80 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
+import { tempPackage } from '../test-support/packages.js';
+import { createTestContext, type TestContext } from './test-context.js';
+
+let ctx: TestContext | undefined;
+afterEach(async () => {
+  await ctx?.close();
+  ctx = undefined;
+  vi.restoreAllMocks();
+});
+
+const PACKAGE = {
+  'migrations/001-ticks.sql': 'create table ticks (id int generated always as identity, job text);',
+  'seeds/001-hello.sql': "insert into ticks (job) values ('seed');",
+};
+
+describe('createTestContext', () => {
+  it('with store, gives a throwaway postgres with the package migrations and seeds', async () => {
+    const dir = await tempPackage(PACKAGE);
+    ctx = createTestContext({ store: { dir } });
+    expect((await ctx.store.query('select job from ticks')).rows).toEqual([{ job: 'seed' }]);
+  });
+
+  it('with store: true, migrates the package in the working folder', async () => {
+    vi.spyOn(process, 'cwd').mockReturnValue(await tempPackage(PACKAGE));
+    ctx = createTestContext({ store: true });
+    const { rows } = await ctx.store.query<{ n: number }>('select count(*)::int as n from ticks');
+    expect(rows).toEqual([{ n: 1 }]);
+  });
+
+  it('without store, ctx.store says so on first use', async () => {
+    ctx = createTestContext();
+    await expect(ctx.store.query('select 1')).rejects.toThrow(/declares no store/);
+    expect(ctx.extension).toMatchObject({ id: 'test', version: '0.0.0', part: 'api' });
+  });
+
+  it('runs a scheduled job by name and records its log', async () => {
+    ctx = createTestContext();
+    const { log } = ctx;
+    ctx.schedule('tick', '* * * * *', () => log.info('ticked'));
+    const run = await ctx.runJob('tick');
+    expect(run).toMatchObject({ job: 'tick', status: 'ok', log: 'info ticked\n' });
+    expect(ctx.logs.map((entry) => entry.message)).toEqual(['ticked']);
+    expect(await ctx.runJob('nope')).toBeUndefined();
+  });
+
+  it('records registered tools', () => {
+    ctx = createTestContext();
+    const spec = { description: 'Echo', input: z.object({}), output: z.object({}) };
+    ctx.tool('echo', spec, () => ({}));
+    expect(ctx.tools.map((tool) => tool.name)).toEqual(['echo']);
+  });
+});
+
+describe('createTestContext for a command', () => {
+  it('records stdout, stderr and the exit code', () => {
+    const cmd = createTestContext({ args: { msg: 'hi' }, extension: { id: 'probe' } });
+    expect(cmd.extension).toEqual({ id: 'probe', version: '0.0.0', part: 'cli' });
+    expect(cmd.args).toEqual({ msg: 'hi' });
+    cmd.out.log('pong %s', cmd.args['msg']);
+    cmd.out.table([{ a: 1 }]);
+    cmd.out.warn('careful\nreally');
+    expect(cmd.exitCode).toBeUndefined();
+    cmd.out.fail(3, 'nope');
+    expect(cmd.output).toEqual({
+      stdout: ['pong hi', 'a', '1'],
+      stderr: ['careful', 'really', 'nope'],
+    });
+    expect(cmd.exitCode).toBe(3);
+  });
+
+  it('with json, keeps stdout for out.json only', () => {
+    const cmd = createTestContext({ args: {}, json: true });
+    cmd.out.log('progress');
+    cmd.out.json({ ok: true });
+    expect(cmd.output.stdout).toEqual(['{', '  "ok": true', '}']);
+    expect(cmd.output.stderr).toEqual(['progress']);
+  });
+});

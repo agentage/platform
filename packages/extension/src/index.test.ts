@@ -6,6 +6,7 @@ import * as tool from './tool/index.js';
 describe('public surface', () => {
   it('the kit exports no server, listener or record loader', () => {
     expect(Object.keys(kit).sort()).toEqual([
+      'AGCID_HEADER',
       'DiscoveryDocumentSchema',
       'ERROR_CODES',
       'ERROR_STATUS',
@@ -13,20 +14,37 @@ describe('public surface', () => {
       'ExtensionRecordSchema',
       'HealthSchema',
       'OkEnvelopeSchema',
+      'PROTOCOL_VERSIONS',
       'PackageSchema',
+      'canonical',
       'createTestContext',
       'fail',
       'imageParts',
+      'isAgcid',
       'isFailure',
+      'mcpSnapshot',
       'ok',
       'parse',
       'readManifest',
+      'startTestMcp',
       'startTestServer',
       'validateManifest',
+      'versionPage',
     ]);
   });
 
   it('the tool exports what the cli calls', () => {
-    expect(Object.keys(tool).sort()).toEqual(['build', 'buildLines']);
+    expect(Object.keys(tool).sort()).toEqual([
+      'KIT_VERSION',
+      'build',
+      'buildLines',
+      'checkCli',
+      'down',
+      'readManifest',
+      'runCommand',
+      'token',
+      'up',
+      'validateManifest',
+    ]);
   });
 });

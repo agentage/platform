@@ -1,0 +1,47 @@
+import { type z } from 'zod';
+import { type PartContext } from '../context/context.js';
+
+type ObjectSchema = z.ZodObject;
+
+export interface ToolSpec<I extends ObjectSchema, O extends ObjectSchema> {
+  description: string;
+  input: I;
+  output: O;
+}
+
+export type ToolHandler<I extends ObjectSchema, O extends ObjectSchema> = (
+  args: z.output<I>
+) => z.input<O> | Promise<z.input<O>>;
+
+// Registers a tool under its own name; the kit serves it as {id}__{name}.
+export type ToolRegistrar = <I extends ObjectSchema, O extends ObjectSchema>(
+  name: string,
+  spec: ToolSpec<I, O>,
+  handler: ToolHandler<I, O>
+) => void;
+
+export interface McpContext extends PartContext {
+  readonly tool: ToolRegistrar;
+}
+
+export interface ToolEntry {
+  name: string;
+  spec: ToolSpec<ObjectSchema, ObjectSchema>;
+  handler: (args: Record<string, unknown>) => unknown;
+}
+
+const TOOL_NAME = /^[a-z][a-z0-9_-]*$/;
+
+export const createToolRegistry = () => {
+  const tools: ToolEntry[] = [];
+  const tool: ToolRegistrar = (name, spec, handler) => {
+    if (!TOOL_NAME.test(name)) throw new Error(`tool name ${name}: lowercase, digits, _ and -`);
+    if (tools.some((entry) => entry.name === name))
+      throw new Error(`tool ${name} is registered twice`);
+    if (!spec.description) throw new Error(`tool ${name} needs a description: it routes the model`);
+    tools.push({ name, spec, handler: handler as ToolEntry['handler'] });
+  };
+  return { tool, tools };
+};
+
+export const prefixed = (id: string, name: string): string => `${id}__${name}`;

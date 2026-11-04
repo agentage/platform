@@ -213,6 +213,9 @@
                         "boolean"
                       ]
                     },
+                    "optional": {
+                      "type": "boolean"
+                    },
                     "required": {
                       "type": "boolean"
                     },

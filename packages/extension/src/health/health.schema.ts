@@ -18,7 +18,7 @@ export const HealthSchema = z.strictObject({
     instance: z.string().regex(/^[0-9a-f]{8,32}$/),
     uptimeSeconds: z.int().min(0),
     checkedAt: z.iso.datetime(),
-    checks: z.record(z.string().regex(/^[a-z][a-z0-9-]*$/), HealthStatusSchema),
+    checks: z.record(z.string().regex(/^[a-z][a-z0-9-]*(:[a-z][a-z0-9-]*)?$/), HealthStatusSchema),
   }),
 });
 

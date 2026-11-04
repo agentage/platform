@@ -90,13 +90,15 @@ describe('build', () => {
     expect(result.buildTime).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/);
   });
 
-  it('refuses a short commit and the parts kit 0.1 does not build', async () => {
+  it('refuses a short commit and a part the package build did not write', async () => {
     const f = fakes();
     const dir = await probeDir();
     const short = build({ dir, env: { COMMIT_SHA: '9f2c3e1' } }, { run: f.run, docker: f.docker });
     await expect(short).rejects.toThrow(/full 40-hex sha/);
     const full = await probeDir(SPEC_MANIFEST);
-    await expect(build({ dir: full, env: ENV }, f)).rejects.toThrow(/api part only/);
+    await expect(build({ dir: full, env: ENV }, f)).rejects.toThrow(
+      'dist/pages/index.js not found: the package build must write the pages part there'
+    );
   });
 
   it('names images ghcr.io/agentage/{id}-{part}:{version}', () => {

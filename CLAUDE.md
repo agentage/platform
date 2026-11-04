@@ -14,15 +14,21 @@ security, backend); this file only adds what the tree does not say.
 ## Layout (`packages/extension/src`)
 
 - `envelope/` ok, fail, parse, the closed error codes; `agcid/` UUIDv7, the request scope
+  (`current.ts` has no express import, so logs and the tool stay loadable by the cli)
 - `manifest/` the Zod manifest (`package.json` `agentage` key), parts normalization, reader
-- `discovery/` the build record and the served discovery document
-- `health/`, `server/` (the kit app, errors, listen and shutdown), `runtime/` (the image entry
-  `dist/runtime/main.js <part>`), `context/` (ctx and `createTestContext`), `testing/`
-- `tool/` the build tool, exported as `@agentage/extension/tool`; it must not import the server
-  stack (`tool-imports.test.ts` guards it, the cli loads it)
-- `index.test.ts` pins both public surfaces: authors get the envelope, schemas, `createTestContext`
-  and `startTestServer`, never the server, port or record loader (sealing); the cli gets `build`
-  and `buildLines`
+- `discovery/` the build record, the served discovery document, the committed `openapi.json`
+- `context/` ctx, settings from `AGENTAGE_SETTINGS`, `createTestContext` (parts and commands)
+- `server/` the kit app every part runs (`createPartApp`), errors, listen and shutdown
+- `runtime/` the image entry `dist/runtime/main.js <part>` and `RUNNERS`, one per part kind
+- `mcp/` tool registry, SDK v2 server factory, the `/mcp` app, the two-era snapshot client
+- `worker/` cron, scheduler (no overlap, run log capture), `agentage_job_runs`
+- `store/` the pg pool, migrations and seeds, the migrate entry `dist/store/migrate.js`, the
+  in-process test store (PGlite, an optional peer)
+- `pages/`, `ui/` the static page helper and the ui file server; `command/` the cli part runner
+- `tool/` build, the per-part stage and recipe, the record extras, `up/` (compose, gateway,
+  dev issuer, wait, down, token); exported as `@agentage/extension/tool`; it must not import the
+  server stack (`tool-imports.test.ts` guards it, the cli loads it)
+- `index.test.ts` pins both public surfaces (sealing)
 - `schemas/` JSON Schema generation; `test-support/` fixtures, excluded from the build
 
 ## Layout (`packages/widget`)
@@ -49,7 +55,10 @@ security, backend); this file only adds what the tree does not say.
 - The record is mounted into the container at deploy time: an image cannot carry its own digest.
 - `/health` checks the socket's local address, so a published Docker port answers 404 by design;
   use `--network host` or `docker exec` to read it.
-- Kit 0.1 serves and builds the api part only; other parts fail loudly in `build` and `runPart`.
-- CI's image smoke clones extension-probe master and installs the packed kit into it: a probe
-  change can turn this CI red, and a kit change that breaks the probe never reaches npm.
+- `ctx.store` is always present; without a store part it throws on first use.
+- The pages part is a kit-served static map in 0.2 (Next.js pages are a later kit).
+- `mcp.listing: token` closes `tools/list` with 401 until the kit verifies tokens.
+- CI's image smoke clones extension-probe master, installs the packed packages it uses and runs
+  `up`: a probe change can turn this CI red, and a kit change that breaks the probe never reaches
+  npm.
 - Public repo: no secrets, no internal hosts, no provider names, no roadmap in code or docs.
