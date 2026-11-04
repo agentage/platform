@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import apiError from '../test-support/fixtures/api-error.json' with { type: 'json' };
 import noAgcid from '../test-support/fixtures/neg-api-error-no-agcid.json' with { type: 'json' };
 import { ERROR_CODES, ERROR_STATUS } from './codes.js';
-import { errorEnvelope, fail, isFailure, ok } from './envelope.js';
+import { errorEnvelope, fail, isFailure, ok, type Failure } from './envelope.js';
 import { ErrorEnvelopeSchema, OkEnvelopeSchema } from './envelope.schema.js';
 import { parse } from './parse.js';
 import { z } from 'zod';
@@ -72,22 +72,25 @@ describe('parse', () => {
     expect(parse(Query, { msg: 'hi', n: '2' })).toEqual({ msg: 'hi', n: 2 });
   });
 
-  it('throws VALIDATION_ERROR with one detail per field', () => {
+  const failureOf = (run: () => unknown): Failure => {
     try {
-      parse(Query, {});
-      expect.unreachable();
+      run();
     } catch (err) {
-      expect(isFailure(err) && err.code).toBe('VALIDATION_ERROR');
-      expect(isFailure(err) && err.details?.map((d) => d.field)).toEqual(['msg']);
+      if (isFailure(err)) return err;
     }
+    throw new Error('expected a kit failure');
+  };
+
+  it('throws VALIDATION_ERROR 400 with one detail per field', () => {
+    const failure = failureOf(() => parse(Query, { n: 'x' }));
+    expect(failure).toMatchObject({ code: 'VALIDATION_ERROR', status: 400 });
+    expect(failure.message).toBe('Invalid request');
+    expect(failure.details?.map((d) => d.field)).toEqual(['msg', 'n']);
   });
 
-  it('names the root when the value itself is wrong', () => {
-    expect(() => parse(z.string(), 1, 'Invalid body')).toThrow('Invalid body');
-    try {
-      parse(z.string(), 1);
-    } catch (err) {
-      expect(isFailure(err) && err.details?.[0]?.field).toBe('(root)');
-    }
+  it('names the root when the value itself is wrong, and takes a message', () => {
+    const failure = failureOf(() => parse(z.string(), 1, 'Invalid body'));
+    expect(failure.message).toBe('Invalid body');
+    expect(failure.details?.map((d) => d.field)).toEqual(['(root)']);
   });
 });
