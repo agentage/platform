@@ -11,3 +11,6 @@ packages/*/src/**/*.js
 packages/*/src/**/*.js.map
 packages/*/src/**/*.d.ts
 packages/*/src/**/*.d.ts.map
+packages/widget/src/ds/styles.generated.ts
+test-results/
+playwright-report/

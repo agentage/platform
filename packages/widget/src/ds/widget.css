@@ -1,0 +1,38 @@
+/* Source of the widget sheet; scripts/build-css.mjs compiles it into styles.generated.ts. */
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/preflight.css' layer(base);
+@import 'tailwindcss/utilities.css' layer(utilities);
+@import '@agentage/design-system/primitives.css';
+@import '@agentage/design-system/styles/tokens.css';
+
+@source '../';
+@source not '../**/*.test.*';
+@source not '../test-support';
+
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-border);
+  }
+
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+:host {
+  display: block;
+  color-scheme: dark;
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: light) {
+  :host {
+    color-scheme: light;
+  }
+}

@@ -45,6 +45,17 @@ jobs:
           if grep -q '\.test\.' /tmp/pack/files.txt; then echo 'test files in the tarball'; exit 1; fi
           node packages/extension/dist/tool/cli.js --help
 
+      - name: Pack smoke - widget (bin and harness in, tests out)
+        run: |
+          set -euo pipefail
+          npm pack -w @agentage/widget --pack-destination /tmp/pack
+          tar -tzf /tmp/pack/agentage-widget-*.tgz > /tmp/pack/widget-files.txt
+          grep -qx 'package/dist/bundle/cli.js' /tmp/pack/widget-files.txt
+          grep -qx 'package/dist/ds/styles.generated.js' /tmp/pack/widget-files.txt
+          grep -qx 'package/harness/harness.html' /tmp/pack/widget-files.txt
+          if grep -Eq '\.test\.|test-support|/e2e/' /tmp/pack/widget-files.txt; then echo 'test files in the widget tarball'; exit 1; fi
+          node packages/widget/dist/bundle/cli.js --help
+
       - name: Image smoke - build extension-probe on this kit
         run: |
           set -euo pipefail
@@ -80,3 +91,32 @@ jobs:
       - name: Container log on failure
         if: failure()
         run: docker logs probe-api || true
+
+  widget-screenshots:
+    name: Widget screenshots
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      options: --user 1001
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Harness, echo widget and light and dark screenshots (Chromium)
+        run: npm run test:e2e
+
+      - name: Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: widget-playwright-report
+          path: |
+            packages/widget/playwright-report
+            packages/widget/test-results
+          retention-days: 7
