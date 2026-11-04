@@ -1,10 +1,14 @@
 # platform
 
-Everything an agentage extension author imports or runs, and no product code. Today it holds one
-package, [`@agentage/extension`](packages/extension): the extension kit (a part exports only
-`create(ctx)`; the kit owns the server, `/health`, discovery, the correlation id and the response
-envelope) and its build tool (one image per part from the kit's recipe, pushed to GitHub Container
-Registry, with a build record of the image digests).
+Everything an agentage extension author imports or runs, and no product code. Two packages:
+
+- [`@agentage/extension`](packages/extension): the extension kit (a part exports only
+  `create(ctx)`; the kit owns the server, `/health`, discovery, the correlation id and the response
+  envelope) and its build tool (one image per part from the kit's recipe, pushed to GitHub
+  Container Registry, with a build record of the image digests).
+- [`@agentage/widget`](packages/widget): the ui part. React widgets as custom elements in a
+  shadow root, the host bridge (`useHost`), design-system `Button` and `Card`, and the bundler
+  with its harness page.
 
 ## Install
 
@@ -75,10 +79,38 @@ Schemas for the manifest, the build record, the discovery document, `/health` an
 in [`packages/extension/schemas`](packages/extension/schemas), generated from the kit's Zod schemas
 (`npm run build && npm run schemas`).
 
+## Write a widget
+
+`src/ui/index.ts` exports `widgets = { echo: Echo }`, each a React component
+([example](packages/widget/README.md)). The kit gives:
+
+| Import                      | Gives                                                                                                                                                                                                                                                        |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `@agentage/widget`          | `useHost()`: `tool(name, args)` resolves the tool's `structuredContent` (rejects with its `error.code`), `api(path, init)` resolves the `/api/v1` envelope's `data`, `context` (extension, version, path, theme); types `Host`, `HostContext`, `ToolOutputs` |
+| `@agentage/widget/ds`       | design-system `Button` and `Card` (`title` plus children) styled inside the shadow root; light and dark follow `prefers-color-scheme`                                                                                                                        |
+| `@agentage/widget/register` | `registerWidgets(id, widgets, { version })`: defines `{id}-{kebab name}` once, open shadow root, adopted sheet, React root that shows an error box when the widget throws                                                                                    |
+| `@agentage/widget/bundle`   | `bundle({ dir })`, also the bin `agentage-widget bundle [--dir <ext>]` (exit 0 ok, 1 failure, 2 usage)                                                                                                                                                       |
+
+The bundler reads `agentage.id` and `version` from the extension's `package.json` and writes
+`dist/ui/`: `{id}.js` (one minified self-contained ESM module: React, components, CSS; it calls
+`registerWidgets` on load), `widgets.json` (`[{ name, element, module: "/ui/{version}/{id}.js" }]`,
+names read from a node build of the map), `harness.html` and `harness.js`.
+
+The harness page mounts every widget from `widgets.json` (or `?widget=<name>`) and bridges
+`tool` to `POST /mcp` as one 2026-07-28 JSON-RPC `tools/call` (`MCP-Protocol-Version`,
+`Mcp-Method`, `Mcp-Name` headers, a JSON or `text/event-stream` answer) and `api` to
+`/api/v1{path}`. Its token: `?token=` wins; on `localhost` or `127.0.0.1` it asks the dev issuer
+at `http://localhost:4281/token` for `{id}:read`; else it calls anonymously. The token stays in
+the bridge. The page has no inline script, so it runs under the ui part's CSP.
+
+A shell mounts a widget by setting the element's `host` before it connects; without one the
+element uses `globalThis.__agentageHost?.(element)`, else an anonymous same-origin bridge.
+
 ## Verify
 
 ```bash
 npm run verify
+npm run test:e2e      # widget harness and screenshots, Chromium; baselines come from the CI container
 ```
 
 ## Release

@@ -10,10 +10,17 @@ export default [
       '**/coverage/**',
       '**/node_modules/**',
       'packages/extension/schemas/**',
+      'packages/widget/src/ds/styles.generated.ts',
+      '**/test-results/**',
+      '**/playwright-report/**',
     ],
   },
   {
-    files: ['packages/*/src/**/*.ts'],
+    files: [
+      'packages/*/src/**/*.{ts,tsx}',
+      'packages/widget/e2e/**/*.ts',
+      'packages/widget/*.config.ts',
+    ],
     languageOptions: {
       parser: tsParser,
       parserOptions: {

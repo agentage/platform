@@ -1,0 +1,71 @@
+{
+  "name": "@agentage/widget",
+  "version": "0.1.0",
+  "description": "The agentage widget kit: useHost, design-system Button and Card in a shadow root, registerWidgets, and the ui bundler with its harness page",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/agentage/platform.git",
+    "directory": "packages/widget"
+  },
+  "homepage": "https://agentage.io",
+  "bugs": {
+    "url": "https://github.com/agentage/platform/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./ds": {
+      "types": "./dist/ds/index.d.ts",
+      "default": "./dist/ds/index.js"
+    },
+    "./register": {
+      "types": "./dist/register/index.d.ts",
+      "default": "./dist/register/index.js"
+    },
+    "./bundle": {
+      "types": "./dist/bundle/index.d.ts",
+      "default": "./dist/bundle/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "agentage-widget": "dist/bundle/cli.js"
+  },
+  "files": [
+    "dist",
+    "harness",
+    "!dist/**/*.test.*",
+    "!dist/test-support"
+  ],
+  "scripts": {
+    "css": "node scripts/build-css.mjs",
+    "build": "npm run css && tsc -b",
+    "verify": "npm run verify --prefix ../..",
+    "test:e2e": "playwright test",
+    "prepublishOnly": "npm run verify"
+  },
+  "dependencies": {
+    "@agentage/design-system": "^0.19.2",
+    "esbuild": "^0.28.2",
+    "zod": "^4.2.0"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "keywords": [
+    "agentage",
+    "extension",
+    "widget"
+  ]
+}

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="agentage-extension" content="{{id}}" />
+    <meta name="agentage-version" content="{{version}}" />
+    <title>{{id}} {{version}} widgets</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        background: oklch(0.085 0.013 277);
+        color: oklch(0.97 0.003 277);
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          color-scheme: light;
+          background: oklch(1 0 0);
+          color: oklch(0.18 0.032 277);
+        }
+      }
+      body {
+        margin: 0;
+        padding: 24px;
+        font-family: system-ui, sans-serif;
+      }
+      main {
+        display: grid;
+        gap: 16px;
+        max-width: 420px;
+      }
+    </style>
+    <script type="module" src="./harness.js"></script>
+  </head>
+  <body>
+    <main id="widgets" aria-label="{{id}} widgets"></main>
+  </body>
+</html>

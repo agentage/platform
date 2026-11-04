@@ -22,5 +22,5 @@
     "sourceMap": true
   },
   "files": [],
-  "references": [{ "path": "packages/extension" }]
+  "references": [{ "path": "packages/extension" }, { "path": "packages/widget" }]
 }

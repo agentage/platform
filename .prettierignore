@@ -5,3 +5,6 @@ package-lock.json
 *.snap
 *.tsbuildinfo
 packages/extension/schemas
+packages/widget/src/ds/styles.generated.ts
+test-results
+playwright-report
