@@ -1,7 +1,8 @@
 import { type ImagePartKind } from '../manifest/primitives.schema.js';
 
-export const PART_PORT = 3000;
+const PART_PORT = 3000;
 
+// 503 passes: a restart cannot fix a dependency outage, so only a dead or 404 part is unhealthy.
 const HEALTH_PROBE =
   `fetch('http://127.0.0.1:${PART_PORT}/health')` +
   '.then((r) => process.exit(r.status === 200 || r.status === 503 ? 0 : 1), () => process.exit(1))';

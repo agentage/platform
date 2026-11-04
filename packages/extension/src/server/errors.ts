@@ -11,7 +11,7 @@ const bodyParserFailure = (err: unknown): Failure | null => {
 };
 
 // Anything that is not a kit failure is an INTERNAL 500 with a generic message; the log has it whole.
-export const toFailure = (err: unknown): Failure => {
+const toFailure = (err: unknown): Failure => {
   if (isFailure(err)) return err;
   return bodyParserFailure(err) ?? fail('INTERNAL', 'Internal error');
 };

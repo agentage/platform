@@ -56,10 +56,11 @@ jobs:
           npm install --no-audit --no-fund ./.kit/kit.tgz
           node node_modules/@agentage/extension/dist/tool/cli.js build
 
-      - name: Image smoke - start it, wait for its HEALTHCHECK
+      - name: Image smoke - revision label is this commit, start it, wait for its HEALTHCHECK
         run: |
           set -euo pipefail
           image="ghcr.io/agentage/probe-api:$(node -p "require('/tmp/probe/package.json').version")"
+          docker inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image" | grep -qx "$GITHUB_SHA"
           docker run -d --name probe-api --network host "$image"
           for i in $(seq 1 30); do
             state=$(docker inspect -f '{{.State.Health.Status}}' probe-api)

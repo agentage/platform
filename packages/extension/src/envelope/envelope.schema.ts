@@ -2,9 +2,9 @@ import { z } from 'zod';
 import { AGCID_PATTERN } from '../agcid/agcid.js';
 import { ERROR_CODES } from './codes.js';
 
-export const AgcidSchema = z.string().regex(AGCID_PATTERN);
+const AgcidSchema = z.string().regex(AGCID_PATTERN);
 
-export const ErrorCodeSchema = z.enum(ERROR_CODES as [string, ...string[]]);
+const ErrorCodeSchema = z.enum(ERROR_CODES as [string, ...string[]]);
 
 export const ErrorEnvelopeSchema = z.strictObject({
   success: z.literal(false),

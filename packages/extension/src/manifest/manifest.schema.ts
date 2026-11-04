@@ -21,7 +21,7 @@ const StorePartSchema = z.union([StoreKindSchema, z.strictObject({ kind: StoreKi
 
 const ROUTED = ['pages', 'ui', 'api', 'mcp'] as const;
 
-export const PartsSchema = z
+const PartsSchema = z
   .strictObject({
     pages: CodePartSchema.optional(),
     ui: CodePartSchema.optional(),
@@ -37,7 +37,7 @@ export const PartsSchema = z
 
 const ArgTypeSchema = z.enum(['string', 'integer', 'number', 'boolean']);
 
-export const CommandSchema = z.strictObject({
+const CommandSchema = z.strictObject({
   name: CommandNameSchema,
   summary: z.string().min(1).max(120),
   args: z
@@ -52,7 +52,7 @@ export const CommandSchema = z.strictObject({
     .optional(),
 });
 
-export const SettingSchema = z
+const SettingSchema = z
   .strictObject({
     type: ArgTypeSchema,
     default: z.union([z.string(), z.number(), z.boolean()]),
@@ -74,7 +74,7 @@ const AgentageBaseSchema = z.strictObject({
   secrets: z.array(SecretNameSchema).optional(),
 });
 
-export const AgentageSchema = AgentageBaseSchema.superRefine(crossFieldRules);
+const AgentageSchema = AgentageBaseSchema.superRefine(crossFieldRules);
 
 export const PackageSchema = z
   .looseObject({
@@ -90,7 +90,6 @@ export const PackageSchema = z
 
 export type CodePart = z.infer<typeof CodePartSchema>;
 export type Parts = z.infer<typeof PartsSchema>;
-export type Agentage = z.infer<typeof AgentageSchema>;
 export type ExtensionPackage = z.infer<typeof PackageSchema>;
 
 function isOn(part: CodePart | undefined): boolean {

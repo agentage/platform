@@ -10,7 +10,7 @@ import {
 } from '../manifest/primitives.schema.js';
 
 // registry host[:port]/owner/{id}-{part}@sha256: deployed by digest, a version's images never change.
-export const ImageDigestRefSchema = z
+const ImageDigestRefSchema = z
   .string()
   .max(256)
   .regex(
@@ -19,7 +19,7 @@ export const ImageDigestRefSchema = z
 
 const PartImageSchema = z.strictObject({ image: ImageDigestRefSchema });
 
-export const PartsRecordSchema = z
+const PartsRecordSchema = z
   .strictObject({
     pages: PartImageSchema.optional(),
     ui: PartImageSchema.optional(),
@@ -32,7 +32,7 @@ export const PartsRecordSchema = z
     message: 'at least one part with an image',
   });
 
-export const OriginSchema = z
+const OriginSchema = z
   .string()
   .max(270)
   .regex(
