@@ -71,4 +71,9 @@ describe('loadRecord', () => {
     await expect(loadRecord(`${dir}/good.json`)).resolves.toEqual(record);
     await expect(loadRecord(`${dir}/bad.json`)).rejects.toThrow(/invalid extension record/);
   });
+
+  it('fails on a record it cannot read, instead of serving the image by tag', async () => {
+    const dir = await tempPackage({ 'record.json/x': '' });
+    await expect(loadRecord(`${dir}/record.json`)).rejects.toThrow(/EISDIR/);
+  });
 });

@@ -1,5 +1,4 @@
-import { readFile } from 'node:fs/promises';
-import { formatIssues } from '../manifest/read-manifest.js';
+import { formatIssues, readJsonIfExists } from '../manifest/read-manifest.js';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
 import { normalizeParts } from '../manifest/parts.js';
 import { type ImagePartKind } from '../manifest/primitives.schema.js';
@@ -40,14 +39,10 @@ export const validateRecord = (value: unknown): ExtensionRecord => {
   throw new Error(`invalid extension record: ${formatIssues(result.error.issues)}`);
 };
 
+// No file means no record is mounted; any other read error stops the part from starting.
 export const loadRecord = async (file: string): Promise<ExtensionRecord | null> => {
-  let text: string;
-  try {
-    text = await readFile(file, 'utf8');
-  } catch {
-    return null; // no record mounted: discovery lists the part's own image by tag
-  }
-  return validateRecord(JSON.parse(text) as unknown);
+  const record = await readJsonIfExists(file);
+  return record === undefined ? null : validateRecord(record);
 };
 
 export const discoveryDocument = (record: ExtensionRecord, host: string) => {

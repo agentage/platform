@@ -16,14 +16,31 @@ export const validateManifest = (value: unknown): ExtensionPackage => {
   );
 };
 
-// The manifest is the `agentage` block of package.json, read as data without running code.
-export const readManifest = async (dir: string): Promise<ExtensionPackage> => {
+const parseJson = (text: string, file: string): unknown => {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch (err) {
+    throw new Error(`${file} is not valid JSON: ${(err as Error).message}`);
+  }
+};
+
+// undefined only for a missing file (JSON never parses to it); any other read error is thrown.
+export const readJsonIfExists = async (file: string): Promise<unknown> => {
   let text: string;
   try {
-    text = await readFile(join(dir, 'package.json'), 'utf8');
+    text = await readFile(file, 'utf8');
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-    throw new Error(`no package.json in ${dir}: run in an extension package folder or pass --dir`);
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    throw err;
   }
-  return validateManifest(JSON.parse(text) as unknown);
+  return parseJson(text, file);
+};
+
+// The manifest is the `agentage` block of package.json, read as data without running code.
+export const readManifest = async (dir: string): Promise<ExtensionPackage> => {
+  const pkg = await readJsonIfExists(join(dir, 'package.json'));
+  if (pkg === undefined) {
+    throw new Error(`no package.json in ${dir}: run it in an extension package folder`);
+  }
+  return validateManifest(pkg);
 };

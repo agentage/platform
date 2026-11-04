@@ -90,10 +90,15 @@ describe('readManifest', () => {
 
   it('says which folder has no package.json, and passes any other read error through', async () => {
     await expect(readManifest('/nonexistent/ext')).rejects.toThrow(
-      'no package.json in /nonexistent/ext: run in an extension package folder or pass --dir'
+      'no package.json in /nonexistent/ext: run it in an extension package folder'
     );
     const dir = await tempPackage({ 'package.json/x': '' });
     await expect(readManifest(dir)).rejects.toThrow(/EISDIR/);
+  });
+
+  it('names the file that is not valid JSON', async () => {
+    const dir = await tempPackage({ 'package.json': '{"name": ' });
+    await expect(readManifest(dir)).rejects.toThrow(`${dir}/package.json is not valid JSON`);
   });
 
   it('names the failing field', async () => {
