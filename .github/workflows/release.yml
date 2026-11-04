@@ -29,22 +29,23 @@ jobs:
           node-version: 22
           cache: 'npm'
 
-      - name: Upgrade npm
-        run: npm install -g npm@latest && npm --version # OIDC needs npm >= 11.5.1
-
       - name: Install
         run: npm ci
 
       - name: Verify
         run: npm run verify
 
-      - name: Publish versions not on npm yet
+      - name: Upgrade npm
+        run: npm install -g npm@latest && npm --version # OIDC needs npm >= 11.5.1
+
+      - name: Publish to npm (skips a version already published)
         env:
           # TEMPORARY: stages the first publish of a new name; delete once @agentage/widget is on npm
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
           if [ -n "${NPM_TOKEN:-}" ]; then
+            # Single quotes on purpose: npm expands ${NPM_TOKEN} itself, the token never lands on disk
             echo '//registry.npmjs.org/:_authToken=${NPM_TOKEN}' >> ~/.npmrc
             echo "first-publish token in use" >> "$GITHUB_STEP_SUMMARY"
           fi

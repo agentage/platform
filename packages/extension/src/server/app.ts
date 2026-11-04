@@ -26,7 +26,7 @@ export interface ApiAppOptions {
 }
 
 // api-standards section 6: CORS * without credentials on /.well-known/ and /api/.
-export const PUBLIC_CORS: CorsOptions = {
+const PUBLIC_CORS: CorsOptions = {
   origin: '*',
   credentials: false,
   allowedHeaders: ['Authorization', 'Content-Type', 'agcid', 'traceparent', 'If-Match'],
@@ -55,6 +55,7 @@ const healthHandler = (options: ApiAppOptions): RequestHandler =>
 
 export const createApiApp = (options: ApiAppOptions): Express => {
   const app = express();
+  // The gateway calls parts over a private network; its X-Forwarded-Proto then sets req.protocol.
   app.set('trust proxy', 'loopback, linklocal, uniquelocal');
   app.use(agcidMiddleware, helmet());
   app.get('/health', healthHandler(options));

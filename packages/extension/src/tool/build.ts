@@ -12,9 +12,9 @@ import { mustRun, runCommand, type Run } from './exec.js';
 import { labelsOf } from './labels.js';
 import { RECORD_FILE, stageContext } from './stage.js';
 
-export const DEFAULT_REGISTRY = 'ghcr.io/agentage';
+const DEFAULT_REGISTRY = 'ghcr.io/agentage';
 
-export const SUPPORTED_PARTS: readonly ImagePartKind[] = ['api'];
+const SUPPORTED_PARTS: readonly ImagePartKind[] = ['api'];
 
 export interface BuildOptions {
   dir?: string;

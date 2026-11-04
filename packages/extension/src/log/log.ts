@@ -25,10 +25,12 @@ const errorFields = (error: unknown): LogFields => {
   return { err: { type: error.name, message: error.message, stack: error.stack } };
 };
 
+// Spread twice: the key order stays, and a field never overwrites time, level, msg, tags or agcid.
 const line = (level: LogLevel, message: string, tags: LogTags, fields: LogFields): string => {
   const agcid = currentAgcid();
-  const entry = { time: new Date().toISOString(), level, msg: message, ...tags, ...fields };
-  return `${JSON.stringify(agcid ? { ...entry, agcid } : entry)}\n`;
+  const own = { time: new Date().toISOString(), level, msg: message, ...tags };
+  const fixed = agcid ? { ...own, agcid } : own;
+  return `${JSON.stringify({ ...fixed, ...fields, ...fixed })}\n`;
 };
 
 const stderrWrite: LogWrite = (text) => void process.stderr.write(text);
@@ -37,5 +39,5 @@ export const createLog = (tags: LogTags, write: LogWrite = stderrWrite): Log => 
   info: (message, fields = {}) => write(line('info', message, tags, fields)),
   warn: (message, fields = {}) => write(line('warn', message, tags, fields)),
   error: (error, fields = {}) =>
-    write(line('error', messageOf(error), tags, { ...errorFields(error), ...fields })),
+    write(line('error', messageOf(error), tags, { ...fields, ...errorFields(error) })),
 });

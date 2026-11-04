@@ -50,6 +50,8 @@ describe('manifest schema', () => {
     );
     const bad = { 'probe.every': { type: 'integer', default: 1.5 } };
     expect(issuesOf(withAgentage({ settings: bad }))).toContain('default does not match type');
+    const outside = { 'probe.mode': { type: 'string', enum: ['a', 'b'], default: 'c' } };
+    expect(issuesOf(withAgentage({ settings: outside }))).toEqual(['default is not one of enum']);
   });
 
   it('keeps first-party ids to the @agentage scope', () => {
@@ -90,10 +92,15 @@ describe('readManifest', () => {
 
   it('says which folder has no package.json, and passes any other read error through', async () => {
     await expect(readManifest('/nonexistent/ext')).rejects.toThrow(
-      'no package.json in /nonexistent/ext: run in an extension package folder or pass --dir'
+      'no package.json in /nonexistent/ext: run it in an extension package folder'
     );
     const dir = await tempPackage({ 'package.json/x': '' });
     await expect(readManifest(dir)).rejects.toThrow(/EISDIR/);
+  });
+
+  it('names the file that is not valid JSON', async () => {
+    const dir = await tempPackage({ 'package.json': '{"name": ' });
+    await expect(readManifest(dir)).rejects.toThrow(`${dir}/package.json is not valid JSON`);
   });
 
   it('names the failing field', async () => {

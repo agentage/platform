@@ -12,11 +12,12 @@ export interface Docker {
   push(tag: string): Promise<string>;
 }
 
-export const PLATFORM = 'linux/amd64';
+const PLATFORM = 'linux/amd64';
 
 const flags = (flag: string, values: Record<string, string>): string[] =>
   Object.entries(values).flatMap(([key, value]) => [flag, `${key}=${value}`]);
 
+// No provenance attestation: the pushed digest is then the image itself, as the record expects.
 export const buildArgsOf = (options: DockerBuild): string[] => [
   'build',
   '--platform',

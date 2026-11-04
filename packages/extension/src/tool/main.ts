@@ -8,7 +8,7 @@ export interface MainDeps {
   err: (line: string) => void;
 }
 
-export const USAGE = `usage: agentage-extension build [--push] [--dir <path>] [--registry <host/owner>]
+const USAGE = `usage: agentage-extension build [--push] [--dir <path>] [--registry <host/owner>]
 
   build      one image per server part from the kit recipe
   --push     push the images and write dist/agentage-extension.json with their digests
@@ -53,7 +53,13 @@ export const main = async (argv: string[], deps: MainDeps = defaultDeps): Promis
     return 2;
   }
   const { positionals, values } = parsed;
-  if (values.help) return (deps.out(USAGE), 0);
-  if (positionals[0] !== 'build' || positionals.length !== 1) return (deps.err(USAGE), 2);
+  if (values.help) {
+    deps.out(USAGE);
+    return 0;
+  }
+  if (positionals[0] !== 'build' || positionals.length !== 1) {
+    deps.err(USAGE);
+    return 2;
+  }
   return runBuild({ push: values.push, dir: values.dir, registry: values.registry }, deps);
 };

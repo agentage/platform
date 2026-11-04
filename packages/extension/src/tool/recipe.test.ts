@@ -1,5 +1,21 @@
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
+import { createServer } from 'node:http';
+import { type AddressInfo } from 'node:net';
 import { describe, expect, it } from 'vitest';
 import { serverPartRecipe } from './recipe.js';
+
+// Runs the recipe's own HEALTHCHECK command against a server answering `status`.
+const healthcheckExit = async (healthcheck: string, status: number): Promise<unknown> => {
+  const server = createServer((_req, res) => void res.writeHead(status).end());
+  await once(server.listen(0, '127.0.0.1'), 'listening');
+  const { port } = server.address() as AddressInfo;
+  const [, ...args] = JSON.parse(healthcheck.slice(healthcheck.indexOf('CMD ') + 4)) as string[];
+  const local = args.map((arg) => arg.replace('127.0.0.1:3000', `127.0.0.1:${port}`));
+  const [code] = await once(spawn(process.execPath, local), 'exit');
+  server.close();
+  return code;
+};
 
 describe('server part recipe', () => {
   const recipe = serverPartRecipe('api');
@@ -31,4 +47,17 @@ describe('server part recipe', () => {
       'CMD ["node", "node_modules/@agentage/extension/dist/runtime/main.js", "api"]'
     );
   });
+
+  it.for([
+    [200, 0],
+    [503, 0],
+    [404, 1],
+    [500, 1],
+  ])(
+    'the HEALTHCHECK maps /health %i to exit %i: an outage restarts nothing',
+    async ([status, exit]) => {
+      const healthcheck = lines.find((line) => line.startsWith('HEALTHCHECK')) ?? '';
+      expect(await healthcheckExit(healthcheck, status as number)).toBe(exit);
+    }
+  );
 });

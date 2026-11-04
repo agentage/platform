@@ -40,6 +40,7 @@ export interface FailOptions {
   retryAfter?: number;
 }
 
+// A registry symbol, so a failure thrown through a second copy of the kit is still recognised.
 const FAILURE = Symbol.for('agentage.extension.failure');
 
 export const ok = <T>(data: T, meta?: Record<string, unknown>): OkEnvelope<T> =>
