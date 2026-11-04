@@ -50,6 +50,8 @@ describe('manifest schema', () => {
     );
     const bad = { 'probe.every': { type: 'integer', default: 1.5 } };
     expect(issuesOf(withAgentage({ settings: bad }))).toContain('default does not match type');
+    const outside = { 'probe.mode': { type: 'string', enum: ['a', 'b'], default: 'c' } };
+    expect(issuesOf(withAgentage({ settings: outside }))).toEqual(['default is not one of enum']);
   });
 
   it('keeps first-party ids to the @agentage scope', () => {

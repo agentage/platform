@@ -61,6 +61,9 @@ export const SettingSchema = z
   })
   .refine((setting) => defaultFits(setting.type, setting.default), {
     message: 'default does not match type',
+  })
+  .refine((setting) => !setting.enum || setting.enum.includes(String(setting.default)), {
+    message: 'default is not one of enum',
   });
 
 const AgentageBaseSchema = z.strictObject({
