@@ -8,11 +8,13 @@ import { fail } from '../envelope/envelope.js';
 import { ErrorEnvelopeSchema } from '../envelope/envelope.schema.js';
 import { createHealthHandler } from '../health/health.js';
 import { HealthSchema } from '../health/health.schema.js';
+import { createLog } from '../log/log.js';
 import { API_MANIFEST, DIGEST, SHA } from '../test-support/packages.js';
 import { createApiApp, type ApiAppOptions } from './app.js';
 import { listen } from './serve.js';
 
 const BUILD = { commit: SHA, buildTime: '2026-11-03T20:00:00Z' };
+const JSON_TYPE = { 'content-type': 'application/json' };
 const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 const routes = (): Router => {
@@ -131,14 +133,35 @@ describe('api app: envelope and headers', () => {
     }
   });
 
-  it('hides internals behind INTERNAL 500 and logs the error whole', async () => {
-    const { get, ctx } = await start();
-    const res = await get('/api/v1/boom');
-    expect(res.status).toBe(500);
-    expect(await res.json()).toMatchObject({
-      error: { code: 'INTERNAL', message: 'Internal error' },
+  it('hides internals behind INTERNAL 500 and logs the error whole, tagged with the agcid', async () => {
+    const lines: Record<string, unknown>[] = [];
+    const log = createLog({ extension: 'probe', part: 'api' }, (line) => {
+      lines.push(JSON.parse(line) as Record<string, unknown>);
     });
-    expect(ctx.logs.map((entry) => entry.level)).toEqual(['error']);
+    const { get } = await start({ log });
+    const res = await get('/api/v1/boom', { headers: { agcid: 'trace-500-check' } });
+    expect(res.status).toBe(500);
+    const text = await res.text();
+    expect(text).not.toContain('secret driver message');
+    expect(JSON.parse(text)).toMatchObject({
+      error: { code: 'INTERNAL', message: 'Internal error', agcid: 'trace-500-check' },
+    });
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({
+      level: 'error',
+      msg: 'secret driver message',
+      agcid: 'trace-500-check',
+      err: { type: 'Error', message: 'secret driver message' },
+    });
+  });
+
+  it('logs a 5xx only; a 4xx is the caller, not the part', async () => {
+    const { get, ctx } = await start();
+    await get('/api/v1/nope');
+    await get('/api/v1/body', { method: 'POST', body: '{bad', headers: JSON_TYPE });
+    expect(ctx.logs).toEqual([]);
+    await get('/api/v1/busy');
+    expect(ctx.logs.map((entry) => entry.message)).toEqual(['Try later']);
   });
 
   it('sends Retry-After with 503', async () => {
@@ -154,7 +177,7 @@ describe('api app: envelope and headers', () => {
       get('/api/v1/body', {
         method: 'POST',
         body,
-        headers: { 'content-type': 'application/json' },
+        headers: JSON_TYPE,
       });
     expect((await post('{"a":1}')).status).toBe(200);
     expect(await (await post('{bad')).json()).toMatchObject({
