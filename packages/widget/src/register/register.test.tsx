@@ -33,7 +33,7 @@ afterEach(() => {
 });
 
 describe('registerWidgets', () => {
-  it('defines {id}-{kebab name} once, with an open shadow root', async () => {
+  it('defines {id}-{kebab name} once, with a styled open shadow root', async () => {
     registerWidgets('alpha', { helloWorld: Hello }, { version: '0.2.0' });
     const first = customElements.get('alpha-hello-world');
     registerWidgets('alpha', { helloWorld: Boom });
@@ -42,6 +42,9 @@ describe('registerWidgets', () => {
     expect(el.shadowRoot?.mode).toBe('open');
     expect(el.shadowRoot?.textContent).toBe('hello from from-property');
     expect(el.textContent).toBe('');
+    expect(el.shadowRoot?.adoptedStyleSheets).toHaveLength(1);
+    expect(document.adoptedStyleSheets).toHaveLength(1);
+    expect(document.adoptedStyleSheets[0]).not.toBe(el.shadowRoot?.adoptedStyleSheets[0]);
   });
 
   it('isolates a throwing widget in its own error box', async () => {
@@ -64,13 +67,16 @@ describe('registerWidgets', () => {
     expect(console.error).toHaveBeenCalledWith('[beta-boom]', expect.any(Error));
   });
 
-  it('takes the page hook before the default bridge, and the bridge last', async () => {
+  it('takes a shell host, then the page hook, and the default bridge last', async () => {
     registerWidgets('gamma', { a: Hello, b: Version });
     const hook = vi.fn(() => fakeHost('hooked'));
     globalThis.__agentageHost = hook;
     const a = await mount('gamma-a');
     expect(hook).toHaveBeenCalledWith(a);
     expect(a.shadowRoot?.textContent).toBe('hello from hooked');
+    const shell = await mount('gamma-a', (e) => (e.host = fakeHost('shell')));
+    expect(shell.shadowRoot?.textContent).toBe('hello from shell');
+    expect(hook).toHaveBeenCalledTimes(1);
     globalThis.__agentageHost = undefined;
     registerWidgets('delta', { b: Version }, { version: '1.2.3' });
     const b = await mount('delta-b');

@@ -1,16 +1,32 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { adoptWidgetStyles, registerProperties } from './sheet.js';
 import { propertyCss, widgetCss } from './styles.generated.js';
 
 const shadow = () => document.createElement('div').attachShadow({ mode: 'open' });
 
+// The sheets are cached per document, so their text is recorded before the first one is built.
+const texts = new WeakMap<CSSStyleSheet, string>();
+const replaceSync = CSSStyleSheet.prototype.replaceSync;
+vi.spyOn(CSSStyleSheet.prototype, 'replaceSync').mockImplementation(function (
+  this: CSSStyleSheet,
+  text: string
+) {
+  texts.set(this, text);
+  replaceSync.call(this, text);
+});
+const cssOf = (sheet: CSSStyleSheet | undefined) => sheet && texts.get(sheet);
+
 describe('the widget sheet', () => {
-  it('registers the @property block once on the document', () => {
+  it('adds only the @property block to the document, once, after the page sheets', () => {
+    const page = new CSSStyleSheet();
+    document.adoptedStyleSheets = [page];
     adoptWidgetStyles(shadow());
     adoptWidgetStyles(shadow());
     registerProperties(document);
-    expect(document.adoptedStyleSheets).toHaveLength(1);
+    expect(document.adoptedStyleSheets).toHaveLength(2);
+    expect(document.adoptedStyleSheets[0]).toBe(page);
+    expect(cssOf(document.adoptedStyleSheets[1])).toBe(propertyCss);
   });
 
   it('adopts one shared sheet into each shadow root, once per root', () => {
@@ -20,7 +36,7 @@ describe('the widget sheet', () => {
     adoptWidgetStyles(b);
     expect(a.adoptedStyleSheets).toHaveLength(1);
     expect(a.adoptedStyleSheets[0]).toBe(b.adoptedStyleSheets[0]);
-    expect(a.adoptedStyleSheets[0]).not.toBe(document.adoptedStyleSheets[0]);
+    expect(cssOf(a.adoptedStyleSheets[0])).toBe(widgetCss);
   });
 });
 
