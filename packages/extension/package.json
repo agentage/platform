@@ -1,6 +1,6 @@
 {
   "name": "@agentage/extension",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "The agentage extension kit: create(ctx) per part (pages, ui, api, mcp, worker, cli), the store, /health, discovery, the envelope, and the build tool with up and token",
   "type": "module",
   "license": "MIT",
@@ -50,6 +50,7 @@
     "@modelcontextprotocol/server": "^2.4.0",
     "cors": "^2.8.5",
     "helmet": "^8.1.0",
+    "jose": "^6.2.15",
     "pg": "^8.23.1",
     "zod": "^4.2.0"
   },

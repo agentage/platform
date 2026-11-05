@@ -6,13 +6,13 @@ export interface Caller {
   scopes: readonly string[];
 }
 
-// A caller, or a thrown UNAUTHORIZED, FORBIDDEN or UNAVAILABLE; none runs in kit 0.2 (tokens off).
+// A caller, or a thrown UNAUTHORIZED, FORBIDDEN or UNAVAILABLE (verify-token.ts).
 export type TokenCheck = (
   authorization: string | undefined,
   access: Access
 ) => Promise<Caller | null>;
 
-// Kit-private until ctx.auth.caller(request) exists (M3): part code never reads it from the request.
+// Read by part code only through ctx.auth.caller(request).
 const callers = new WeakMap<object, Caller | null>();
 
 export const setCaller = (request: object, caller: Caller | null): void =>
@@ -20,7 +20,11 @@ export const setCaller = (request: object, caller: Caller | null): void =>
 
 export const callerOf = (request: object): Caller | null => callers.get(request) ?? null;
 
-const RANK: Record<Access, number> = { public: 0, read: 1, write: 2, admin: 3 };
+export const RANK: Record<Access, number> = { public: 0, read: 1, write: 2, admin: 3 };
+
+// The scope a route or tool declares, as tokens and the record name it: {id}:{verb}, or public.
+export const scopeOf = (id: string, access: Access = 'read'): string =>
+  access === 'public' ? 'public' : `${id}:${access}`;
 
 export const strongest = (needed: readonly Access[]): Access =>
   needed.reduce<Access>((top, access) => (RANK[access] > RANK[top] ? access : top), 'public');

@@ -1,3 +1,4 @@
+import { callerOf, type Caller } from '../auth/token-check.js';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
 import { createLog, type Log } from '../log/log.js';
 import { type Store } from '../store/store.types.js';
@@ -14,9 +15,11 @@ export interface ExtensionInfo {
   commit: string;
 }
 
-// The kit 0.2 subset of the host ctx; auth, secrets and spans arrive in later versions.
+// The kit 0.3 subset of the host ctx; secrets and spans arrive in later versions.
 export interface PartContext {
   readonly extension: Readonly<ExtensionInfo>;
+  // Who called, as the kit's token check found it; null on a public route.
+  readonly auth: { caller(request: object): Caller | null };
   readonly log: Log;
   readonly settings: Readonly<Record<string, SettingValue>>;
   readonly store: Store;
@@ -55,5 +58,6 @@ export const createContext = (input: ContextInput): PartContext => {
   });
   const log = input.log ?? createLog({ extension: pkg.agentage.id, part });
   const settings = Object.freeze({ ...settingDefaults(pkg), ...input.settings });
-  return Object.freeze({ extension, log, settings, store: store ?? NO_STORE });
+  const auth = Object.freeze({ caller: callerOf });
+  return Object.freeze({ extension, auth, log, settings, store: store ?? NO_STORE });
 };

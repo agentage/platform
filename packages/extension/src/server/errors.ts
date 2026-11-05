@@ -26,5 +26,6 @@ export const errorHandler =
     const failure = toFailure(err);
     if (failure.status >= 500) log.error(err);
     if (failure.retryAfter !== undefined) res.setHeader('Retry-After', String(failure.retryAfter));
+    for (const [name, value] of Object.entries(failure.headers ?? {})) res.setHeader(name, value);
     res.status(failure.status).json(errorEnvelope(failure, agcidOfResponse(res)));
   };

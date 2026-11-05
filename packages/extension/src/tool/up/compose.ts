@@ -1,7 +1,7 @@
 import { type ExtensionPackage } from '../../manifest/manifest.schema.js';
 import { hasPostgres, imageParts } from '../../manifest/parts.js';
 import { type ImagePartKind } from '../../manifest/primitives.schema.js';
-import { DEV_ISSUER } from './dev-issuer-app.js';
+import { DEV_AUDIENCE, DEV_ISSUER } from './dev-issuer-app.js';
 import { GATEWAY_PORT, ISSUER_PORT, PART_PORT, TRAEFIK_COMMAND, TRAEFIK_IMAGE } from './gateway.js';
 
 export const STORE_IMAGE = 'postgres:18-alpine';
@@ -24,13 +24,22 @@ const STORE_PASSWORD = 'agentage-local';
 
 const storeUrl = (id: string): string => `postgres://${id}:${STORE_PASSWORD}@store:5432/${id}`;
 
+// The parts read the issuer's keys over the compose network, so its tokens name that address.
+const TOKENS = {
+  AGENTAGE_ISSUER: `http://issuer:${PART_PORT}`,
+  AGENTAGE_AUDIENCE: DEV_AUDIENCE,
+};
+
 // Only the ui under `up` names the dev issuer: its CSP then lets the harness ask it for a token.
 const partEnv = (pkg: ExtensionPackage, part: ImagePartKind | 'migrate') => ({
   AGENTAGE_ORIGIN: `http://localhost:${GATEWAY_PORT}`,
+  ...TOKENS,
   AGENTAGE_RECORD_FILE: RECORD_TARGET,
   ...(hasPostgres(pkg) && part !== 'ui' ? { AGENTAGE_STORE_URL: storeUrl(pkg.agentage.id) } : {}),
   ...(part === 'ui' ? { AGENTAGE_DEV_ISSUER: DEV_ISSUER } : {}),
 });
+
+const QUICK_CHECK = { interval: '2s', timeout: '3s', retries: 30 };
 
 const storeService = (id: string) => ({
   image: STORE_IMAGE,
@@ -38,9 +47,7 @@ const storeService = (id: string) => ({
   volumes: ['store:/var/lib/postgresql'],
   healthcheck: {
     test: ['CMD-SHELL', `pg_isready -U ${id} -d ${id}`],
-    interval: '2s',
-    timeout: '3s',
-    retries: 30,
+    ...QUICK_CHECK,
   },
 });
 
@@ -61,14 +68,13 @@ const fixedServices = (input: ComposeInput, anyImage: string) => ({
     volumes: [`${input.gatewayFile}:/etc/traefik/dynamic.yml:ro`],
     healthcheck: {
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8082/ping'],
-      interval: '2s',
-      timeout: '3s',
-      retries: 30,
+      ...QUICK_CHECK,
     },
   },
   issuer: {
     image: anyImage,
     command: ['node', ISSUER_ENTRY],
+    environment: TOKENS,
     ports: [`127.0.0.1:${ISSUER_PORT}:${PART_PORT}`],
   },
 });

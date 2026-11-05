@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { z } from 'zod';
+import { scopeOf } from '../auth/token-check.js';
 import { createContext } from '../context/context.js';
 import { type RecordExtras } from '../discovery/discovery.js';
 import { WidgetSchema } from '../discovery/discovery.schema.js';
@@ -23,8 +24,8 @@ const noStore: Store = {
 
 const silent = createLog({ extension: 'build', part: 'mcp' }, () => undefined);
 
-// The tool names the mcp part registers, read by running its create(ctx) with a recording ctx.
-export const toolNames = async (dir: string, pkg: ExtensionPackage): Promise<string[]> => {
+// The tools the mcp part registers and their scopes, read by running its create(ctx) on a recorder.
+export const toolsOf = async (dir: string, pkg: ExtensionPackage) => {
   const registry = createToolRegistry();
   const base = createContext({
     pkg,
@@ -37,7 +38,11 @@ export const toolNames = async (dir: string, pkg: ExtensionPackage): Promise<str
   await (
     await loadCreate<McpContext>(dir, pkg, 'mcp')
   )({ ...base, tool: registry.tool });
-  return registry.tools.map((tool) => prefixed(pkg.agentage.id, tool.name));
+  const { id } = pkg.agentage;
+  return registry.tools.map((tool) => ({
+    name: prefixed(id, tool.name),
+    scope: scopeOf(id, tool.spec.scope),
+  }));
 };
 
 const widgetsOf = async (dir: string) => {
@@ -50,7 +55,7 @@ export const recordExtras = async (dir: string, pkg: ExtensionPackage): Promise<
   const { code } = normalizeParts(pkg.agentage.parts);
   const extras: RecordExtras = {};
   if (code.mcp) {
-    const tools = await toolNames(dir, pkg);
+    const tools = await toolsOf(dir, pkg);
     if (tools.length > 0) extras.tools = tools;
   }
   if (code.ui) extras.widgets = await widgetsOf(dir);

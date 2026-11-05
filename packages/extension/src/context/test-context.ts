@@ -78,8 +78,11 @@ const serverContext = (options: TestContextOptions): TestContext => {
   const logs: LogEntry[] = [];
   const log = runLog(recordingLog(logs));
   const store = testStore(options.store, recordingLog([]));
+  const extension = { ...TEST_EXTENSION, ...options.extension };
+  const caller = { sub: 'usr_test', scopes: [`${extension.id}:read`] };
   return {
-    extension: { ...TEST_EXTENSION, ...options.extension },
+    extension,
+    auth: { caller: () => caller },
     log,
     logs,
     settings: { ...options.settings },

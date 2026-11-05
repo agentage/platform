@@ -16,6 +16,8 @@ const FILES = {
 };
 const RECORD_MOUNT = '/x/.agentage/record.json:/run/agentage/agentage-extension.json:ro';
 const STORE_URL = 'postgres://probe:agentage-local@store:5432/probe';
+// The parts read keys from the issuer over the compose network; the tokens name the same URL.
+const TOKENS = { AGENTAGE_ISSUER: 'http://issuer:3000', AGENTAGE_AUDIENCE: 'localhost' };
 
 type Service = Record<string, unknown>;
 
@@ -52,6 +54,7 @@ describe('composeFile', () => {
       command: ['node', 'dist/store/migrate.js'],
       environment: {
         AGENTAGE_ORIGIN: 'http://localhost:4280',
+        ...TOKENS,
         AGENTAGE_RECORD_FILE: '/run/agentage/agentage-extension.json',
         AGENTAGE_STORE_URL: STORE_URL,
       },
@@ -74,6 +77,7 @@ describe('composeFile', () => {
       expect(services[part]).toMatchObject({ image: TAGS[part], volumes: [RECORD_MOUNT] });
       expect(services[part]?.['environment']).toMatchObject({
         AGENTAGE_ORIGIN: 'http://localhost:4280',
+        ...TOKENS,
       });
     }
     expect(services['api']).toMatchObject({
@@ -89,7 +93,7 @@ describe('composeFile', () => {
     expect(services['ui']).not.toHaveProperty('depends_on');
   });
 
-  it('publishes the gateway on 127.0.0.1:4280 and the dev issuer on 127.0.0.1:4281', () => {
+  it('publishes the gateway on 127.0.0.1:4280 and the dev issuer on 127.0.0.1:4281 (C9)', () => {
     const services = servicesOf();
     expect(services['gateway']).toMatchObject({
       image: TRAEFIK_IMAGE,
@@ -99,6 +103,7 @@ describe('composeFile', () => {
     expect(services['issuer']).toEqual({
       image: TAGS['pages'],
       command: ['node', 'node_modules/@agentage/extension/dist/tool/up/dev-issuer.js'],
+      environment: TOKENS,
       ports: ['127.0.0.1:4281:3000'],
     });
   });

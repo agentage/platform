@@ -16,7 +16,7 @@ describe('up files', () => {
     const record = validateRecord(await read('record.json'));
     expect(record.parts.api).toEqual({ image: `ghcr.io/agentage/probe-api@${IMAGE_ID}` });
     expect(record).toMatchObject({
-      tools: ['probe__echo'],
+      tools: [{ name: 'probe__echo', scope: 'probe:read' }],
       commands: ['ping'],
       parts: { store: { migrations: 1 } },
     });

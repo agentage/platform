@@ -47,6 +47,12 @@ export const WidgetSchema = z.strictObject({
   module: z.string().regex(/^\/ui\/[^/]+\/[^/]+\.m?js$/),
 });
 
+// C8: each tool names the scope tools/call needs, or public.
+const ToolRecordSchema = z.strictObject({
+  name: PrefixedToolNameSchema,
+  scope: z.string().regex(/^(public|[a-z][a-z0-9-]*:(read|write|admin))$/),
+});
+
 const recordShape = {
   id: ExtensionIdSchema,
   version: VersionSchema,
@@ -57,7 +63,7 @@ const recordShape = {
     .string()
     .regex(/^\/api\/v[1-9][0-9]*\/openapi\.json$/)
     .optional(),
-  tools: z.array(PrefixedToolNameSchema).min(1).optional(),
+  tools: z.array(ToolRecordSchema).min(1).optional(),
   widgets: z.array(WidgetSchema).min(1).optional(),
   commands: z.array(CommandNameSchema).min(1).optional(),
 };

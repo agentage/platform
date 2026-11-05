@@ -15,7 +15,7 @@ export const DEFAULT_RECORD_FILE = '/run/agentage/agentage-extension.json';
 
 export interface RecordExtras {
   openapi?: string;
-  tools?: string[];
+  tools?: { name: string; scope: string }[];
   widgets?: { name: string; element: string; module: string }[];
   migrations?: number;
 }

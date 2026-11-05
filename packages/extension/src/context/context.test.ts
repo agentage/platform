@@ -4,6 +4,7 @@ import { validateManifest } from '../manifest/read-manifest.js';
 import { API_MANIFEST, SHA, SPEC_MANIFEST } from '../test-support/packages.js';
 import { recordedLog } from '../test-support/http.js';
 import { startTestServer } from '../testing/test-server.js';
+import { setCaller } from '../auth/token-check.js';
 import { createContext, settingDefaults } from './context.js';
 import { createTestContext } from './test-context.js';
 
@@ -97,5 +98,20 @@ describe('ctx', () => {
       commit: '0'.repeat(40),
     });
     await server.close();
+  });
+});
+
+describe('ctx.auth (C6)', () => {
+  it('caller(request) is what the kit checked for that request, null when anonymous', () => {
+    const ctx = createContext(BASE);
+    const request = {};
+    expect(ctx.auth.caller(request)).toBeNull();
+    setCaller(request, { sub: 'usr_1', scopes: ['probe:read'] });
+    expect(ctx.auth.caller(request)).toEqual({ sub: 'usr_1', scopes: ['probe:read'] });
+  });
+
+  it('the test context has a fixed caller with read on its own extension', () => {
+    const ctx = createTestContext({ extension: { id: 'probe' } });
+    expect(ctx.auth.caller({})).toEqual({ sub: 'usr_test', scopes: ['probe:read'] });
   });
 });
