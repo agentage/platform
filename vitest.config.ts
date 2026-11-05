@@ -5,6 +5,7 @@ export default defineConfig({
     // An in-process postgres (the store tests) boots in seconds when the whole suite runs at once.
     testTimeout: 30_000,
     include: ['packages/*/src/**/*.test.{ts,tsx}'],
+    setupFiles: ['packages/extension/src/test-support/cleanup.ts'],
     coverage: {
       provider: 'v8',
       include: ['packages/*/src/**/*.{ts,tsx}'],

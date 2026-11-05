@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
@@ -36,14 +36,21 @@ export const SHA = 'a'.repeat(40);
 
 export const DIGEST = `sha256:${'b'.repeat(64)}`;
 
-// A throwaway package folder: files maps relative paths to contents.
+const made: string[] = [];
+
+// A throwaway package folder: files maps relative paths to contents; removed after its test file.
 export const tempPackage = async (files: Record<string, string>): Promise<string> => {
   const dir = await mkdtemp(join(tmpdir(), 'agentage-kit-test-'));
+  made.push(dir);
   for (const [path, content] of Object.entries(files)) {
     await mkdir(dirname(join(dir, path)), { recursive: true });
     await writeFile(join(dir, path), content);
   }
   return dir;
+};
+
+export const removeTempPackages = async (): Promise<void> => {
+  await Promise.all(made.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 };
 
 export const json = (value: unknown): string => `${JSON.stringify(value, null, 2)}\n`;
