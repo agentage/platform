@@ -3,17 +3,24 @@ import { recordOf, validateRecord } from '../discovery/discovery.js';
 import { validateManifest } from '../manifest/read-manifest.js';
 import { linkModules } from '../test-support/http.js';
 import { DIGEST, json, SHA, SPEC_MANIFEST, tempPackage } from '../test-support/packages.js';
-import { recordExtras, toolNames } from './record-extras.js';
+import { recordExtras, toolsOf } from './record-extras.js';
 
 const FULL = validateManifest(SPEC_MANIFEST);
 const BUILD = { commit: SHA, buildTime: '2026-11-05T10:00:00Z' };
 const WIDGETS = [{ name: 'echo', element: 'probe-echo', module: '/ui/0.1.0/probe.js' }];
+// C8: each tool with the scope tools/call needs, read when it declares none.
+const TOOLS = [
+  { name: 'probe__echo', scope: 'probe:read' },
+  { name: 'probe__count', scope: 'probe:write' },
+  { name: 'probe__time', scope: 'public' },
+];
 
 const MCP = `import { z } from 'zod';
 export const create = (ctx) => {
   const spec = { description: 'Echo', input: z.object({}), output: z.object({}) };
   ctx.tool('echo', spec, () => ({}));
-  ctx.tool('count', spec, () => ctx.store.query('select 1'));
+  ctx.tool('count', { ...spec, scope: 'write' }, () => ctx.store.query('select 1'));
+  ctx.tool('time', { ...spec, scope: 'public' }, () => ({}));
 };
 `;
 
@@ -39,18 +46,18 @@ const images = Object.fromEntries(
 );
 
 describe('recordExtras', () => {
-  it('lists the tools the mcp part registers, the widgets, the openapi path and the migration count', async () => {
+  it('lists the tools the mcp part registers with their scopes, the widgets, the openapi path and the migration count', async () => {
     const dir = await probe();
     const extras = await recordExtras(dir, FULL);
     expect(extras).toEqual({
-      tools: ['probe__echo', 'probe__count'],
+      tools: TOOLS,
       widgets: WIDGETS,
       openapi: '/api/v1/openapi.json',
       migrations: 2,
     });
     const record = validateRecord(recordOf(FULL, BUILD, images, extras));
     expect(record).toMatchObject({
-      tools: ['probe__echo', 'probe__count'],
+      tools: TOOLS,
       commands: ['ping'],
       widgets: WIDGETS,
       openapi: '/api/v1/openapi.json',
@@ -73,7 +80,7 @@ describe('recordExtras', () => {
 
   it('refuses an mcp entry without create, a bad widgets.json and a bad openapi.json', async () => {
     await expect(
-      toolNames(await probe({ 'dist/mcp/index.js': 'export const x = 1;' }), FULL)
+      toolsOf(await probe({ 'dist/mcp/index.js': 'export const x = 1;' }), FULL)
     ).rejects.toThrow(/dist\/mcp\/index\.js does not export create\(ctx\)/);
     await expect(
       recordExtras(await probe({ 'dist/ui/widgets.json': '[]' }), FULL)

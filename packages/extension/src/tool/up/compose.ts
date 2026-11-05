@@ -1,7 +1,7 @@
 import { type ExtensionPackage } from '../../manifest/manifest.schema.js';
 import { hasPostgres, imageParts } from '../../manifest/parts.js';
 import { type ImagePartKind } from '../../manifest/primitives.schema.js';
-import { DEV_ISSUER } from './dev-issuer-app.js';
+import { DEV_AUDIENCE, DEV_ISSUER, UP_ISSUER } from './dev-issuer-app.js';
 import { GATEWAY_PORT, ISSUER_PORT, PART_PORT, TRAEFIK_COMMAND, TRAEFIK_IMAGE } from './gateway.js';
 
 export const STORE_IMAGE = 'postgres:18-alpine';
@@ -24,13 +24,18 @@ const STORE_PASSWORD = 'agentage-local';
 
 const storeUrl = (id: string): string => `postgres://${id}:${STORE_PASSWORD}@store:5432/${id}`;
 
+const TOKENS = { AGENTAGE_ISSUER: UP_ISSUER, AGENTAGE_AUDIENCE: DEV_AUDIENCE };
+
 // Only the ui under `up` names the dev issuer: its CSP then lets the harness ask it for a token.
 const partEnv = (pkg: ExtensionPackage, part: ImagePartKind | 'migrate') => ({
   AGENTAGE_ORIGIN: `http://localhost:${GATEWAY_PORT}`,
+  ...TOKENS,
   AGENTAGE_RECORD_FILE: RECORD_TARGET,
   ...(hasPostgres(pkg) && part !== 'ui' ? { AGENTAGE_STORE_URL: storeUrl(pkg.agentage.id) } : {}),
   ...(part === 'ui' ? { AGENTAGE_DEV_ISSUER: DEV_ISSUER } : {}),
 });
+
+const QUICK_CHECK = { interval: '2s', timeout: '3s', retries: 30 };
 
 const storeService = (id: string) => ({
   image: STORE_IMAGE,
@@ -38,20 +43,27 @@ const storeService = (id: string) => ({
   volumes: ['store:/var/lib/postgresql'],
   healthcheck: {
     test: ['CMD-SHELL', `pg_isready -U ${id} -d ${id}`],
-    interval: '2s',
-    timeout: '3s',
-    retries: 30,
+    ...QUICK_CHECK,
   },
 });
 
-const partService = (input: ComposeInput, part: ImagePartKind) => ({
-  image: input.tags[part],
-  environment: partEnv(input.pkg, part),
-  volumes: [`${input.recordFile}:${RECORD_TARGET}:ro`],
-  ...(hasPostgres(input.pkg) && part !== 'ui'
-    ? { depends_on: { store: { condition: 'service_healthy' } } }
-    : {}),
+const HEALTHY = { condition: 'service_healthy' };
+
+// api and mcp read the issuer's keys and revoked list before they serve.
+const dependsOn = (pkg: ExtensionPackage, part: ImagePartKind) => ({
+  ...(hasPostgres(pkg) && part !== 'ui' ? { store: HEALTHY } : {}),
+  ...(part === 'api' || part === 'mcp' ? { issuer: HEALTHY } : {}),
 });
+
+const partService = (input: ComposeInput, part: ImagePartKind) => {
+  const depends_on = dependsOn(input.pkg, part);
+  return {
+    image: input.tags[part],
+    environment: partEnv(input.pkg, part),
+    volumes: [`${input.recordFile}:${RECORD_TARGET}:ro`],
+    ...(Object.keys(depends_on).length > 0 ? { depends_on } : {}),
+  };
+};
 
 const fixedServices = (input: ComposeInput, anyImage: string) => ({
   gateway: {
@@ -61,9 +73,7 @@ const fixedServices = (input: ComposeInput, anyImage: string) => ({
     volumes: [`${input.gatewayFile}:/etc/traefik/dynamic.yml:ro`],
     healthcheck: {
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8082/ping'],
-      interval: '2s',
-      timeout: '3s',
-      retries: 30,
+      ...QUICK_CHECK,
     },
   },
   issuer: {
@@ -78,7 +88,7 @@ const migrateService = (input: ComposeInput) => ({
   command: ['node', 'dist/store/migrate.js'],
   environment: partEnv(input.pkg, 'migrate'),
   ...(input.seedsDir ? { volumes: [`${input.seedsDir}:/app/seeds:ro`] } : {}),
-  depends_on: { store: { condition: 'service_healthy' } },
+  depends_on: { store: HEALTHY },
   profiles: ['jobs'],
   restart: 'no',
 });

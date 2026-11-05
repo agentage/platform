@@ -78,3 +78,18 @@ describe('loadRecord', () => {
     await expect(loadRecord(`${dir}/record.json`)).rejects.toThrow(/EISDIR/);
   });
 });
+
+describe('tools in the record (C8)', () => {
+  it('are objects naming the scope tools/call needs, or public', () => {
+    const record = recordOf(API_MANIFEST, BUILD, { api: API_IMAGE });
+    const valid = (tools: unknown) => ExtensionRecordSchema.safeParse({ ...record, tools }).success;
+    expect(valid([{ name: 'probe__echo', scope: 'probe:read' }])).toBe(true);
+    expect(valid([{ name: 'probe__time', scope: 'public' }])).toBe(true);
+    for (const tools of [
+      ['probe__echo'],
+      [{ name: 'probe__echo' }],
+      [{ name: 'probe__echo', scope: 'read' }],
+    ])
+      expect(valid(tools), JSON.stringify(tools)).toBe(false);
+  });
+});

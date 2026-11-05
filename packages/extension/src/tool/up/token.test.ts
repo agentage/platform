@@ -2,7 +2,7 @@ import { createPublicKey, verify, type JsonWebKeyInput } from 'node:crypto';
 import { type Server } from 'node:http';
 import { type AddressInfo } from 'node:net';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createIssuer, DEV_AUDIENCE, DEV_ISSUER } from './dev-issuer-app.js';
+import { createIssuer, DEV_AUDIENCE, UP_ISSUER } from './dev-issuer-app.js';
 import { token } from './token.js';
 
 let issuer: Server;
@@ -29,7 +29,7 @@ describe('token', () => {
     expect(head).toMatchObject({ alg: 'EdDSA', typ: 'at+jwt' });
     const body = decode(claims);
     expect(body).toMatchObject({
-      iss: DEV_ISSUER,
+      iss: UP_ISSUER,
       aud: DEV_AUDIENCE,
       sub: 'usr_dev',
       scope: 'probe:read probe:write',

@@ -81,7 +81,12 @@ describe('the api serves its openapi document', () => {
     const dir = await tempPackage(files);
     const options = {
       part: 'api',
-      env: { PORT: '0' },
+      env: {
+        PORT: '0',
+        AGENTAGE_ISSUER: 'http://127.0.0.1:9',
+        AGENTAGE_AUDIENCE: 'localhost',
+        AGENTAGE_ORIGIN: 'http://localhost:4280',
+      },
       importModule: async () => ({ create: () => Router() }),
     };
     server = await runPart({ ...options, dir, serve: { signals: [] } });

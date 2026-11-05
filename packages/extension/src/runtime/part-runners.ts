@@ -1,7 +1,6 @@
 import { join } from 'node:path';
 import { type Express } from 'express';
 import { type PartContext } from '../context/context.js';
-import { readOpenapi } from '../discovery/openapi.js';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
 import { loadCreate, type ImportModule } from '../manifest/entry.js';
 import { hasPostgres } from '../manifest/parts.js';
@@ -23,6 +22,7 @@ export interface RunnerInput {
   env: Env;
   ctx: () => PartContext;
   base: PartAppBase;
+  openapi: Record<string, unknown> | null;
   importModule?: ImportModule;
 }
 
@@ -37,8 +37,7 @@ const callCreate = async <C>(input: RunnerInput, part: ImagePartKind, ctx: C): P
 
 const api = async (input: RunnerInput): Promise<Running> => {
   const router = (await callCreate(input, 'api', input.ctx())) as ApiHandler;
-  const openapi = await readOpenapi(input.dir);
-  return { app: createApiApp({ ...input.base, router, openapi }) };
+  return { app: createApiApp({ ...input.base, router, openapi: input.openapi }) };
 };
 
 const mcp = async (input: RunnerInput): Promise<Running> => {

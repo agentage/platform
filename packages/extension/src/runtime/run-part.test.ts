@@ -1,7 +1,7 @@
 import { type Server } from 'node:http';
 import { type AddressInfo } from 'node:net';
 import { Router } from 'express';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { API_MANIFEST, DIGEST, json, SHA, tempPackage } from '../test-support/packages.js';
 import { createOf } from '../manifest/entry.js';
 import { buildInfoFromEnv, portFromEnv } from './build-info.js';
@@ -19,7 +19,11 @@ const echoModule = {
 };
 
 let server: Server | undefined;
-afterEach(() => server?.close());
+beforeEach(() => void vi.spyOn(process.stderr, 'write').mockImplementation(() => true));
+afterEach(() => {
+  server?.close();
+  vi.restoreAllMocks();
+});
 
 const portOf = (s: Server): number => (s.address() as AddressInfo).port;
 
@@ -35,6 +39,10 @@ describe('runPart', () => {
     const dir = await tempPackage({
       'package.json': json(API_MANIFEST),
       'record.json': json({ ...record, parts: { api: { image } } }),
+      'openapi.json': json({
+        openapi: '3.1.0',
+        paths: { '/api/v1/echo': { get: { security: [] } } },
+      }),
     });
     const env = {
       PORT: '0',
@@ -42,6 +50,8 @@ describe('runPart', () => {
       BUILD_TIME: '2026-11-03T20:00:00Z',
       AGENTAGE_RECORD_FILE: `${dir}/record.json`,
       AGENTAGE_ORIGIN: 'https://probe.next.agentage.io',
+      AGENTAGE_ISSUER: 'http://127.0.0.1:9',
+      AGENTAGE_AUDIENCE: '*.agentage.io',
     };
     server = await runPart({
       dir,

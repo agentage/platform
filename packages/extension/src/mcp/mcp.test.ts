@@ -86,13 +86,32 @@ describe('mcp part', () => {
     expect(refused['isError']).toBe(true);
     const error = { code: 'FORBIDDEN', message: 'not for you', agcid: 'trace-mcp-check' };
     expect(refused['structuredContent']).toEqual({ error });
-    expect(refused['content']).toEqual([{ type: 'text', text: JSON.stringify({ error }) }]);
+    expect(refused['content']).toEqual([{ type: 'text', text: 'not for you' }]);
     const crashed = await call(s, 'probe__crash', {}, 'trace-crash-check');
     expect(crashed['structuredContent']).toEqual({
       error: { code: 'INTERNAL', message: 'Internal error', agcid: 'trace-crash-check' },
     });
     expect(JSON.stringify(crashed)).not.toContain('secret detail');
     expect(ctx.logs.find((entry) => entry.level === 'error')?.message).toBe('secret detail');
+  });
+
+  it('a bad argument is VALIDATION_ERROR naming the fields, before the tool runs (C7)', async () => {
+    const { server: s } = await start();
+    for (const args of [{ msg: 5 }, { msg: 'x'.repeat(201) }, {}]) {
+      const error = {
+        code: 'VALIDATION_ERROR',
+        message: 'Invalid arguments: msg',
+        agcid: 'trace-bad-args',
+      };
+      expect(
+        await call(s, 'probe__echo', args, 'trace-bad-args'),
+        JSON.stringify(args).slice(0, 20)
+      ).toEqual({
+        isError: true,
+        content: [{ type: 'text', text: 'Invalid arguments: msg' }],
+        structuredContent: { error },
+      });
+    }
   });
 
   it('answers 405 to GET, DELETE and any other method on /mcp', async () => {

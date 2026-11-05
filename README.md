@@ -99,22 +99,24 @@ layout, one container per part) and prints one line per step, ending `ready N pa
 working copy is its own compose project (`agentage-{id}-{8 hex of the folder}`), so `up` refuses
 while another copy holds 4280 or 4281 (naming it), and on a kept volume the store line says
 `already applied`. `down` removes this copy's project only and names it (`--keep-data` keeps the
-store volume). `token` mints a dev token (`aga_` + EdDSA JWT, `{id}:{verb}` scopes) that nothing
-verifies yet. Every docker, git and npm call has a timeout (`tool/timeouts.ts`); none retries, and
+store volume). `token` mints a dev token (`aga_` + EdDSA JWT, `{id}:{verb}` scopes, 1 hour) that the
+parts of `up` check like a deployment's; the issuer also takes `ttlSeconds`, `aud` and
+`POST /revoke { jti }`. Every docker, git and npm call has a timeout (`tool/timeouts.ts`); none retries, and
 a re-run is safe. The cli runs the same code as `agentage extension build|up|down|token` through
 `@agentage/extension/tool`, plus `runCommand` and `checkCli` for installed commands.
 
 ## Run a part image
 
-|                                        |                                                                                                     |
-| -------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Entry                                  | `node node_modules/@agentage/extension/dist/runtime/main.js <part>`; port `3000` (`PORT` overrides) |
-| `/health`                              | loopback only (the container `HEALTHCHECK`, an operator on the node); `404` from any other address  |
-| `/.well-known/agentage-extension.json` | the record at `/run/agentage/agentage-extension.json` (`AGENTAGE_RECORD_FILE`) plus the host        |
-| `AGENTAGE_ORIGIN`                      | the deployment's origin; else taken from the request                                                |
-| `AGENTAGE_SETTINGS`                    | JSON of setting values over the manifest defaults                                                   |
-| `AGENTAGE_STORE_URL` / `_FILE`         | the postgres connection (or a file holding it); else libpq `PG*` variables                          |
-| `AGENTAGE_DEV_ISSUER`                  | set by `up` for the ui part only: its CSP then lets the harness reach the dev issuer                |
+|                                                           |                                                                                                     |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Entry                                                     | `node node_modules/@agentage/extension/dist/runtime/main.js <part>`; port `3000` (`PORT` overrides) |
+| `/health`                                                 | loopback only (the container `HEALTHCHECK`, an operator on the node); `404` from any other address  |
+| `/.well-known/agentage-extension.json`                    | the record at `/run/agentage/agentage-extension.json` (`AGENTAGE_RECORD_FILE`) plus the host        |
+| `AGENTAGE_ORIGIN`                                         | the deployment's origin; pages and ui take it from the request without it                           |
+| `AGENTAGE_SETTINGS`                                       | JSON of setting values over the manifest defaults                                                   |
+| `AGENTAGE_STORE_URL` / `_FILE`                            | the postgres connection (or a file holding it); else libpq `PG*` variables                          |
+| `AGENTAGE_ISSUER`, `AGENTAGE_AUDIENCE`, `AGENTAGE_ORIGIN` | required for api and mcp: without them, or with a host off the audience, the part does not start    |
+| `AGENTAGE_DEV_ISSUER`                                     | set by `up` for the ui part only: its CSP then lets the harness reach the dev issuer                |
 
 Schemas for the manifest, the build record, the discovery document, `/health` and the envelope are
 in [`packages/extension/schemas`](packages/extension/schemas), generated from the kit's Zod schemas

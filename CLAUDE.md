@@ -60,10 +60,12 @@ security, backend); this file only adds what the tree does not say.
   use `--network host` or `docker exec` to read it.
 - `ctx.store` is always present; without a store part it throws on first use.
 - The pages part is a kit-served static map in 0.2 (Next.js pages are a later kit).
-- `mcp.listing: token` closes `tools/list` with 401 until the kit verifies tokens.
-- Tokens are off in kit 0.2: `tokenCheck` (`auth/token-check.ts`) is an option of the part apps and
-  `runPart`, unset everywhere; with one, each route asks for its OpenAPI operation's access and each
-  `tools/call` for its tool's `scope` (read when undeclared). M3 plugs the JWKS check in there.
+- Tokens are on from kit 0.3 in every api and mcp part (`auth/part-auth.ts`): no
+  `AGENTAGE_ISSUER`, or a host off `AGENTAGE_AUDIENCE`, and the part does not start. Each route asks
+  for its OpenAPI operation's access, each `tools/call` for its tool's `scope` (read when
+  undeclared). The test servers (`startTestServer`, `startTestMcp`) run without a check and
+  `createTestContext` gives a fixed caller. Under `up` the tokens name the issuer
+  `http://issuer:3000` (the parts reach it there) while the host mints at `localhost:4281`.
 - `up` names its compose project per working copy; scripts reach it with
   `-f .agentage/compose.json`, never `-p`. The ui CSP allows the dev issuer only when
   `AGENTAGE_DEV_ISSUER` is set (only `up` sets it).

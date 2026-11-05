@@ -25,16 +25,21 @@ describe('access', () => {
     expect(routeAccess(DOC, 'GET', '/api/v1/echo')).toBe('public');
     expect(routeAccess(DOC, 'GET', '/api/v1/ticks')).toBe('read');
     expect(routeAccess(DOC, 'POST', '/api/v1/ticks')).toBe('write');
+    // As Express routes: without case, one trailing slash ignored.
+    expect(routeAccess(DOC, 'POST', '/api/v1/Ticks/')).toBe('write');
+    expect(routeAccess(DOC, 'DELETE', '/API/V1/TICKS/42/')).toBe('admin');
     expect(routeAccess(DOC, 'DELETE', '/api/v1/ticks/42')).toBe('admin');
     expect(routeAccess(DOC, 'PUT', '/api/v1/echo')).toBe('read');
     expect(routeAccess(DOC, 'GET', '/api/v1/nope')).toBe('read');
     expect(routeAccess(null, 'GET', '/api/v1/echo')).toBe('read');
   });
 
-  it('picks the most specific path: a concrete one over a template listed before it', () => {
+  // Express may route /x/admin to the /x/:id handler (first registered): every match counts.
+  it('takes the strongest access of every path the request matches', () => {
     const doc = {
       paths: {
-        '/x/{id}': { get: { security: [] } },
+        '/x/{id}': { get: { security: [] }, post: { security: [{ agentage: ['probe:write'] }] } },
+        '/x/me': { post: { security: [{ agentage: ['probe:read'] }] } },
         '/x/admin': { get: { security: [{ agentage: ['probe:admin'] }] } },
         '/x/{id}/{part}': { get: { security: [] } },
         '/x/{id}/notes': { get: { security: [{ agentage: ['probe:write'] }] } },
@@ -44,6 +49,7 @@ describe('access', () => {
     expect(routeAccess(doc, 'GET', '/x/42')).toBe('public');
     expect(routeAccess(doc, 'GET', '/x/42/notes')).toBe('write');
     expect(routeAccess(doc, 'GET', '/x/42/other')).toBe('public');
+    expect(routeAccess(doc, 'POST', '/x/me')).toBe('write');
   });
 
   it('takes the strongest of several needs', () => {

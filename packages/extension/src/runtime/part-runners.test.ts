@@ -29,6 +29,13 @@ export const create = (ctx) => {
   'dist/worker/index.js': `export const create = ({ schedule, log }) => { schedule('tick', '* * * * *', () => log.info('tick')); };\n`,
 };
 
+// The api and mcp parts need an issuer and an origin under the audience to start; none is called.
+const AUTH = {
+  AGENTAGE_ISSUER: 'http://127.0.0.1:9',
+  AGENTAGE_AUDIENCE: 'localhost',
+  AGENTAGE_ORIGIN: 'http://localhost:4280',
+};
+
 // SIGUSR2 stands in for SIGTERM: emitting it stops the server and the scheduler like a real stop.
 const STOP = 'SIGUSR2' as const;
 
@@ -53,7 +60,7 @@ const start = async (part: string, env: Record<string, string> = {}, at = dir): 
   const server: Server = await runPart({
     dir: at,
     part,
-    env: { PORT: '0', AGENTAGE_RECORD_FILE: `${at}/no-record.json`, ...env },
+    env: { PORT: '0', AGENTAGE_RECORD_FILE: `${at}/no-record.json`, ...AUTH, ...env },
     serve: { signals: [STOP], exit: () => undefined },
   });
   return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -81,7 +88,7 @@ describe('runPart per part', () => {
   it('mcp: the mcp.listing setting token closes tools/list', async () => {
     const url = await start('mcp', { AGENTAGE_SETTINGS: '{"mcp.listing":"token"}' });
     await expect(mcpSnapshot(`${url}/mcp`, '2026-07-28')).rejects.toThrow(
-      /^mcp answered 401: .*"tools\/list needs a token"/
+      /^mcp answered 401: .*"Missing token"/
     );
   });
 

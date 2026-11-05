@@ -2,14 +2,16 @@ import { type Server } from 'node:http';
 import { createContext, type PartContext, type ServerPartKind } from '../context/context.js';
 import { settingsFromEnv } from '../context/settings.js';
 import { DEFAULT_RECORD_FILE, loadRecord } from '../discovery/discovery.js';
-import { type TokenCheck } from '../auth/token-check.js';
-import { type HealthCheck } from '../health/health.js';
+import { type ExtensionRecord } from '../discovery/discovery.schema.js';
+import { declaredScopes, partAuth } from '../auth/part-auth.js';
+import { readOpenapi } from '../discovery/openapi.js';
 import { createLog, type Log } from '../log/log.js';
 import { type ImportModule } from '../manifest/entry.js';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
 import { hasPostgres, imageParts } from '../manifest/parts.js';
 import { type ImagePartKind } from '../manifest/primitives.schema.js';
 import { readManifest } from '../manifest/read-manifest.js';
+import { type PartAppBase } from '../server/app.js';
 import { serve, type ServeOptions } from '../server/serve.js';
 import { createStore, storeCheck } from '../store/store.js';
 import { type Store } from '../store/store.types.js';
@@ -22,9 +24,9 @@ export interface RunPartOptions {
   env: Env;
   importModule?: ImportModule;
   serve?: Pick<ServeOptions, 'signals' | 'exit'>;
-  // The host's token check for every route and tool; none in kit 0.2 (see auth/token-check.ts).
-  tokenCheck?: TokenCheck;
 }
+
+type Openapi = Record<string, unknown> | null;
 
 interface Start {
   pkg: ExtensionPackage;
@@ -70,29 +72,38 @@ const lazyContext = (start: Start, store: Store | undefined): (() => PartContext
   };
 };
 
-const baseFor = async (options: RunPartOptions, start: Start, store: Store | undefined) => {
+const guardFor = async (start: Start, openapi: Openapi, record: ExtensionRecord | null) => {
+  if (start.part !== 'api' && start.part !== 'mcp') return { checks: {} };
+  const { id } = start.pkg.agentage;
+  return partAuth(start.env, id, start.log, declaredScopes(id, openapi, record?.tools));
+};
+
+const baseFor = async (start: Start, store: Store | undefined, openapi: Openapi) => {
   const { pkg, env, log } = start;
-  const checks: Record<string, HealthCheck> = store ? { store: storeCheck(store) } : {};
+  const record = await recordFor(env, log);
+  const guard: Partial<PartAppBase> = await guardFor(start, openapi, record);
   return {
     pkg,
     log,
-    checks,
+    record,
+    ...guard,
+    checks: { ...(store ? { store: storeCheck(store) } : {}), ...guard.checks },
     build: buildInfoFromEnv(env),
-    record: await recordFor(env, log),
     origin: env['AGENTAGE_ORIGIN'] || undefined,
     ownImage: env['AGENTAGE_IMAGE'],
-    tokenCheck: options.tokenCheck,
   };
 };
 
 const inputFor = async (options: RunPartOptions, start: Start): Promise<RunnerInput> => {
   const store = storeFor(start);
+  const openapi = await readOpenapi(options.dir);
   return {
     dir: options.dir,
     pkg: start.pkg,
     env: start.env,
     ctx: lazyContext(start, store),
-    base: await baseFor(options, start, store),
+    base: await baseFor(start, store, openapi),
+    openapi,
     importModule: options.importModule,
   };
 };

@@ -10,7 +10,7 @@ export interface ServerIdentity {
   version: string;
 }
 
-const text = (value: unknown) => [{ type: 'text' as const, text: JSON.stringify(value) }];
+const text = (value: string) => [{ type: 'text' as const, text: value }];
 
 // A failed tool is isError with the REST error shape; anything unexpected is a generic INTERNAL.
 // Outside a request (no agcid in scope) the error still carries a valid one, minted here.
@@ -18,13 +18,26 @@ const errorResult = (err: unknown, log: Log) => {
   const failure: Failure = isFailure(err) ? err : fail('INTERNAL', 'Internal error');
   if (failure.status >= 500) log.error(err);
   const error = { code: failure.code, message: failure.message, agcid: agcidOf(currentAgcid()) };
-  return { isError: true, content: text({ error }), structuredContent: { error } };
+  return { isError: true, content: text(error.message), structuredContent: { error } };
+};
+
+// The kit, not the SDK, refuses bad arguments (C7): the SDK lists the schema, passes all through.
+const listedOnly = (input: ToolEntry['spec']['input']) => ({
+  '~standard': { ...input['~standard'], validate: (value: unknown) => ({ value }) },
+});
+
+const argsOf = (entry: ToolEntry, args: Record<string, unknown>) => {
+  const parsed = entry.spec.input.safeParse(args);
+  if (parsed.success) return parsed.data;
+  const fields = new Set(parsed.error.issues.map((issue) => issue.path.join('.') || '(root)'));
+  throw fail('VALIDATION_ERROR', `Invalid arguments: ${[...fields].join(', ')}`);
 };
 
 const callback = (entry: ToolEntry, log: Log) => async (args: Record<string, unknown>) => {
   try {
-    const output = entry.spec.output.parse(await entry.handler(args));
-    return { content: text(output), structuredContent: output as Record<string, unknown> };
+    const output = entry.spec.output.parse(await entry.handler(argsOf(entry, args)));
+    const content = text(JSON.stringify(output));
+    return { content, structuredContent: output as Record<string, unknown> };
   } catch (err) {
     return errorResult(err, log);
   }
@@ -36,7 +49,7 @@ export const serverFactory = (identity: ServerIdentity, tools: ToolEntry[], log:
   for (const entry of tools) {
     const config = {
       description: entry.spec.description,
-      inputSchema: entry.spec.input,
+      inputSchema: listedOnly(entry.spec.input),
       outputSchema: entry.spec.output,
     };
     server.registerTool(prefixed(identity.id, entry.name), config, callback(entry, log));

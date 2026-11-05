@@ -1,3 +1,5 @@
+import { setTimeout as sleep } from 'node:timers/promises';
+
 // What a route or tool declares (api-standards section 5): public, or a verb on the extension's own scope.
 export type Access = 'public' | 'read' | 'write' | 'admin';
 
@@ -6,13 +8,12 @@ export interface Caller {
   scopes: readonly string[];
 }
 
-// A caller, or a thrown UNAUTHORIZED, FORBIDDEN or UNAVAILABLE; none runs in kit 0.2 (tokens off).
+// A caller, or a thrown UNAUTHORIZED, FORBIDDEN or UNAVAILABLE (verify-token.ts).
 export type TokenCheck = (
   authorization: string | undefined,
   access: Access
 ) => Promise<Caller | null>;
 
-// Kit-private until ctx.auth.caller(request) exists (M3): part code never reads it from the request.
 const callers = new WeakMap<object, Caller | null>();
 
 export const setCaller = (request: object, caller: Caller | null): void =>
@@ -20,7 +21,10 @@ export const setCaller = (request: object, caller: Caller | null): void =>
 
 export const callerOf = (request: object): Caller | null => callers.get(request) ?? null;
 
-const RANK: Record<Access, number> = { public: 0, read: 1, write: 2, admin: 3 };
+export const RANK: Record<Access, number> = { public: 0, read: 1, write: 2, admin: 3 };
+
+export const scopeOf = (id: string, access: Access = 'read'): string =>
+  access === 'public' ? 'public' : `${id}:${access}`;
 
 export const strongest = (needed: readonly Access[]): Access =>
   needed.reduce<Access>((top, access) => (RANK[access] > RANK[top] ? access : top), 'public');
@@ -37,3 +41,11 @@ export const accessOfSecurity = (security: unknown): Access => {
   const verbs = scopes.map((scope) => (VERB.exec(scope)?.[1] as Access | undefined) ?? 'read');
   return verbs.length === 0 ? 'read' : strongest(verbs);
 };
+
+// security.md: a failed read of the issuer is tried once more before it counts as an outage.
+export const retryOnce = <T>(read: () => Promise<T>, retries = (_err: unknown) => true) =>
+  read().catch(async (err: unknown) => {
+    if (!retries(err)) throw err;
+    await sleep(1000);
+    return read();
+  });

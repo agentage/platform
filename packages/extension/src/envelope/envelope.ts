@@ -33,11 +33,14 @@ export interface Failure extends Error {
   readonly status: number;
   readonly details?: ErrorDetail[];
   readonly retryAfter?: number;
+  readonly headers?: Readonly<Record<string, string>>;
 }
 
 export interface FailOptions {
   details?: ErrorDetail[];
   retryAfter?: number;
+  // Sent with the refusal, as WWW-Authenticate on a 401 or 403 (api-standards section 5).
+  headers?: Record<string, string>;
 }
 
 // A registry symbol, so a failure thrown through a second copy of the kit is still recognised.
@@ -59,6 +62,7 @@ export const fail = (code: ErrorCode, message: string, options: FailOptions = {}
     status: ERROR_STATUS[code],
     details: options.details,
     retryAfter: retryAfterOf(code, options.retryAfter),
+    headers: options.headers,
   });
 
 export const isFailure = (err: unknown): err is Failure =>

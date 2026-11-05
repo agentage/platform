@@ -128,9 +128,23 @@
       "minItems": 1,
       "type": "array",
       "items": {
-        "type": "string",
-        "maxLength": 64,
-        "pattern": "^[a-z][a-z0-9-]*__[a-z][a-z0-9_-]*$"
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[a-z][a-z0-9-]*__[a-z][a-z0-9_-]*$"
+          },
+          "scope": {
+            "type": "string",
+            "pattern": "^(public|[a-z][a-z0-9-]*:(read|write|admin))$"
+          }
+        },
+        "required": [
+          "name",
+          "scope"
+        ],
+        "additionalProperties": false
       }
     },
     "widgets": {

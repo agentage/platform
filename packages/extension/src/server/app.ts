@@ -26,8 +26,10 @@ export interface PartAppBase {
   ownImage?: string;
   origin?: string;
   checks?: Record<string, HealthCheck>;
-  // Off (undefined) in kit 0.2: no route or tool checks a token; M3 passes the JWKS check.
+  // Set by the runtime for api and mcp parts (auth/part-auth.ts); unset in the test servers.
   tokenCheck?: TokenCheck;
+  // The RFC 9728 document a token-protected part serves at /.well-known/oauth-protected-resource.
+  resource?: Record<string, unknown>;
 }
 
 export interface PartAppOptions extends PartAppBase {
@@ -80,6 +82,9 @@ export const createPartApp = (options: PartAppOptions): Express => {
   if (options.part !== 'worker') {
     app.use('/.well-known', cors(PUBLIC_CORS));
     app.get('/.well-known/agentage-extension.json', discoveryHandler(options));
+    const { resource } = options;
+    if (resource)
+      app.get('/.well-known/oauth-protected-resource', (_req, res) => void res.json(resource));
   }
   options.mount(app);
   app.use(notFound);
