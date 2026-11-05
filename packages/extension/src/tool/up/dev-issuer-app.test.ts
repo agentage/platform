@@ -1,8 +1,8 @@
-import { type Server } from 'node:http';
+import { request, type Server } from 'node:http';
 import { type AddressInfo } from 'node:net';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { claimsOf } from '../../test-support/issuer.js';
-import { createIssuer, DEV_AUDIENCE, DEV_ISSUER, mint, newKeys } from './dev-issuer-app.js';
+import { createIssuer, DEV_AUDIENCE, mint, newKeys, UP_ISSUER } from './dev-issuer-app.js';
 
 let issuer: Server;
 let url: string;
@@ -11,7 +11,10 @@ beforeEach(async () => {
   await new Promise<void>((resolve) => issuer.listen(0, '127.0.0.1', resolve));
   url = `http://127.0.0.1:${(issuer.address() as AddressInfo).port}`;
 });
-afterEach(() => void issuer.close());
+afterEach(() => {
+  vi.useRealTimers();
+  issuer.close();
+});
 
 const post = (body: string, path = '/token') => fetch(`${url}${path}`, { method: 'POST', body });
 
@@ -23,8 +26,9 @@ describe('dev issuer', () => {
     const preflight = await fetch(`${url}/token`, { method: 'OPTIONS' });
     expect(preflight.status).toBe(204);
     expect(preflight.headers.get('access-control-allow-origin')).toBe('*');
-    // A browser test that adds its own headers still gets the harness its token.
-    expect(preflight.headers.get('access-control-allow-headers')).toBe('*');
+    expect(preflight.headers.get('access-control-allow-headers')).toBe(
+      'content-type, x-client-type'
+    );
     expect((await fetch(`${url}/token`)).status).toBe(404);
     expect((await fetch(`${url}/nope`, { method: 'POST' })).status).toBe(404);
   });
@@ -55,7 +59,7 @@ describe('dev issuer', () => {
 
   it('mints with the given clock and key id', () => {
     const keys = newKeys();
-    const settings = { issuer: DEV_ISSUER, audience: DEV_AUDIENCE };
+    const settings = { issuer: UP_ISSUER, audience: DEV_AUDIENCE };
     const { token, expiresAt } = mint(
       keys,
       { scope: 'probe:read' },
@@ -73,7 +77,7 @@ describe('dev issuer', () => {
   it('mints for another audience and down to one second (test inputs, C9)', async () => {
     const res = await post('{"scope":"probe:read","aud":"other.example","ttlSeconds":1}');
     const claims = claimsOf(((await res.json()) as { token: string }).token);
-    expect(claims).toMatchObject({ aud: 'other.example', iss: DEV_ISSUER });
+    expect(claims).toMatchObject({ aud: 'other.example', iss: UP_ISSUER });
     expect(Number(claims['exp']) - Number(claims['iat'])).toBe(1);
     const plain = claimsOf(
       ((await (await post('{"scope":"probe:read"}')).json()) as { token: string }).token
@@ -81,30 +85,22 @@ describe('dev issuer', () => {
     expect(plain['aud']).toBe('localhost');
   });
 
-  it('revokes a jti it minted: listed with its exp until the exp passes', async () => {
-    const { token } = (await (await post('{"scope":"probe:read","ttlSeconds":1}')).json()) as {
-      token: string;
-    };
-    const { jti, exp } = claimsOf(token) as { jti: string; exp: number };
+  it('revokes a jti: listed for a day, the longest a dev token lives', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const jti = `tok_${'0'.repeat(36)}`;
     const revoked = await post(JSON.stringify({ jti }), '/revoke');
     expect([revoked.status, await revoked.json()]).toEqual([200, { jti, revoked: true }]);
     const list = await fetch(`${url}/.well-known/agentage-revoked`);
     expect(list.headers.get('cache-control')).toBe('no-store');
+    const exp = Math.floor(Date.now() / 1000) + 86_400;
     const body = (await list.json()) as { revoked: object[]; generatedAt: string };
-    expect(body.revoked).toEqual([{ jti, exp }]);
-    expect(new Date(body.generatedAt).toISOString()).toBe(body.generatedAt);
-    vi.useFakeTimers({ toFake: ['Date'] });
+    expect(body).toEqual({ revoked: [{ jti, exp }], generatedAt: new Date().toISOString() });
     vi.setSystemTime((exp + 1) * 1000);
-    const later = (await (await fetch(`${url}/.well-known/agentage-revoked`)).json()) as {
-      revoked: object[];
-    };
-    vi.useRealTimers();
-    expect(later.revoked).toEqual([]);
+    const later = await (await fetch(`${url}/.well-known/agentage-revoked`)).json();
+    expect(later).toMatchObject({ revoked: [] });
   });
 
-  it('refuses a revoke of a jti it never minted, or a bad body', async () => {
-    const unknown = await post(JSON.stringify({ jti: `tok_${'0'.repeat(36)}` }), '/revoke');
-    expect([unknown.status, await unknown.json()]).toEqual([404, { error: 'unknown jti' }]);
+  it('refuses a revoke with a bad body', async () => {
     for (const body of ['{}', '{nope', '{"jti":"x","more":1}']) {
       const res = await post(body, '/revoke');
       expect([res.status, await res.json()], body).toEqual([
@@ -112,5 +108,27 @@ describe('dev issuer', () => {
         { error: 'jti must be a tok_ id' },
       ]);
     }
+  });
+
+  it('answers loopback and its compose name only, and pages of the local gateway only', async () => {
+    // fetch sets Host itself; node:http sends the one given.
+    const status = (headers: { host?: string; origin?: string }) =>
+      new Promise<number | undefined>((resolve, reject) => {
+        const options = { method: 'OPTIONS', headers };
+        const req = request(`${url}/token`, options, (res) => resolve(res.resume().statusCode));
+        req.on('error', reject).end();
+      });
+    for (const host of ['localhost:4281', '127.0.0.1:4281', 'issuer:3000'])
+      expect(await status({ host }), host).toBe(204);
+    for (const origin of ['http://localhost:4280', 'http://127.0.0.1:4280'])
+      expect(await status({ origin }), origin).toBe(204);
+    for (const headers of [{ host: 'evil.example' }, { origin: 'https://evil.example' }] as const)
+      expect(await status(headers), JSON.stringify(headers)).toBe(403);
+    expect(await status({ origin: 'http://localhost:3000' })).toBe(403);
+    const refused = await fetch(`${url}/token`, { method: 'POST', headers: { origin: 'null' } });
+    expect([refused.status, await refused.json()]).toEqual([
+      403,
+      { error: 'host or origin not allowed' },
+    ]);
   });
 });

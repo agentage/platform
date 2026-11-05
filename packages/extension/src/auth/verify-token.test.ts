@@ -40,11 +40,12 @@ let check: TokenCheck;
 const checkOf = (url: string) => {
   revoked = createRevokedList(url, recordedLog().log);
   const deps = { issuer: url, audience: AUDIENCE, id: 'probe', origin: ORIGIN, revoked };
-  return createTokenCheck({ ...deps, keys: remoteKeys(url) });
+  return createTokenCheck({ ...deps, keys: remoteKeys(url).keys });
 };
 beforeEach(async () => {
   issuer = await startIssuer();
   check = checkOf(issuer.url);
+  await revoked.refresh();
 });
 afterEach(async () => {
   vi.useRealTimers();
@@ -83,6 +84,27 @@ describe('the token check (C4)', () => {
     await expect(check(memory, 'read')).rejects.toMatchObject(forbidden('probe:read'));
   });
 
+  it('a scope is exactly {id}:{verb}: anything longer grants nothing', async () => {
+    for (const [scope, access] of [
+      ['probe:admin:x', 'admin'],
+      ['probe:read:junk', 'read'],
+      ['probe:constructor', 'read'],
+    ] as const)
+      await expect(check(await forged({}, { scope }), access), scope).rejects.toMatchObject(
+        forbidden(`probe:${access}`)
+      );
+  });
+
+  it('the Bearer scheme in any case; the aga_ prefix exactly', async () => {
+    const bearer = await issuer.bearer({ scope: 'probe:read' });
+    expect(await check(bearer.replace('Bearer', 'bEARER'), 'read')).toMatchObject({
+      sub: 'usr_dev',
+    });
+    await expect(check(bearer.replace('aga_', 'AGA_'), 'read')).rejects.toMatchObject(
+      unauthorized('Invalid token')
+    );
+  });
+
   it('no token, another scheme or no aga_ prefix is 401 naming the resource document', async () => {
     await expect(check(undefined, 'read')).rejects.toMatchObject(unauthorized('Missing token'));
     const bearer = await issuer.bearer({ scope: 'probe:read' });
@@ -106,6 +128,9 @@ describe('the token check (C4)', () => {
       `Bearer ${otherIss.token}`,
       await forged({ key: otherKey() }),
       await forged({ typ: 'JWT' }),
+      await forged({ typ: 'application/at+jwt' }),
+      await forged({ typ: 'AT+JWT' }),
+      await forged({}, { aud: [AUDIENCE, 'evil.example'] }),
       await forged({ alg: 'HS256', key: new Uint8Array(32) }),
       await forged({ kid: undefined }),
       await forged({}, { exp: undefined }),
@@ -144,6 +169,15 @@ describe('the token check (C4)', () => {
     expect(await check(bearer, 'read')).toMatchObject({ sub: 'usr_dev' });
     vi.setSystemTime(Date.now() + 31_000);
     await expect(check(unknown, 'read')).rejects.toMatchObject(UNAVAILABLE);
+  });
+
+  it('a failed key read is tried once more before it counts as an outage', async () => {
+    const bearer = await issuer.bearer({ scope: 'probe:read' });
+    const real = globalThis.fetch;
+    const reads = vi.spyOn(globalThis, 'fetch').mockImplementation((url, init) => real(url, init));
+    reads.mockImplementationOnce(() => Promise.reject(new TypeError('fetch failed')));
+    expect(await check(bearer, 'read')).toMatchObject({ sub: 'usr_dev' });
+    expect(reads).toHaveBeenCalledTimes(2);
   });
 
   it('no key read yet and the issuer unreachable: 503 with Retry-After, never 401', async () => {

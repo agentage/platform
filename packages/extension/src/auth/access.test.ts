@@ -25,6 +25,9 @@ describe('access', () => {
     expect(routeAccess(DOC, 'GET', '/api/v1/echo')).toBe('public');
     expect(routeAccess(DOC, 'GET', '/api/v1/ticks')).toBe('read');
     expect(routeAccess(DOC, 'POST', '/api/v1/ticks')).toBe('write');
+    // As Express routes: without case, one trailing slash ignored.
+    expect(routeAccess(DOC, 'POST', '/api/v1/Ticks/')).toBe('write');
+    expect(routeAccess(DOC, 'DELETE', '/API/V1/TICKS/42/')).toBe('admin');
     expect(routeAccess(DOC, 'DELETE', '/api/v1/ticks/42')).toBe('admin');
     expect(routeAccess(DOC, 'PUT', '/api/v1/echo')).toBe('read');
     expect(routeAccess(DOC, 'GET', '/api/v1/nope')).toBe('read');

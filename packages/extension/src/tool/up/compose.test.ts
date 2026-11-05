@@ -103,7 +103,6 @@ describe('composeFile', () => {
     expect(services['issuer']).toEqual({
       image: TAGS['pages'],
       command: ['node', 'node_modules/@agentage/extension/dist/tool/up/dev-issuer.js'],
-      environment: TOKENS,
       ports: ['127.0.0.1:4281:3000'],
     });
   });

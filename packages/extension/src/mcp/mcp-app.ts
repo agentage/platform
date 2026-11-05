@@ -20,6 +20,8 @@ const MCP_CORS = {
   allowedHeaders: [...(PUBLIC_CORS.allowedHeaders as string[]), ...MCP_HEADERS],
 };
 
+const PARSE_ERROR = { jsonrpc: '2.0', error: { code: -32700, message: 'Parse error' }, id: null };
+
 const parsed = (body: Buffer): unknown => {
   try {
     return JSON.parse(body.toString('utf8')) as unknown;
@@ -84,6 +86,8 @@ const handle =
   async (req: Request, res: Response): Promise<void> => {
     const body = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
     const message = parsed(body);
+    // The SDK reads a body again when given none (a BOM, say): it must only run what guard read.
+    if (message === undefined) return void res.status(400).json(PARSE_ERROR);
     await guard(options, req, message);
     await send(await handler.fetch(webRequest(req, body), { parsedBody: message }), res);
   };

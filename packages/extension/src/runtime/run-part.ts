@@ -72,27 +72,22 @@ const lazyContext = (start: Start, store: Store | undefined): (() => PartContext
   };
 };
 
-// Every api and mcp part checks tokens; its resource document names what its routes and tools need.
-type Guard = Pick<PartAppBase, 'tokenCheck' | 'resource' | 'checks'>;
-
-const authFor = (start: Start, openapi: Openapi, record: ExtensionRecord | null): Guard => {
-  if (start.part !== 'api' && start.part !== 'mcp') return {};
+const guardFor = async (start: Start, openapi: Openapi, record: ExtensionRecord | null) => {
+  if (start.part !== 'api' && start.part !== 'mcp') return { checks: {} };
   const { id } = start.pkg.agentage;
-  const auth = partAuth(start.env, id, start.log);
-  const resource = auth.resource(declaredScopes(id, openapi, record?.tools));
-  return { tokenCheck: auth.check, resource, checks: { auth: auth.health } };
+  return partAuth(start.env, id, start.log, declaredScopes(id, openapi, record?.tools));
 };
 
 const baseFor = async (start: Start, store: Store | undefined, openapi: Openapi) => {
   const { pkg, env, log } = start;
   const record = await recordFor(env, log);
-  const { checks, ...guard } = authFor(start, openapi, record);
+  const guard: Partial<PartAppBase> = await guardFor(start, openapi, record);
   return {
     pkg,
     log,
     record,
     ...guard,
-    checks: { ...(store ? { store: storeCheck(store) } : {}), ...checks },
+    checks: { ...(store ? { store: storeCheck(store) } : {}), ...guard.checks },
     build: buildInfoFromEnv(env),
     origin: env['AGENTAGE_ORIGIN'] || undefined,
     ownImage: env['AGENTAGE_IMAGE'],

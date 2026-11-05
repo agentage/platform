@@ -1,3 +1,5 @@
+import { setTimeout as sleep } from 'node:timers/promises';
+
 // What a route or tool declares (api-standards section 5): public, or a verb on the extension's own scope.
 export type Access = 'public' | 'read' | 'write' | 'admin';
 
@@ -12,7 +14,6 @@ export type TokenCheck = (
   access: Access
 ) => Promise<Caller | null>;
 
-// Read by part code only through ctx.auth.caller(request).
 const callers = new WeakMap<object, Caller | null>();
 
 export const setCaller = (request: object, caller: Caller | null): void =>
@@ -22,7 +23,6 @@ export const callerOf = (request: object): Caller | null => callers.get(request)
 
 export const RANK: Record<Access, number> = { public: 0, read: 1, write: 2, admin: 3 };
 
-// The scope a route or tool declares, as tokens and the record name it: {id}:{verb}, or public.
 export const scopeOf = (id: string, access: Access = 'read'): string =>
   access === 'public' ? 'public' : `${id}:${access}`;
 
@@ -41,3 +41,11 @@ export const accessOfSecurity = (security: unknown): Access => {
   const verbs = scopes.map((scope) => (VERB.exec(scope)?.[1] as Access | undefined) ?? 'read');
   return verbs.length === 0 ? 'read' : strongest(verbs);
 };
+
+// security.md: a failed read of the issuer is tried once more before it counts as an outage.
+export const retryOnce = <T>(read: () => Promise<T>, retries = (_err: unknown) => true) =>
+  read().catch(async (err: unknown) => {
+    if (!retries(err)) throw err;
+    await sleep(1000);
+    return read();
+  });

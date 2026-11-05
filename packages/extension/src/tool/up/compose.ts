@@ -1,7 +1,7 @@
 import { type ExtensionPackage } from '../../manifest/manifest.schema.js';
 import { hasPostgres, imageParts } from '../../manifest/parts.js';
 import { type ImagePartKind } from '../../manifest/primitives.schema.js';
-import { DEV_AUDIENCE, DEV_ISSUER } from './dev-issuer-app.js';
+import { DEV_AUDIENCE, DEV_ISSUER, UP_ISSUER } from './dev-issuer-app.js';
 import { GATEWAY_PORT, ISSUER_PORT, PART_PORT, TRAEFIK_COMMAND, TRAEFIK_IMAGE } from './gateway.js';
 
 export const STORE_IMAGE = 'postgres:18-alpine';
@@ -24,11 +24,7 @@ const STORE_PASSWORD = 'agentage-local';
 
 const storeUrl = (id: string): string => `postgres://${id}:${STORE_PASSWORD}@store:5432/${id}`;
 
-// The parts read the issuer's keys over the compose network, so its tokens name that address.
-const TOKENS = {
-  AGENTAGE_ISSUER: `http://issuer:${PART_PORT}`,
-  AGENTAGE_AUDIENCE: DEV_AUDIENCE,
-};
+const TOKENS = { AGENTAGE_ISSUER: UP_ISSUER, AGENTAGE_AUDIENCE: DEV_AUDIENCE };
 
 // Only the ui under `up` names the dev issuer: its CSP then lets the harness ask it for a token.
 const partEnv = (pkg: ExtensionPackage, part: ImagePartKind | 'migrate') => ({
@@ -74,7 +70,6 @@ const fixedServices = (input: ComposeInput, anyImage: string) => ({
   issuer: {
     image: anyImage,
     command: ['node', ISSUER_ENTRY],
-    environment: TOKENS,
     ports: [`127.0.0.1:${ISSUER_PORT}:${PART_PORT}`],
   },
 });

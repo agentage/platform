@@ -18,7 +18,7 @@ export interface ExtensionInfo {
 // The kit 0.3 subset of the host ctx; secrets and spans arrive in later versions.
 export interface PartContext {
   readonly extension: Readonly<ExtensionInfo>;
-  // Who called, as the kit's token check found it; null on a public route.
+  // api only: who called, as the token check found it; null on a public route and in other parts.
   readonly auth: { caller(request: object): Caller | null };
   readonly log: Log;
   readonly settings: Readonly<Record<string, SettingValue>>;

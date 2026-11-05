@@ -34,7 +34,7 @@ const PartsRecordSchema = z
     message: 'at least one part with an image',
   });
 
-const OriginSchema = z
+export const OriginSchema = z
   .string()
   .max(270)
   .regex(
@@ -47,7 +47,6 @@ export const WidgetSchema = z.strictObject({
   module: z.string().regex(/^\/ui\/[^/]+\/[^/]+\.m?js$/),
 });
 
-// C8: each tool names the scope tools/call needs, or public.
 const ToolRecordSchema = z.strictObject({
   name: PrefixedToolNameSchema,
   scope: z.string().regex(/^(public|[a-z][a-z0-9-]*:(read|write|admin))$/),
