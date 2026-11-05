@@ -32,3 +32,6 @@ export const imageParts = (pkg: ExtensionPackage): ImagePartKind[] => {
 
 export const entryOf = (pkg: ExtensionPackage, part: ImagePartKind | 'cli'): string =>
   normalizeParts(pkg.agentage.parts).code[part]?.entry ?? `./dist/${part}/index.js`;
+
+export const hasPostgres = (pkg: ExtensionPackage): boolean =>
+  normalizeParts(pkg.agentage.parts).store === 'postgres';

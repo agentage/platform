@@ -133,5 +133,3 @@ export const build = async (
   if (!options.push) return result;
   return { ...result, recordFile: await writeRecord(dir, await recordFor(dir, pkg, info, images)) };
 };
-
-export { writeRecord };

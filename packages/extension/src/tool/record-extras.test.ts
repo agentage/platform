@@ -76,7 +76,7 @@ describe('recordExtras', () => {
   it('refuses an mcp entry without create, a bad widgets.json and a bad openapi.json', async () => {
     await expect(
       toolNames(await probe({ 'dist/mcp/index.js': 'export const x = 1;' }), FULL)
-    ).rejects.toThrow('the mcp entry does not export create(ctx)');
+    ).rejects.toThrow(/dist\/mcp\/index\.js does not export create\(ctx\)/);
     await expect(
       recordExtras(await probe({ 'dist/ui/widgets.json': '[]' }), FULL)
     ).rejects.toThrow();

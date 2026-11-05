@@ -174,11 +174,7 @@ describe('api app: envelope and headers', () => {
   it('maps a bad JSON body to 400 and an oversized one to 413', async () => {
     const { get } = await start();
     const post = (body: string) =>
-      get('/api/v1/body', {
-        method: 'POST',
-        body,
-        headers: JSON_TYPE,
-      });
+      get('/api/v1/body', { method: 'POST', body, headers: JSON_TYPE });
     expect((await post('{"a":1}')).status).toBe(200);
     expect(await (await post('{bad')).json()).toMatchObject({
       error: { code: 'VALIDATION_ERROR' },

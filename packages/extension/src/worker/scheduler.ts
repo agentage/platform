@@ -2,7 +2,7 @@ import { type HealthCheck } from '../health/health.js';
 import { type Log } from '../log/log.js';
 import { nextRun, parseCron, type Cron } from './cron.js';
 import { JobNameSchema, JobOptionsSchema, toMs, type JobOptions } from './job-options.js';
-import { withRunBuffer } from './run-log.js';
+import { withRunBuffer, type RunBuffer } from './run-log.js';
 import { type JobRun, type RunStatus, type RunStore } from './runs.js';
 
 export type Job = () => unknown;
@@ -75,7 +75,7 @@ const newEntry = (
   return entry;
 };
 
-const runJob = async (entry: Entry, log: Log, buffer: { text: string; truncated: boolean }) => {
+const runJob = async (entry: Entry, log: Log, buffer: RunBuffer) => {
   try {
     await withRunBuffer(buffer, async () => entry.job());
     return 'ok' as const;
@@ -88,7 +88,7 @@ const runJob = async (entry: Entry, log: Log, buffer: { text: string; truncated:
 // Never twice at once; every run saved with its log, a failed save is logged and the job goes on.
 const execute = async (s: State, entry: Entry): Promise<JobRun> => {
   entry.running = true;
-  const buffer = { text: '', truncated: false };
+  const buffer: RunBuffer = { text: '', truncated: false };
   const startedAt = s.now();
   const status = await runJob(entry, s.deps.log, buffer);
   entry.running = false;

@@ -15,7 +15,8 @@ security, backend); this file only adds what the tree does not say.
 
 - `envelope/` ok, fail, parse, the closed error codes; `agcid/` UUIDv7, the request scope
   (`current.ts` has no express import, so logs and the tool stay loadable by the cli)
-- `manifest/` the Zod manifest (`package.json` `agentage` key), parts normalization, reader
+- `manifest/` the Zod manifest (`package.json` `agentage` key), parts normalization, reader,
+  `entry.ts` (`loadCreate`: the one way part, command and build code reach a part's `create`)
 - `discovery/` the build record, the served discovery document, the committed `openapi.json`
 - `context/` ctx, settings from `AGENTAGE_SETTINGS`, `createTestContext` (parts and commands)
 - `server/` the kit app every part runs (`createPartApp`), errors, listen and shutdown

@@ -12,14 +12,16 @@ export interface ServiceState {
   exitCode: number;
 }
 
+export const composeArgs = (target: ComposeTarget, args: string[]): string[] => [
+  'compose',
+  ...(target.file ? ['-f', target.file] : []),
+  '-p',
+  target.project,
+  ...args,
+];
+
 export const compose = (run: Run, target: ComposeTarget, args: string[]): Promise<string> =>
-  mustRun(run, 'docker', [
-    'compose',
-    ...(target.file ? ['-f', target.file] : []),
-    '-p',
-    target.project,
-    ...args,
-  ]);
+  mustRun(run, 'docker', composeArgs(target, args));
 
 interface PsRow {
   Service?: string;

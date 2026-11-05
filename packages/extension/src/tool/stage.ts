@@ -2,7 +2,7 @@ import { access, cp, mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, normalize, sep } from 'node:path';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
-import { entryOf, normalizeParts } from '../manifest/parts.js';
+import { entryOf, hasPostgres } from '../manifest/parts.js';
 import { type ImagePartKind } from '../manifest/primitives.schema.js';
 import { OPENAPI_FILE } from '../discovery/openapi.js';
 import { serverPartRecipe } from './recipe.js';
@@ -31,7 +31,7 @@ export const localTarballs = (pkg: ExtensionPackage): string[] =>
       return path;
     });
 
-const exists = (path: string): Promise<boolean> =>
+export const exists = (path: string): Promise<boolean> =>
   access(path).then(
     () => true,
     () => false
@@ -51,13 +51,16 @@ const copyDeps = async (dir: string, root: string, pkg: ExtensionPackage): Promi
   for (const path of localTarballs(pkg)) await copyInto(join(dir, path), join(root, 'deps', path));
 };
 
+// The api image runs the migrate job, so it alone carries the store's files.
+const migrates = (pkg: ExtensionPackage, part: ImagePartKind): boolean =>
+  part === 'api' && hasPostgres(pkg);
+
 // What a part image carries: its own dist/{part}, the shared dist/lib, and for api the store files.
 export const appPaths = async (dir: string, pkg: ExtensionPackage, part: ImagePartKind) => {
   const paths = ['package.json', join('dist', part)];
   if (part === 'api' && (await exists(join(dir, OPENAPI_FILE)))) paths.push(OPENAPI_FILE);
   if (await exists(join(dir, 'dist', 'lib'))) paths.push(join('dist', 'lib'));
-  const postgres = normalizeParts(pkg.agentage.parts).store === 'postgres';
-  if (part === 'api' && postgres) {
+  if (migrates(pkg, part)) {
     for (const folder of ['migrations', 'seeds'])
       if (await exists(join(dir, folder))) paths.push(folder);
   }
@@ -67,7 +70,7 @@ export const appPaths = async (dir: string, pkg: ExtensionPackage, part: ImagePa
 const copyApp = async (dir: string, root: string, pkg: ExtensionPackage, part: ImagePartKind) => {
   for (const path of await appPaths(dir, pkg, part))
     await copyInto(join(dir, path), join(root, 'app', path));
-  if (part === 'api' && normalizeParts(pkg.agentage.parts).store === 'postgres') {
+  if (migrates(pkg, part)) {
     await mkdir(join(root, 'app', 'dist', 'store'), { recursive: true });
     await writeFile(join(root, 'app', 'dist', 'store', 'migrate.js'), MIGRATE_SHIM);
   }

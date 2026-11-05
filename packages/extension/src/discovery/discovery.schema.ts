@@ -41,7 +41,7 @@ const OriginSchema = z
     /^(https:\/\/[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+|http:\/\/(127\.0\.0\.1|localhost))(:[0-9]{1,5})?$/
   );
 
-const WidgetSchema = z.strictObject({
+export const WidgetSchema = z.strictObject({
   name: z.string().regex(/^[a-z][a-z0-9-]*$/),
   element: z.string().regex(/^[a-z][a-z0-9]*-[a-z0-9-]+$/),
   module: z.string().regex(/^\/ui\/[^/]+\/[^/]+\.m?js$/),

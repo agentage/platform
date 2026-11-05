@@ -1,5 +1,5 @@
 import { type ExtensionPackage } from '../../manifest/manifest.schema.js';
-import { imageParts, normalizeParts } from '../../manifest/parts.js';
+import { hasPostgres, imageParts } from '../../manifest/parts.js';
 import { type ImagePartKind } from '../../manifest/primitives.schema.js';
 import { GATEWAY_PORT, ISSUER_PORT, PART_PORT, TRAEFIK_COMMAND, TRAEFIK_IMAGE } from './gateway.js';
 
@@ -17,20 +17,19 @@ export interface ComposeInput {
 export const projectName = (pkg: ExtensionPackage): string => `agentage-${pkg.agentage.id}`;
 
 // A local-only credential: the store has no published port, only the parts' network reaches it.
-const storeUrl = (id: string): string => `postgres://${id}:agentage-local@store:5432/${id}`;
+const STORE_PASSWORD = 'agentage-local';
 
-const hasStore = (pkg: ExtensionPackage): boolean =>
-  normalizeParts(pkg.agentage.parts).store === 'postgres';
+const storeUrl = (id: string): string => `postgres://${id}:${STORE_PASSWORD}@store:5432/${id}`;
 
 const partEnv = (pkg: ExtensionPackage, part: ImagePartKind | 'migrate') => ({
   AGENTAGE_ORIGIN: `http://localhost:${GATEWAY_PORT}`,
   AGENTAGE_RECORD_FILE: RECORD_TARGET,
-  ...(hasStore(pkg) && part !== 'ui' ? { AGENTAGE_STORE_URL: storeUrl(pkg.agentage.id) } : {}),
+  ...(hasPostgres(pkg) && part !== 'ui' ? { AGENTAGE_STORE_URL: storeUrl(pkg.agentage.id) } : {}),
 });
 
 const storeService = (id: string) => ({
   image: STORE_IMAGE,
-  environment: { POSTGRES_USER: id, POSTGRES_PASSWORD: 'agentage-local', POSTGRES_DB: id },
+  environment: { POSTGRES_USER: id, POSTGRES_PASSWORD: STORE_PASSWORD, POSTGRES_DB: id },
   volumes: ['store:/var/lib/postgresql'],
   healthcheck: {
     test: ['CMD-SHELL', `pg_isready -U ${id} -d ${id}`],
@@ -44,7 +43,7 @@ const partService = (input: ComposeInput, part: ImagePartKind) => ({
   image: input.tags[part],
   environment: partEnv(input.pkg, part),
   volumes: [`${input.recordFile}:${RECORD_TARGET}:ro`],
-  ...(hasStore(input.pkg) && part !== 'ui'
+  ...(hasPostgres(input.pkg) && part !== 'ui'
     ? { depends_on: { store: { condition: 'service_healthy' } } }
     : {}),
 });
@@ -84,10 +83,10 @@ export const composeFile = (input: ComposeInput) => {
   const services: Record<string, unknown> = {};
   for (const part of parts) services[part] = partService(input, part);
   Object.assign(services, fixedServices(input, input.tags[parts[0] ?? 'api'] ?? ''));
-  if (hasStore(input.pkg)) {
+  if (hasPostgres(input.pkg)) {
     services['store'] = storeService(input.pkg.agentage.id);
     if (input.tags['api']) services['migrate'] = migrateService(input);
   }
-  const volumes = hasStore(input.pkg) ? { store: {} } : {};
+  const volumes = hasPostgres(input.pkg) ? { store: {} } : {};
   return { name: projectName(input.pkg), services, volumes };
 };
