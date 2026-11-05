@@ -1,6 +1,6 @@
 {
   "name": "@agentage/widget",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The agentage widget kit: useHost, design-system Button and Card in a shadow root, registerWidgets, and the ui bundler with its harness page",
   "type": "module",
   "license": "MIT",
