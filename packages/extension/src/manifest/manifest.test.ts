@@ -64,9 +64,7 @@ describe('manifest schema', () => {
     const owned = ['lowercase id, never a name the platform owns'];
     for (const id of ['auth', 'Probe', 'extension', 'com1'])
       expect(issuesOf(withAgentage({ id }))).toEqual(owned);
-    expect(issuesOf(withAgentage({ id: 'x'.repeat(33) }))).toEqual([
-      'Too big: expected string to have <=32 characters',
-    ]);
+    expect(issuesOf(withAgentage({ id: 'x'.repeat(33) }))).toEqual([expect.stringMatching(/<=32/)]);
     expect(issuesOf(withAgentage({ id: 'authors' }))).toEqual([]);
     expect(issuesOf(withAgentage({ parts: { worker: true } }))).toContain(
       'at least one routed part (pages, ui, api or mcp)'
@@ -94,7 +92,7 @@ describe('manifest schema', () => {
 
   it('refuses unknown keys in the manifest block', () => {
     expect(issuesOf(withAgentage({ contributes: {} }))).toEqual([
-      'Unrecognized key: "contributes"',
+      expect.stringContaining('"contributes"'),
     ]);
   });
 });

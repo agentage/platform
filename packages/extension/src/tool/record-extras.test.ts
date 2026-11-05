@@ -75,13 +75,15 @@ describe('recordExtras', () => {
     await expect(
       toolNames(await probe({ 'dist/mcp/index.js': 'export const x = 1;' }), FULL)
     ).rejects.toThrow(/dist\/mcp\/index\.js does not export create\(ctx\)/);
-    await expect(recordExtras(await probe({ 'dist/ui/widgets.json': '[]' }), FULL)).rejects.toThrow(
-      'Too small: expected array to have >=1 items'
-    );
+    await expect(
+      recordExtras(await probe({ 'dist/ui/widgets.json': '[]' }), FULL)
+    ).rejects.toMatchObject({ issues: [expect.objectContaining({ code: 'too_small', path: [] })] });
     const extra = json([{ ...WIDGETS[0], size: 1 }]);
     await expect(
       recordExtras(await probe({ 'dist/ui/widgets.json': extra }), FULL)
-    ).rejects.toThrow('Unrecognized key: \\"size\\"');
+    ).rejects.toMatchObject({
+      issues: [expect.objectContaining({ code: 'unrecognized_keys', keys: ['size'] })],
+    });
     const swagger = json({ swagger: '2.0', paths: {} });
     await expect(recordExtras(await probe({ 'openapi.json': swagger }), FULL)).rejects.toThrow(
       'openapi.json is not an OpenAPI 3.1 document'

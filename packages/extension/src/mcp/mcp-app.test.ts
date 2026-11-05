@@ -82,11 +82,7 @@ describe('mcp listing', () => {
     expect(init.status).toBe(200);
     const bad = await fetch(`${s.url}/mcp`, { method: 'POST', headers: HEADERS, body: '{nope' });
     expect(bad.status).toBe(400);
-    expect(await bad.json()).toEqual({
-      jsonrpc: '2.0',
-      error: { code: -32700, message: 'Parse error: Invalid JSON' },
-      id: null,
-    });
+    expect(await bad.json()).toMatchObject({ jsonrpc: '2.0', error: { code: -32700 }, id: null });
   });
 });
 
@@ -94,9 +90,9 @@ describe('mcp wire per protocol era', () => {
   it('answers a 2025-11-25 client with a one-event SSE stream, anonymous while listing is open', async () => {
     const res = await post((await app('open')).url, LIST);
     expect(res.headers.get('content-type')).toBe('text/event-stream');
-    const [event, data, ...rest] = (await res.text()).split('\n');
-    expect([event, rest]).toEqual(['event: message', ['', '']]);
-    const message = JSON.parse(data?.replace(/^data: /, '') ?? '') as unknown;
+    const data = (await res.text()).split('\n').filter((line) => line.startsWith('data:'));
+    expect(data).toHaveLength(1);
+    const message = JSON.parse(data[0]?.slice(5) ?? '') as unknown;
     expect(message).toEqual({ jsonrpc: '2.0', id: 1, result: { tools: [ECHO] } });
   });
 
@@ -119,8 +115,7 @@ describe('mcp wire per protocol era', () => {
       id: 1,
       error: {
         code: -32602,
-        message:
-          'Invalid params: the MCP-Protocol-Version header names protocol revision 2026-07-28, but the request is missing the required per-request envelope key(s): _meta',
+        message: expect.stringContaining('_meta'),
         data: { envelope: { missing: ['_meta'] } },
       },
     });

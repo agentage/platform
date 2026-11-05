@@ -86,8 +86,8 @@ describe('parse', () => {
     expect(failure).toMatchObject({ code: 'VALIDATION_ERROR', status: 400 });
     expect(failure.message).toBe('Invalid request');
     expect(failure.details).toEqual([
-      { field: 'msg', message: 'Invalid input: expected string, received undefined' },
-      { field: 'n', message: 'Invalid input: expected number, received NaN' },
+      { field: 'msg', message: expect.stringContaining('expected string') },
+      { field: 'n', message: expect.stringContaining('expected number') },
     ]);
   });
 

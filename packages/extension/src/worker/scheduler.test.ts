@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ZodError } from 'zod';
 import { recordedLog, type RecordedLog } from '../test-support/http.js';
 import { runLog } from './run-log.js';
 import { memoryRuns } from './runs.js';
@@ -20,12 +21,14 @@ afterEach(() => {
 });
 
 // The message a refused schedule throws, or 'scheduled'.
+// A Zod refusal reads as its issues (path, code, message), never as Zod's own JSON layout.
 const refusal = (name: string, cron = '* * * * *', options?: object): string => {
   try {
     scheduler.schedule(name, cron, () => undefined, options);
     return 'scheduled';
   } catch (err) {
-    return (err as Error).message;
+    if (!(err instanceof ZodError)) return (err as Error).message;
+    return err.issues.map((i) => `${i.path.join('.')} ${i.code}: ${i.message}`).join('; ');
   }
 };
 
@@ -135,15 +138,15 @@ describe('scheduler', () => {
   it('refuses a duplicate name, a bad name, a bad cron and unknown options', () => {
     scheduler.schedule('tick', '* * * * *', () => undefined);
     expect(refusal('tick')).toBe('job tick is scheduled twice');
-    expect(refusal('Tick_1')).toMatch(/"message": "job names are lowercase, digits and dashes"/);
-    expect(refusal('x'.repeat(49))).toMatch(/"message": "Too big: expected string to have <=48/);
+    expect(refusal('Tick_1')).toBe(' invalid_format: job names are lowercase, digits and dashes');
+    expect(refusal('x'.repeat(49))).toMatch(/^ too_big: /);
     expect(refusal('x'.repeat(48))).toBe('scheduled');
     expect(refusal('bad', '* * *')).toBe('cron "* * *": five fields expected');
-    expect(refusal('soon', '* * * * *', { timeout: 'soon' })).toMatch(
-      /"path": \[\s+"timeout"\s+\],\s+"message": "a duration like 500ms, 30s, 5m or 1h"/
+    expect(refusal('soon', '* * * * *', { timeout: 'soon' })).toBe(
+      'timeout invalid_format: a duration like 500ms, 30s, 5m or 1h'
     );
     expect(refusal('extra', '* * * * *', { timeout: 5, retries: 3 })).toMatch(
-      /"message": "Unrecognized key: \\"retries\\""/
+      /^ unrecognized_keys: .*retries/
     );
     expect(Object.keys(scheduler.checks())).toEqual(['job:tick', `job:${'x'.repeat(48)}`]);
   });

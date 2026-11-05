@@ -15,7 +15,7 @@ describe('the compose project', () => {
 
   it('resolves a symlinked folder to its real path, and keeps a missing one as given', async () => {
     const dir = await tempPackage({ 'package.json': '{}' });
-    const link = `${dir}-link`;
+    const link = join(await tempPackage({}), 'link');
     await symlink(dir, link, 'dir');
     expect(await workingCopy(link)).toBe(await workingCopy(dir));
     expect(await workingCopy('/no/such/folder')).toBe('/no/such/folder');

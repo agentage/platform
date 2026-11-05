@@ -124,7 +124,10 @@ describe('runCommand', () => {
     const brokenImport = await probe(ALL, "import './nope.js';\nexport const create = () => ({});");
     expect(await runIn(brokenImport, 'ping')).toMatchObject({
       code: EXIT_FAILED,
-      stderr: `Cannot find module './nope.js' imported from ${brokenImport}/dist/cli/index.js\n`,
+      // Node's own one-line message, passed through (its spelling of the path varies by loader).
+      stderr: expect.stringMatching(
+        /^Cannot find module '\S*nope\.js' imported from \S+\/dist\/cli\/index\.js\n$/
+      ),
     });
   });
 });

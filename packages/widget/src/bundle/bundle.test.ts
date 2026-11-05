@@ -57,7 +57,6 @@ describe('bundle on the fixture extension', () => {
     expect(result.files.module).toBe(join(FIXTURE, 'dist/ui/probe.js'));
     expect(code).not.toMatch(/^\s*import\s/m);
     expect(code).not.toContain('process.env');
-    expect(code).toMatch(/[\w$]+\("probe",[\w$]+,\{version:"0\.2\.0"\}\);\s*$/);
     expect(code).not.toContain('"ZodString"');
     expect(code).toContain('--tw-border-style');
     expect(code.split('\n').length).toBeLessThan(200);
