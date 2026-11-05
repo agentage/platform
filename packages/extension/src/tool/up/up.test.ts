@@ -1,7 +1,9 @@
+import { realpath } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { API_MANIFEST } from '../../test-support/packages.js';
 import { ENV, fakeDocker, PROBE, probeDir } from '../../test-support/up-fixtures.js';
+import { projectName } from './project.js';
 import { up } from './up.js';
 
 describe('up', () => {
@@ -46,7 +48,8 @@ describe('up', () => {
       'up -d --remove-orphans',
       'ps -a --format json',
     ]);
-    expect(docker.calls[0]?.args).toEqual(['npm', 'run', 'build']);
+    expect(docker.calls[0]?.args.slice(0, 3)).toEqual(['docker', 'ps', '--format']);
+    expect(docker.calls[1]?.args).toEqual(['npm', 'run', 'build']);
     expect(docker.calls.filter((c) => c.args[1] === 'build')).toHaveLength(5);
     expect(docker.calls.every((c) => c.options?.quiet === true)).toBe(true);
     const composeArgs = docker.calls.find((c) => c.args[1] === 'compose')?.args.slice(0, 6);
@@ -54,9 +57,9 @@ describe('up', () => {
       'docker',
       'compose',
       '-f',
-      join(dir, '.agentage/compose.json'),
+      join(await realpath(dir), '.agentage/compose.json'),
       '-p',
-      'agentage-probe',
+      projectName('probe', await realpath(dir)),
     ]);
   });
 
@@ -82,12 +85,52 @@ describe('up', () => {
 
   it('fails on a cli entry that does not match the commands, and on a broken part', async () => {
     const cli = 'export const create = () => ({});';
+    const before = fakeDocker();
     await expect(
-      up({ dir: await probeDir(PROBE, cli), env: ENV }, { run: fakeDocker().run })
-    ).rejects.toThrow('cli part: cli handlers [] differ from commands [ping]');
+      up({ dir: await probeDir(PROBE, cli), env: ENV }, { run: before.run })
+    ).rejects.toThrow(
+      'check failed: entries: cli part: cli handlers [] differ from commands [ping]'
+    );
+    expect(before.calls.filter((c) => c.args[1] === 'build' || c.args[1] === 'compose')).toEqual(
+      []
+    );
     const broken = fakeDocker({ mcp: 'unhealthy' });
     await expect(up({ dir: await probeDir(), env: ENV }, { run: broken.run })).rejects.toThrow(
       /^mcp is unhealthy/
     );
+  });
+
+  it('says what a kept store already had, migrations and seeds', async () => {
+    const lines: string[] = [];
+    const migrate = '{"migrations":2,"applied":0,"seeds":0,"seedsBefore":1}\n';
+    await up(
+      { dir: await probeDir(), env: ENV, onLine: (line) => void lines.push(line) },
+      { run: fakeDocker({}, { migrate }).run }
+    );
+    expect(lines[2]).toMatch(
+      /^store {4}postgres:18-alpine +2 migrations already applied · 1 seed already applied$/
+    );
+  });
+
+  it('refuses before building when another project holds the gateway or issuer port', async () => {
+    const dir = await probeDir();
+    const other = 'agentage-probe-1-gateway-1\tagentage-probe-ffffffff\t127.0.0.1:4280->80/tcp';
+    const docker = fakeDocker({}, { running: other });
+    await expect(up({ dir, env: ENV }, { run: docker.run })).rejects.toThrow(
+      'localhost:4280 is held by compose project agentage-probe-ffffffff: run agentage extension down in the working copy that started it, then up again'
+    );
+    expect(docker.calls).toHaveLength(1);
+    const stray = fakeDocker({}, { running: 'web\t\t0.0.0.0:4281->3000/tcp, [::]:4281->3000/tcp' });
+    await expect(up({ dir, env: ENV }, { run: stray.run })).rejects.toThrow(
+      'localhost:4281 is held by container web: stop it, then up again'
+    );
+  });
+
+  it('runs again over its own project: the ports it holds are no refusal', async () => {
+    const dir = await probeDir();
+    const own = projectName('probe', await realpath(dir));
+    const running = `${own}-gateway-1\t${own}\t127.0.0.1:4280->80/tcp\nother\tx\t0.0.0.0:14280->80/tcp`;
+    const result = await up({ dir, env: ENV }, { run: fakeDocker({}, { running }).run });
+    expect(result).toMatchObject({ parts: 7, project: own });
   });
 });

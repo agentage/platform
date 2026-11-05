@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { validateManifest } from '../../manifest/read-manifest.js';
 import { API_MANIFEST, SPEC_MANIFEST } from '../../test-support/packages.js';
-import { composeFile, projectName, STORE_IMAGE } from './compose.js';
+import { composeFile, STORE_IMAGE } from './compose.js';
 import { TRAEFIK_IMAGE } from './gateway.js';
 
 const FULL = validateManifest(SPEC_MANIFEST);
@@ -9,7 +9,11 @@ const PARTS = ['pages', 'ui', 'api', 'mcp', 'worker'];
 const TAGS = Object.fromEntries(
   PARTS.map((part) => [part, `ghcr.io/agentage/probe-${part}:0.1.0`])
 );
-const FILES = { recordFile: '/x/.agentage/record.json', gatewayFile: '/x/.agentage/gateway.yml' };
+const FILES = {
+  project: 'agentage-probe-0123abcd',
+  recordFile: '/x/.agentage/record.json',
+  gatewayFile: '/x/.agentage/gateway.yml',
+};
 const RECORD_MOUNT = '/x/.agentage/record.json:/run/agentage/agentage-extension.json:ro';
 const STORE_URL = 'postgres://probe:agentage-local@store:5432/probe';
 
@@ -21,8 +25,7 @@ const servicesOf = (pkg = FULL, tags = TAGS) =>
 describe('composeFile', () => {
   it('has the store, its migrate job, one service per part, the gateway and the issuer', () => {
     const file = composeFile({ pkg: FULL, tags: TAGS, ...FILES });
-    expect(file.name).toBe('agentage-probe');
-    expect(projectName(FULL)).toBe('agentage-probe');
+    expect(file.name).toBe('agentage-probe-0123abcd');
     expect(Object.keys(file.services).sort()).toEqual(
       [...PARTS, 'gateway', 'issuer', 'migrate', 'store'].sort()
     );
@@ -78,6 +81,11 @@ describe('composeFile', () => {
       depends_on: { store: { condition: 'service_healthy' } },
     });
     expect(services['ui']?.['environment']).not.toHaveProperty('AGENTAGE_STORE_URL');
+    for (const part of PARTS.filter((p) => p !== 'ui'))
+      expect(services[part]?.['environment']).not.toHaveProperty('AGENTAGE_DEV_ISSUER');
+    expect(services['ui']?.['environment']).toMatchObject({
+      AGENTAGE_DEV_ISSUER: 'http://localhost:4281',
+    });
     expect(services['ui']).not.toHaveProperty('depends_on');
   });
 

@@ -39,4 +39,19 @@ describe('callApi', () => {
     await expect(callApi(fetch, anonymous, '/echo')).rejects.toMatchObject({ code: 'HTTP_500' });
     await expect(callApi(fetch, anonymous, 'echo')).rejects.toMatchObject({ code: 'BAD_PATH' });
   });
+
+  it('bounds every call, keeps the caller signal, and names the path that did not answer', async () => {
+    const { fetch, calls } = fakeFetch(jsonResponse({ success: true, data: 1 }));
+    const own = new AbortController();
+    await callApi(fetch, anonymous, '/ticks', { signal: own.signal });
+    const signal = calls[0]?.init.signal;
+    expect(signal?.aborted).toBe(false);
+    own.abort();
+    expect(signal?.aborted).toBe(true);
+    const hung = async () => Promise.reject(new DOMException('timed out', 'TimeoutError'));
+    await expect(callApi(hung, anonymous, '/ticks')).rejects.toMatchObject({
+      code: 'TIMEOUT',
+      message: '/api/v1/ticks did not answer in 30 s',
+    });
+  });
 });

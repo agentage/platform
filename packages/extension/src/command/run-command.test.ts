@@ -100,6 +100,16 @@ describe('runCommand', () => {
     const bad = await tempPackage({ 'package.json': json({ name: 'x' }) });
     expect((await runIn(bad, 'ping')).code).toBe(EXIT_FAILED);
   });
+
+  it('exits 1 saying to build first when the cli entry was never built', async () => {
+    const unbuilt = await tempPackage({ 'package.json': json(manifest(ALL)) });
+    expect(await runIn(unbuilt, 'ping')).toMatchObject({
+      code: EXIT_FAILED,
+      stderr: expect.stringMatching(/dist\/cli\/index\.js not found: build the package first/),
+    });
+    const brokenImport = await probe(ALL, "import './nope.js';\nexport const create = () => ({});");
+    expect((await runIn(brokenImport, 'ping')).stderr).toMatch(/nope\.js/);
+  });
 });
 
 describe('checkCli', () => {

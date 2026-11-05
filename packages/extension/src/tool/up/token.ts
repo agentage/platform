@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TIMEOUTS } from '../timeouts.js';
 import { DEV_ISSUER } from './dev-issuer-app.js';
 
 export interface TokenOptions {
@@ -16,10 +17,15 @@ export const token = async (options: TokenOptions): Promise<string> => {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ scope: options.scope }),
-  }).catch(() => {
+    signal: AbortSignal.timeout(TIMEOUTS.issuer),
+  }).catch((err: unknown) => {
+    if ((err as Error).name === 'TimeoutError')
+      throw new Error(`the dev issuer at ${issuer} did not answer in ${TIMEOUTS.issuer / 1000} s`);
     throw new Error(`no dev issuer at ${issuer}: run agentage extension up first`);
   });
   const body: unknown = await res.json().catch(() => null);
   if (!res.ok) throw new Error(`the dev issuer refused: ${JSON.stringify(body)}`);
-  return AnswerSchema.parse(body).token;
+  const answer = AnswerSchema.safeParse(body);
+  if (!answer.success) throw new Error('the dev issuer answered without an aga_ token');
+  return answer.data.token;
 };

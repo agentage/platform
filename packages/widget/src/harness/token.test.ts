@@ -21,6 +21,7 @@ describe('resolveToken', () => {
       await expect(resolveToken(args)).resolves.toBe('aga_dev');
       expect(calls[0]?.url).toBe(DEV_ISSUER);
       expect(calls[0]?.init).toMatchObject({ method: 'POST', body: '{"scope":"probe:read"}' });
+      expect(calls[0]?.init.signal).toBeInstanceOf(AbortSignal);
     }
   });
 

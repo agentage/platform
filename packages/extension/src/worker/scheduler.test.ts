@@ -40,6 +40,24 @@ describe('scheduler', () => {
     expect(runs.all('tick').map((run) => run.status)).toEqual(['ok']);
   });
 
+  it('a run that skips a tick, or runs past its timeout, reads degraded until the next run', async () => {
+    const releases: (() => void)[] = [];
+    const hang = () => new Promise<void>((resolve) => void releases.push(resolve));
+    scheduler.schedule('tick', '* * * * *', hang);
+    scheduler.schedule('slow', '* * * * *', hang, { timeout: '20s' });
+    const check = (name: string) => scheduler.checks()[`job:${name}`]?.();
+    scheduler.start();
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect([await check('tick'), await check('slow')]).toEqual(['ok', 'ok']);
+    await vi.advanceTimersByTimeAsync(21_000);
+    expect([await check('tick'), await check('slow')]).toEqual(['ok', 'degraded']);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(await check('tick')).toBe('degraded');
+    for (const release of releases) release();
+    await vi.advanceTimersByTimeAsync(0);
+    expect([await check('tick'), await check('slow')]).toEqual(['ok', 'ok']);
+  });
+
   it('saves every run with the log the job wrote through ctx.log', async () => {
     const log = runLog(logged.log);
     scheduler.schedule('tick', '* * * * *', async () => {

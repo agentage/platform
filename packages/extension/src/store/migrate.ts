@@ -2,13 +2,16 @@
 import { createLog } from '../log/log.js';
 import { readManifest } from '../manifest/read-manifest.js';
 import { migrate } from './migrations.js';
-import { createStore } from './store.js';
+import { createStore, type StoreTimeouts } from './store.js';
+
+// A migration may rewrite a table: minutes, not a request's seconds; the job itself has no retry.
+const MIGRATE_TIMEOUTS: StoreTimeouts = { connectMs: 10_000, statementMs: 300_000 };
 
 // The api image's migrate entry (`node dist/store/migrate.js` in /app), run as a job before a rollout.
 const log = createLog({ extension: 'unknown', part: 'migrate' });
 try {
   const pkg = await readManifest(process.cwd());
-  const store = createStore(process.env, log);
+  const store = createStore(process.env, log, MIGRATE_TIMEOUTS);
   const result = await migrate(
     store,
     process.cwd(),

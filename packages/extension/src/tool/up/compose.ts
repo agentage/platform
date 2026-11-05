@@ -1,6 +1,7 @@
 import { type ExtensionPackage } from '../../manifest/manifest.schema.js';
 import { hasPostgres, imageParts } from '../../manifest/parts.js';
 import { type ImagePartKind } from '../../manifest/primitives.schema.js';
+import { DEV_ISSUER } from './dev-issuer-app.js';
 import { GATEWAY_PORT, ISSUER_PORT, PART_PORT, TRAEFIK_COMMAND, TRAEFIK_IMAGE } from './gateway.js';
 
 export const STORE_IMAGE = 'postgres:18-alpine';
@@ -9,6 +10,8 @@ const ISSUER_ENTRY = 'node_modules/@agentage/extension/dist/tool/up/dev-issuer.j
 
 export interface ComposeInput {
   pkg: ExtensionPackage;
+  // The compose project, one per working copy (project.ts).
+  project: string;
   tags: Record<string, string>;
   recordFile: string;
   gatewayFile: string;
@@ -16,17 +19,17 @@ export interface ComposeInput {
   seedsDir?: string;
 }
 
-export const projectName = (pkg: ExtensionPackage): string => `agentage-${pkg.agentage.id}`;
-
 // A local-only credential: the store has no published port, only the parts' network reaches it.
 const STORE_PASSWORD = 'agentage-local';
 
 const storeUrl = (id: string): string => `postgres://${id}:${STORE_PASSWORD}@store:5432/${id}`;
 
+// Only the ui under `up` names the dev issuer: its CSP then lets the harness ask it for a token.
 const partEnv = (pkg: ExtensionPackage, part: ImagePartKind | 'migrate') => ({
   AGENTAGE_ORIGIN: `http://localhost:${GATEWAY_PORT}`,
   AGENTAGE_RECORD_FILE: RECORD_TARGET,
   ...(hasPostgres(pkg) && part !== 'ui' ? { AGENTAGE_STORE_URL: storeUrl(pkg.agentage.id) } : {}),
+  ...(part === 'ui' ? { AGENTAGE_DEV_ISSUER: DEV_ISSUER } : {}),
 });
 
 const storeService = (id: string) => ({
@@ -91,5 +94,5 @@ export const composeFile = (input: ComposeInput) => {
     if (input.tags['api']) services['migrate'] = migrateService(input);
   }
   const volumes = hasPostgres(input.pkg) ? { store: {} } : {};
-  return { name: projectName(input.pkg), services, volumes };
+  return { name: input.project, services, volumes };
 };

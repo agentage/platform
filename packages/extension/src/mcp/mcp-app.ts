@@ -3,10 +3,11 @@ import { pipeline } from 'node:stream/promises';
 import cors from 'cors';
 import express, { type Express, type Request, type Response } from 'express';
 import { createMcpHandler, type McpHttpHandler } from '@modelcontextprotocol/server';
+import { strongest, type Access } from '../auth/token-check.js';
 import { fail } from '../envelope/envelope.js';
 import { BODY_LIMIT, createPartApp, PUBLIC_CORS, type PartAppBase } from '../server/app.js';
 import { serverFactory } from './server.js';
-import { type ToolEntry } from './tools.js';
+import { prefixed, type ToolEntry } from './tools.js';
 
 export interface McpAppOptions extends PartAppBase {
   tools: ToolEntry[];
@@ -27,10 +28,37 @@ const parsed = (body: Buffer): unknown => {
   }
 };
 
+interface Message {
+  method?: unknown;
+  params?: { name?: unknown };
+}
+
+const messagesOf = (body: unknown): (Message | null)[] =>
+  (Array.isArray(body) ? body : [body]) as (Message | null)[];
+
 const isListing = (body: unknown): boolean =>
-  (Array.isArray(body) ? body : [body]).some(
-    (message) => (message as { method?: unknown } | null)?.method === 'tools/list'
-  );
+  messagesOf(body).some((message) => message?.method === 'tools/list');
+
+// Each tools/call needs its tool's declared scope (read when it declares none).
+const callAccess = (options: McpAppOptions, body: unknown): Access[] =>
+  messagesOf(body)
+    .filter((message) => message?.method === 'tools/call')
+    .map((message) => {
+      const id = options.pkg.agentage.id;
+      const entry = options.tools.find((t) => prefixed(id, t.name) === message?.params?.name);
+      return entry?.spec.scope ?? 'read';
+    });
+
+// Tokens off: calls stay anonymous and a closed listing refuses every tools/list (nothing can verify).
+const guard = async (options: McpAppOptions, req: Request, body: unknown): Promise<void> => {
+  const listing = options.listing === 'token' && isListing(body) ? (['read'] as Access[]) : [];
+  const needed = [...listing, ...callAccess(options, body)];
+  if (!options.tokenCheck) {
+    if (listing.length > 0) throw fail('UNAUTHORIZED', 'tools/list needs a token');
+    return;
+  }
+  if (needed.length > 0) await options.tokenCheck(req.get('authorization'), strongest(needed));
+};
 
 const webRequest = (req: Request, body: Buffer): globalThis.Request => {
   const headers = new Headers();
@@ -51,14 +79,12 @@ const send = async (response: globalThis.Response, res: Response): Promise<void>
   await pipeline(Readable.fromWeb(response.body as never), res);
 };
 
-// The kit verifies no token yet, so a closed listing refuses every tools/list.
 const handle =
-  (handler: McpHttpHandler, listing: McpAppOptions['listing']) =>
+  (handler: McpHttpHandler, options: McpAppOptions) =>
   async (req: Request, res: Response): Promise<void> => {
     const body = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
     const message = parsed(body);
-    if (listing === 'token' && isListing(message))
-      throw fail('UNAUTHORIZED', 'tools/list needs a token');
+    await guard(options, req, message);
     await send(await handler.fetch(webRequest(req, body), { parsedBody: message }), res);
   };
 
@@ -82,7 +108,7 @@ export const createMcpApp = (options: McpAppOptions): Express => {
     part: 'mcp',
     mount: (app) => {
       app.use('/mcp', cors(MCP_CORS));
-      app.post('/mcp', raw, handle(handler, options.listing));
+      app.post('/mcp', raw, handle(handler, options));
       app.all('/mcp', methodNotAllowed);
     },
   });

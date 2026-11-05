@@ -28,13 +28,23 @@ describe('migrate', () => {
     });
     const s = openStore();
     const { log, lines } = recordedLog();
-    expect(await migrate(s, dir, log)).toEqual({ migrations: 2, applied: 2, seeds: 1 });
+    expect(await migrate(s, dir, log)).toEqual({
+      migrations: 2,
+      applied: 2,
+      seeds: 1,
+      seedsBefore: 0,
+    });
     expect(await names(s)).toEqual(['001-ticks.sql', '002-seed-col.sql', 'seed:001-hello.sql']);
     expect((await s.query('select job, note from ticks')).rows).toEqual([
       { job: 'seed', note: 'x' },
     ]);
     expect(lines[0]).toMatchObject({ msg: 'migrated', migrations: 2, applied: 2, seeds: 1 });
-    expect(await migrate(s, dir, log)).toEqual({ migrations: 2, applied: 0, seeds: 0 });
+    expect(await migrate(s, dir, log)).toEqual({
+      migrations: 2,
+      applied: 0,
+      seeds: 0,
+      seedsBefore: 1,
+    });
     expect((await s.query('select count(*)::int as n from ticks')).rows).toEqual([{ n: 1 }]);
   });
 
@@ -48,7 +58,12 @@ describe('migrate', () => {
       'migrations/002-more.sql': 'create table more (id int);',
       'seeds/001-hello.sql': "insert into ticks (job) values ('seed');",
     });
-    expect(await migrate(s, later, log)).toEqual({ migrations: 2, applied: 1, seeds: 0 });
+    expect(await migrate(s, later, log)).toEqual({
+      migrations: 2,
+      applied: 1,
+      seeds: 0,
+      seedsBefore: 0,
+    });
   });
 
   it('takes missing folders as empty', async () => {
@@ -58,6 +73,7 @@ describe('migrate', () => {
       migrations: 0,
       applied: 0,
       seeds: 0,
+      seedsBefore: 0,
     });
   });
 
@@ -67,8 +83,42 @@ describe('migrate', () => {
       'migrations/002-broken.sql': 'create tabel nope (id int);',
     });
     const s = openStore();
-    await expect(migrate(s, dir, recordedLog().log)).rejects.toThrow(/syntax error/);
-    expect(await names(s)).toEqual(['001-ticks.sql']);
+    await expect(migrate(s, dir, recordedLog().log)).rejects.toThrow(
+      /^migration 002-broken\.sql failed: syntax error/
+    );
+    expect(await names(s)).toEqual(['001-ticks.sql', 'seeds:owed']);
+  });
+
+  it('a fresh store whose first run failed still gets its seeds once the fix lands', async () => {
+    const files = {
+      'migrations/001-ticks.sql': TICKS,
+      'seeds/001-hello.sql': "insert into ticks (job) values ('seed');",
+    };
+    const broken = await tempPackage({ ...files, 'migrations/002-more.sql': 'create tabel x;' });
+    const s = openStore();
+    const { log } = recordedLog();
+    await expect(migrate(s, broken, log)).rejects.toThrow(/migration 002-more\.sql failed/);
+    const fixed = await tempPackage({ ...files, 'migrations/002-more.sql': 'create table x ();' });
+    expect(await migrate(s, fixed, log)).toEqual({
+      migrations: 2,
+      applied: 1,
+      seeds: 1,
+      seedsBefore: 0,
+    });
+    expect(await names(s)).toEqual(['001-ticks.sql', '002-more.sql', 'seed:001-hello.sql']);
+    expect((await migrate(s, fixed, log)).seeds).toBe(0);
+  });
+
+  it('names a failing seed and keeps it owed', async () => {
+    const dir = await tempPackage({
+      'migrations/001-ticks.sql': TICKS,
+      'seeds/001-bad.sql': 'insert into nope values (1);',
+    });
+    const s = openStore();
+    await expect(migrate(s, dir, recordedLog().log)).rejects.toThrow(
+      /^seed 001-bad\.sql failed: relation "nope" does not exist/
+    );
+    expect(await names(s)).toEqual(['001-ticks.sql', 'seeds:owed']);
   });
 });
 

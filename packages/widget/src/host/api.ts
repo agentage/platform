@@ -1,6 +1,7 @@
 import { hostError } from './host-error.js';
 import { type FetchLike, type TokenSource } from './host.types.js';
 import { EnvelopeSchema } from './rpc.schema.js';
+import { timedOut, withTimeout } from './timeout.js';
 
 const withAuth = (init: RequestInit | undefined, token: string | undefined): RequestInit => {
   const headers = new Headers(init?.headers);
@@ -24,8 +25,10 @@ export const callApi = async (
   init?: RequestInit
 ): Promise<unknown> => {
   if (!path.startsWith('/')) throw hostError('BAD_PATH', `api path must start with /: ${path}`);
-  const res = await fetchFn(`/api/v1${path}`, withAuth(init, await token()));
-  const envelope = EnvelopeSchema.safeParse(await readJson(res));
+  const { res, body } = await fetchFn(`/api/v1${path}`, withTimeout(withAuth(init, await token())))
+    .then(async (answer) => ({ res: answer, body: await readJson(answer) }))
+    .catch(timedOut(`/api/v1${path}`));
+  const envelope = EnvelopeSchema.safeParse(body);
   if (!envelope.success) throw hostError(`HTTP_${res.status}`, `api answered ${res.status}`);
   if (!envelope.data.success)
     throw hostError(envelope.data.error.code, envelope.data.error.message);

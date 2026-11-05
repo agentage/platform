@@ -1,5 +1,5 @@
 import { hostError } from './host-error.js';
-import { RpcResponseSchema, type RpcResponse } from './rpc.schema.js';
+import { EnvelopeSchema, RpcResponseSchema, type RpcResponse } from './rpc.schema.js';
 
 const isEventStream = (res: Response): boolean =>
   (res.headers.get('content-type') ?? '').includes('text/event-stream');
@@ -23,10 +23,18 @@ const fromEventStream = (text: string, id: number): unknown => {
   return messages.find((message) => message.id === id) ?? messages.at(-1);
 };
 
+// A refusal before the tool runs (401, 403, 503) is the kit's REST envelope: its code reaches the widget.
+const refusal = (body: unknown, status: number): Error => {
+  const envelope = EnvelopeSchema.safeParse(body);
+  if (envelope.success && !envelope.data.success)
+    return hostError(envelope.data.error.code, envelope.data.error.message);
+  return hostError(`HTTP_${status}`, `MCP answered ${status} without a JSON-RPC message`);
+};
+
 export const readRpc = async (res: Response, id: number): Promise<RpcResponse> => {
   const text = await res.text();
   const body = isEventStream(res) ? fromEventStream(text, id) : parseJson(text);
   const parsed = RpcResponseSchema.safeParse(body);
   if (parsed.success && (parsed.data.result !== undefined || parsed.data.error)) return parsed.data;
-  throw hostError(`HTTP_${res.status}`, `MCP answered ${res.status} without a JSON-RPC message`);
+  throw refusal(body, res.status);
 };

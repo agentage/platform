@@ -53,16 +53,25 @@ export const probeDir = async (
   return dir;
 };
 
+export const MIGRATED = 'migrated\n{"migrations":1,"applied":1,"seeds":1,"seedsBefore":0}\n';
+
+export interface FakeDockerOptions {
+  // What `docker ps --format` prints: name, compose project and ports, tab-separated.
+  running?: string;
+  migrate?: string;
+}
+
 // npm, docker build and inspect, and compose: ps answers from `health`, migrate prints its summary.
-export const fakeDocker = (health: Record<string, string> = {}) => {
+export const fakeDocker = (health: Record<string, string> = {}, fake: FakeDockerOptions = {}) => {
   const calls: { args: string[]; options?: RunOptions }[] = [];
   const answer = (args: string[]): string => {
     if (args[0] === 'image') return `${IMAGE_ID}\n`;
+    if (args[0] === 'ps') return fake.running ?? '';
     if (args.includes('ps'))
       return SERVICES.map((s) =>
         JSON.stringify({ Service: s, State: 'running', Health: health[s] ?? 'healthy' })
       ).join('\n');
-    if (args.includes('run')) return 'migrated\n{"migrations":1,"applied":1,"seeds":1}\n';
+    if (args.includes('run')) return fake.migrate ?? MIGRATED;
     return '';
   };
   const run: Run = async (command, args, options) => {
