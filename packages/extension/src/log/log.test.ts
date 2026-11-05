@@ -29,11 +29,11 @@ describe('log', () => {
 
   it('passes an error whole under err', () => {
     const { log, lines } = capture();
-    log.error(new TypeError('boom'), { route: '/x', err: 'not the error' });
+    const error = new TypeError('boom');
+    log.error(error, { route: '/x', err: 'not the error' });
     log.error('plain');
     expect(lines[0]).toMatchObject({ level: 'error', msg: 'boom', route: '/x' });
-    expect(lines[0]?.['err']).toMatchObject({ type: 'TypeError', message: 'boom' });
-    expect(lines[0]?.['err']).toHaveProperty('stack');
+    expect(lines[0]?.['err']).toEqual({ type: 'TypeError', message: 'boom', stack: error.stack });
     expect(lines[1]).toMatchObject({ msg: 'plain', err: { message: 'plain' } });
   });
 

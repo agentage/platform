@@ -1,3 +1,4 @@
+import { type Server } from 'node:http';
 import express from 'express';
 import { describe, expect, it, vi } from 'vitest';
 import { createTestContext } from '../context/test-context.js';
@@ -13,6 +14,27 @@ describe('serve', () => {
     stop();
     await vi.waitFor(() => expect(exit).toHaveBeenCalledWith(0));
     expect(ctx.logs.map((entry) => entry.message)).toEqual(['listening', 'shutting down']);
+  });
+
+  it('exits 0 after the 10 s grace period when connections never drain', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    try {
+      const exit = vi.fn();
+      const stuck = { close: vi.fn(), closeIdleConnections: vi.fn() } as unknown as Server;
+      shutdownOn(stuck, {
+        app: express(),
+        port: 0,
+        log: createTestContext().log,
+        exit,
+        signals: [],
+      })();
+      vi.advanceTimersByTime(9_999);
+      expect(exit).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1);
+      expect(exit).toHaveBeenCalledWith(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('rejects when the port is taken', async () => {

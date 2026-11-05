@@ -118,7 +118,7 @@ describe('composeFile', () => {
       agentage: { id: 'probe', parts: { mcp: true, store: 'postgres' } },
     });
     const services = servicesOf(pkg, { mcp: TAGS['mcp'] ?? '' });
-    expect(services['store']).toBeDefined();
-    expect(services['migrate']).toBeUndefined();
+    expect(Object.keys(services).sort()).toEqual(['gateway', 'issuer', 'mcp', 'store']);
+    expect(services['store']?.['image']).toBe(STORE_IMAGE);
   });
 });

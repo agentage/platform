@@ -1,18 +1,20 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { recordedLog } from '../test-support/http.js';
 import { tempPackage } from '../test-support/packages.js';
+import { RUNS_TABLE } from '../worker/runs.js';
 import { migrate, sqlFiles } from './migrations.js';
 import { createTestStore, type TestStore } from './test-store.js';
 
 const TICKS = 'create table ticks (id int generated always as identity primary key, job text);';
+const HELLO = "insert into ticks (job) values ('seed');";
 
-let store: TestStore | undefined;
-afterEach(async () => {
-  await store?.close();
-  store = undefined;
+// A fresh in-process postgres per test, booted here so no test pays the WASM start.
+let store: TestStore;
+beforeEach(async () => {
+  store = createTestStore(async () => undefined);
+  await store.query('select 1');
 });
-
-const openStore = (): TestStore => (store = createTestStore(async () => undefined));
+afterEach(() => store.close());
 
 const names = async (s: TestStore) =>
   (await s.query<{ name: string }>('select name from _migrations order by name')).rows.map(
@@ -24,9 +26,9 @@ describe('migrate', () => {
     const dir = await tempPackage({
       'migrations/002-seed-col.sql': "alter table ticks add column note text default 'x';",
       'migrations/001-ticks.sql': TICKS,
-      'seeds/001-hello.sql': "insert into ticks (job) values ('seed');",
+      'seeds/001-hello.sql': HELLO,
     });
-    const s = openStore();
+    const s = store;
     const { log, lines } = recordedLog();
     expect(await migrate(s, dir, log)).toEqual({
       migrations: 2,
@@ -48,15 +50,14 @@ describe('migrate', () => {
     expect((await s.query('select count(*)::int as n from ticks')).rows).toEqual([{ n: 1 }]);
   });
 
-  it('applies a new file later, but never seeds a store that already has rows', async () => {
-    const dir = await tempPackage({ 'migrations/001-ticks.sql': TICKS });
-    const s = openStore();
+  it('applies a file added later, never seeding a store with a ledger row, even with no table', async () => {
+    const s = store;
     const { log } = recordedLog();
-    await migrate(s, dir, log);
+    await migrate(s, await tempPackage({ 'migrations/001-schema.sql': 'create schema app;' }), log);
     const later = await tempPackage({
-      'migrations/001-ticks.sql': TICKS,
-      'migrations/002-more.sql': 'create table more (id int);',
-      'seeds/001-hello.sql': "insert into ticks (job) values ('seed');",
+      'migrations/001-schema.sql': 'create schema app;',
+      'migrations/002-ticks.sql': TICKS,
+      'seeds/001-hello.sql': HELLO,
     });
     expect(await migrate(s, later, log)).toEqual({
       migrations: 2,
@@ -64,14 +65,25 @@ describe('migrate', () => {
       seeds: 0,
       seedsBefore: 0,
     });
+    expect(await names(s)).toEqual(['001-schema.sql', '002-ticks.sql']);
+  });
+
+  it("seeds a store whose only table is the kit's own", async () => {
+    const dir = await tempPackage({
+      'migrations/001-ticks.sql': TICKS,
+      'seeds/001-hello.sql': HELLO,
+    });
+    const s = store;
+    await s.query(RUNS_TABLE);
+    expect((await migrate(s, dir, recordedLog().log)).seeds).toBe(1);
   });
 
   it('never seeds a store that already holds tables, even with no ledger (a restored dump)', async () => {
     const dir = await tempPackage({
       'migrations/001-ticks.sql': TICKS,
-      'seeds/001-hello.sql': "insert into ticks (job) values ('seed');",
+      'seeds/001-hello.sql': HELLO,
     });
-    const s = openStore();
+    const s = store;
     await s.query('create table notes (id int); insert into notes values (1);');
     expect(await migrate(s, dir, recordedLog().log)).toEqual({
       migrations: 1,
@@ -84,7 +96,7 @@ describe('migrate', () => {
 
   it('takes missing folders as empty', async () => {
     const dir = await tempPackage({ 'package.json': '{}' });
-    const s = openStore();
+    const s = store;
     expect(await migrate(s, dir, recordedLog().log)).toEqual({
       migrations: 0,
       applied: 0,
@@ -93,25 +105,28 @@ describe('migrate', () => {
     });
   });
 
-  it('throws on a failing file and leaves it unrecorded', async () => {
+  it('names a failing file, rolls it back and leaves it unrecorded', async () => {
     const dir = await tempPackage({
       'migrations/001-ticks.sql': TICKS,
-      'migrations/002-broken.sql': 'create tabel nope (id int);',
+      'migrations/002-bad.sql': 'create table half (id int);\ninsert into nope values (1);',
     });
-    const s = openStore();
+    const s = store;
     await expect(migrate(s, dir, recordedLog().log)).rejects.toThrow(
-      /^migration 002-broken\.sql failed: syntax error/
+      /^migration 002-bad\.sql failed: relation "nope" does not exist$/
     );
     expect(await names(s)).toEqual(['001-ticks.sql', 'seeds:owed']);
+    const half =
+      "select count(*)::int as n from information_schema.tables where table_name = 'half'";
+    expect((await s.query(half)).rows).toEqual([{ n: 0 }]);
   });
 
   it('a fresh store whose first run failed still gets its seeds once the fix lands', async () => {
     const files = {
       'migrations/001-ticks.sql': TICKS,
-      'seeds/001-hello.sql': "insert into ticks (job) values ('seed');",
+      'seeds/001-hello.sql': HELLO,
     };
     const broken = await tempPackage({ ...files, 'migrations/002-more.sql': 'create tabel x;' });
-    const s = openStore();
+    const s = store;
     const { log } = recordedLog();
     await expect(migrate(s, broken, log)).rejects.toThrow(/migration 002-more\.sql failed/);
     const fixed = await tempPackage({ ...files, 'migrations/002-more.sql': 'create table x ();' });
@@ -130,7 +145,7 @@ describe('migrate', () => {
       'migrations/001-ticks.sql': TICKS,
       'seeds/001-bad.sql': 'insert into nope values (1);',
     });
-    const s = openStore();
+    const s = store;
     await expect(migrate(s, dir, recordedLog().log)).rejects.toThrow(
       /^seed 001-bad\.sql failed: relation "nope" does not exist/
     );

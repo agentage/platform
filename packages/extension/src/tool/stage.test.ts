@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { validateManifest } from '../manifest/read-manifest.js';
 import { API_MANIFEST, json, tempPackage } from '../test-support/packages.js';
+import { serverPartRecipe } from './recipe.js';
 import { localTarballs, stageContext } from './stage.js';
 
 const withDeps = (dependencies: Record<string, string>) =>
@@ -12,7 +13,12 @@ describe('stage', () => {
   it('finds file: tarball dependencies inside the package only', () => {
     const pkg = withDeps({ a: '^1.0.0', b: 'file:.kit/b-1.0.0.tgz', c: 'file:../c' });
     expect(localTarballs(pkg)).toEqual(['.kit/b-1.0.0.tgz']);
-    expect(() => localTarballs(withDeps({ x: 'file:../x.tgz' }))).toThrow(/inside the package/);
+    expect(() => localTarballs(withDeps({ x: 'file:../x.tgz' }))).toThrow(
+      'local dependency ../x.tgz must live inside the package folder'
+    );
+    expect(() => localTarballs(withDeps({ x: 'file:/opt/x.tgz' }))).toThrow(
+      'local dependency /opt/x.tgz must live inside the package folder'
+    );
     expect(localTarballs(API_MANIFEST)).toEqual([]);
   });
 
@@ -36,7 +42,7 @@ describe('stage', () => {
     expect(await readFile(join(root, 'deps/.kit/b-1.0.0.tgz'), 'utf8')).toBe('tarball');
     expect(await readdir(join(root, 'app/dist'))).toEqual(['api']);
     expect((await stat(join(root, 'app/package.json'))).isFile()).toBe(true);
-    expect(await readFile(join(root, 'Dockerfile'), 'utf8')).toContain('FROM node:26-alpine');
+    expect(await readFile(join(root, 'Dockerfile'), 'utf8')).toBe(serverPartRecipe('api'));
   });
 
   it('needs the part entry built under dist/', async () => {
@@ -55,6 +61,8 @@ describe('stage', () => {
 
   it('needs a lockfile, since the image runs npm ci', async () => {
     const dir = await tempPackage({ 'package.json': json(API_MANIFEST), 'dist/api/index.js': '' });
-    await expect(stageContext(dir, API_MANIFEST, 'api', dir)).rejects.toThrow(/package-lock/);
+    await expect(stageContext(dir, API_MANIFEST, 'api', dir)).rejects.toThrow(
+      'package-lock.json is missing: the image installs with npm ci'
+    );
   });
 });

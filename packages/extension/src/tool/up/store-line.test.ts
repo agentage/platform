@@ -17,6 +17,9 @@ describe('the store line', () => {
     expect(phrase({ migrations: 3, applied: 1, seeds: 0, seedsBefore: 2 })).toBe(
       '1 migration applied, 2 already applied · 2 seeds already applied'
     );
+    expect(phrase({ migrations: 2, applied: 1, seeds: 1, seedsBefore: 1 })).toBe(
+      '1 migration applied, 1 already applied · 1 seed'
+    );
   });
 
   it('an api image on kit 0.2.0 prints no seedsBefore: the migrations still say already', () => {

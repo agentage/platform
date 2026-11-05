@@ -1,18 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { json, SPEC_MANIFEST, tempPackage } from '../test-support/packages.js';
+import { createTestStore, type TestStore } from './test-store.js';
 
-const ended = vi.hoisted(() => ({ count: 0 }));
+const pool = vi.hoisted(() => ({
+  store: undefined as TestStore | undefined,
+  ended: 0,
+  opened: [] as unknown[],
+}));
 
-// The entry builds a pg pool from env; here that pool is an in-process store.
-vi.mock('./store.js', async () => {
-  const { createTestStore } = await import('./test-store.js');
-  return {
-    createStore: () => {
-      const store = createTestStore(async () => undefined);
-      return { query: store.query, end: async () => (ended.count++, store.close()) };
-    },
-  };
-});
+// The entry builds a pg pool from env; here that pool is an in-process store, booted in a hook.
+vi.mock('./store.js', () => ({
+  createStore: (_env: unknown, _log: unknown, timeouts: unknown) => {
+    pool.opened.push(timeouts);
+    return { query: pool.store?.query, end: async () => void (pool.ended += 1) };
+  },
+}));
 
 const run = async (dir: string) => {
   vi.spyOn(process, 'cwd').mockReturnValue(dir);
@@ -22,13 +24,19 @@ const run = async (dir: string) => {
 
 let stdout: string[];
 let stderr: string[];
-beforeEach(() => {
+beforeEach(async () => {
+  pool.store = createTestStore(async () => undefined);
+  await pool.store.query('select 1');
+  Object.assign(pool, { ended: 0, opened: [] });
   stdout = [];
   stderr = [];
   vi.spyOn(process.stdout, 'write').mockImplementation((text) => stdout.push(String(text)) > 0);
   vi.spyOn(process.stderr, 'write').mockImplementation((text) => stderr.push(String(text)) > 0);
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(async () => {
+  vi.restoreAllMocks();
+  await pool.store?.close();
+});
 
 describe('the migrate entry', () => {
   it('migrates the package in the working folder and prints the summary', async () => {
@@ -39,7 +47,8 @@ describe('the migrate entry', () => {
     });
     await run(dir);
     expect(stdout).toEqual(['{"migrations":1,"applied":1,"seeds":1,"seedsBefore":0}\n']);
-    expect(ended.count).toBe(1);
+    expect(pool.opened).toEqual([{ connectMs: 10_000, statementMs: 300_000 }]);
+    expect(pool.ended).toBe(1);
   });
 
   it('exits 1 on a bad migration, the log naming the file, and prints no summary', async () => {
@@ -62,6 +71,13 @@ describe('the migrate entry', () => {
     const exit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
     await run(await tempPackage({ 'package.json': json({ name: 'x' }) }));
     expect(exit).toHaveBeenCalledWith(1);
-    expect(JSON.parse(stderr.join(''))).toMatchObject({ level: 'error', part: 'migrate' });
+    expect(stdout).toEqual([]);
+    expect(pool.opened).toEqual([]);
+    expect(JSON.parse(stderr.join(''))).toMatchObject({
+      level: 'error',
+      extension: 'unknown',
+      part: 'migrate',
+      msg: expect.stringMatching(/^invalid agentage manifest in package\.json: version: /),
+    });
   });
 });

@@ -57,8 +57,8 @@ describe('pages app', () => {
     const log = recordedLog().log;
     const pages = (site: Record<string, unknown>) =>
       createPagesApp({ pkg: PKG, build: BUILD, log, site: site as Record<string, string> });
-    expect(() => pages({ 'about.html': '<p></p>' })).toThrow();
-    expect(() => pages({ '/a b': '<p></p>' })).toThrow();
-    expect(() => pages({ '/': 42 })).toThrow();
+    expect(() => pages({ 'about.html': '<p></p>' })).toThrow(/"Invalid key in record"/);
+    expect(() => pages({ '/a b': '<p></p>' })).toThrow(/"Invalid key in record"/);
+    expect(() => pages({ '/': 42 })).toThrow(/"Invalid input: expected string, received number"/);
   });
 });

@@ -1,7 +1,7 @@
 import { createPublicKey, verify, type JsonWebKeyInput } from 'node:crypto';
 import { type Server } from 'node:http';
 import { type AddressInfo } from 'node:net';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createIssuer, DEV_AUDIENCE, DEV_ISSUER } from './dev-issuer-app.js';
 import { token } from './token.js';
 
@@ -12,7 +12,10 @@ beforeEach(async () => {
   await new Promise<void>((resolve) => issuer.listen(0, '127.0.0.1', resolve));
   url = `http://127.0.0.1:${(issuer.address() as AddressInfo).port}`;
 });
-afterEach(() => void issuer.close());
+afterEach(() => {
+  issuer.close();
+  vi.restoreAllMocks();
+});
 
 const decode = (part: string) =>
   JSON.parse(Buffer.from(part, 'base64url').toString()) as Record<string, unknown>;
@@ -49,7 +52,7 @@ describe('token', () => {
   it('refuses a scope that is not {id}:{read|write|admin}', async () => {
     for (const scope of ['probe', 'probe:delete', 'Probe:read', 'probe:read  probe:write']) {
       await expect(token({ scope, issuer: url })).rejects.toThrow(
-        /^the dev issuer refused: \{"error":"scope must be/
+        'the dev issuer refused: {"error":"scope must be {id}:{read|write|admin}, space-separated"}'
       );
     }
   });
@@ -69,12 +72,16 @@ describe('token', () => {
   });
 
   it('gives up on an issuer that does not answer in 5 s, with its own message', async () => {
-    const hung = (async (_url: string, init?: RequestInit) => {
-      expect(init?.signal).toBeInstanceOf(AbortSignal);
-      throw new DOMException('The operation timed out.', 'TimeoutError');
-    }) as typeof fetch;
+    const short = AbortSignal.timeout(10);
+    const bound = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(short);
+    // Answers only when the signal fires: the bound is what ends the call.
+    const hung = ((_url: string, init?: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+      })) as typeof fetch;
     await expect(token({ scope: 'probe:read', issuer: url, fetch: hung })).rejects.toThrow(
       `the dev issuer at ${url} did not answer in 5 s`
     );
+    expect(bound.mock.calls).toEqual([[5000]]);
   });
 });

@@ -69,10 +69,17 @@ describe('waitHealthy', () => {
 
   it('gives up after the timeout and names the services still waiting', async () => {
     vi.useFakeTimers({ now: new Date('2026-11-05T10:00:00Z') });
-    const { run } = fakeRun([[healthy('store'), starting('api')]]);
+    const { run, calls } = fakeRun([[healthy('store'), starting('api')]]);
     const sleep = async (ms: number) => void vi.advanceTimersByTime(ms);
     await expect(
       waitHealthy(TARGET, ['store', 'api', 'mcp'], { run, sleep, timeoutMs: 3000 })
     ).rejects.toThrow('not healthy after 3 s: api, mcp');
+    // Polls at 0, 1, 2, 3 and 4 s: the first past the deadline gives up.
+    expect(calls).toHaveLength(5);
+    const slow = fakeRun([[starting('api')]]);
+    await expect(waitHealthy(TARGET, ['api'], { run: slow.run, sleep })).rejects.toThrow(
+      'not healthy after 180 s: api'
+    );
+    expect(slow.calls).toHaveLength(182);
   });
 });

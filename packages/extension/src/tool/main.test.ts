@@ -31,6 +31,14 @@ const deps = (result: BuildResult | Error = RESULT) => {
   return { d, out, err, calls };
 };
 
+// A usage error runs nothing and prints the usage.
+const usageOf = async (argv: string[]) => {
+  const usage = deps();
+  expect(await main(argv, usage.d)).toBe(2);
+  expect(usage.calls).toEqual([]);
+  return usage.err;
+};
+
 describe('tool cli', () => {
   it('build prints one line per image and exits 0', async () => {
     const { d, out, calls } = deps();
@@ -43,9 +51,11 @@ describe('tool cli', () => {
     const failing = deps(new Error('docker build failed'));
     expect(await main(['build'], failing.d)).toBe(1);
     expect(failing.err).toEqual(['build failed: docker build failed']);
-    expect(await main([], deps().d)).toBe(2);
-    expect(await main(['deploy'], deps().d)).toBe(2);
-    expect(await main(['build', '--nope'], deps().d)).toBe(2);
+    for (const argv of [[], ['deploy'], ['build', 'x']])
+      expect(await usageOf(argv)).toEqual([expect.stringMatching(/^usage: agentage-extension </)]);
+    expect(await usageOf(['build', '--nope'])).toEqual([
+      expect.stringMatching(/^Unknown option '--nope'.*\nusage: agentage-extension </),
+    ]);
     const help = deps();
     expect(await main(['--help'], help.d)).toBe(0);
     expect(help.out[0]).toMatch(/^usage: agentage-extension <build\|up\|down\|token>/);

@@ -53,9 +53,13 @@ describe('settingsFromEnv', () => {
     expect(() => from({ 'tick.every': 1.5 })).toThrow(
       'setting tick.every: 1.5 does not fit its declaration'
     );
-    expect(() => from({ ratio: '2' })).toThrow(/setting ratio: "2"/);
-    expect(() => from({ verbose: 'yes' })).toThrow(/setting verbose/);
-    expect(() => from({ 'mcp.listing': 'closed' })).toThrow(/setting mcp\.listing: "closed"/);
+    expect(() => from({ ratio: '2' })).toThrow('setting ratio: "2" does not fit its declaration');
+    expect(() => from({ verbose: 'yes' })).toThrow(
+      'setting verbose: "yes" does not fit its declaration'
+    );
+    expect(() => from({ 'mcp.listing': 'closed' })).toThrow(
+      'setting mcp.listing: "closed" does not fit its declaration'
+    );
   });
 
   it('refuses AGENTAGE_SETTINGS that is not a JSON object', () => {

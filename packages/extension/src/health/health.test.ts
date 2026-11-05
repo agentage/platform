@@ -1,5 +1,5 @@
 import { type AddressInfo } from 'node:net';
-import express from 'express';
+import express, { type Request, type Response } from 'express';
 import { describe, expect, it, vi } from 'vitest';
 import { listen } from '../server/serve.js';
 import contractExample from '../test-support/fixtures/health-memory.json' with { type: 'json' };
@@ -47,7 +47,12 @@ describe('health', () => {
 
   it('takes the worst check; a throwing check is unavailable', async () => {
     const checks = { store: async () => 'degraded' as const, auth: async () => 'ok' as const };
-    expect((await healthBody({ ...OPTIONS, checks })).data.status).toBe('degraded');
+    const degraded = await healthBody({ ...OPTIONS, checks });
+    const statuses = { store: 'degraded', auth: 'ok' };
+    expect(degraded).toMatchObject({
+      success: true,
+      data: { status: 'degraded', checks: statuses },
+    });
     const down = { store: () => Promise.reject(new Error('down')) };
     const body = await healthBody({ ...OPTIONS, checks: down });
     expect(body).toMatchObject({ success: false, data: { status: 'unavailable' } });
@@ -81,6 +86,17 @@ describe('health', () => {
     } finally {
       server.close();
     }
+  });
+
+  it('the handler refuses a socket off loopback with NOT_FOUND, running no check', async () => {
+    const store = vi.fn(async (): Promise<HealthStatus> => 'ok');
+    const handler = createHealthHandler({ ...OPTIONS, checks: { store } });
+    const req = { socket: { localAddress: '10.0.1.7' } } as unknown as Request;
+    await expect(handler(req, {} as Response, () => undefined)).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: 'Not found',
+    });
+    expect(store).not.toHaveBeenCalled();
   });
 
   it('the schema takes the contract example and refuses a hostname', () => {

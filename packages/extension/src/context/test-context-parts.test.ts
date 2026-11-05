@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { tempPackage } from '../test-support/packages.js';
-import { createTestContext, type TestContext } from './test-context.js';
+import { createTestContext, type TestContext, type TestContextOptions } from './test-context.js';
 
 let ctx: TestContext | undefined;
 afterEach(async () => {
@@ -15,24 +15,46 @@ const PACKAGE = {
   'seeds/001-hello.sql': "insert into ticks (job) values ('seed');",
 };
 
-describe('createTestContext', () => {
-  it('with store, gives a throwaway postgres with the package migrations and seeds', async () => {
-    const dir = await tempPackage(PACKAGE);
-    ctx = createTestContext({ store: { dir } });
-    expect((await ctx.store.query('select job from ticks')).rows).toEqual([{ job: 'seed' }]);
-  });
+// Builds the ctx and boots its store in a hook: the first query migrates and seeds it.
+const booted = async (store: TestContextOptions['store']): Promise<void> => {
+  ctx = createTestContext({ store });
+  await ctx.store.query('select 1');
+};
 
-  it('with store: true, migrates the package in the working folder', async () => {
+describe('createTestContext({ store: { dir } })', () => {
+  beforeEach(async () => booted({ dir: await tempPackage(PACKAGE) }));
+
+  it('gives a throwaway postgres with the package migrations and seeds', async () => {
+    expect((await ctx?.store.query('select job from ticks'))?.rows).toEqual([{ job: 'seed' }]);
+    expect(ctx?.logs).toEqual([]);
+  });
+});
+
+describe('createTestContext({ store: true })', () => {
+  beforeEach(async () => {
     vi.spyOn(process, 'cwd').mockReturnValue(await tempPackage(PACKAGE));
-    ctx = createTestContext({ store: true });
-    const { rows } = await ctx.store.query<{ n: number }>('select count(*)::int as n from ticks');
-    expect(rows).toEqual([{ n: 1 }]);
+    await booted(true);
   });
 
+  it('migrates the package in the working folder', async () => {
+    const result = await ctx?.store.query<{ n: number }>('select count(*)::int as n from ticks');
+    expect(result?.rows).toEqual([{ n: 1 }]);
+  });
+});
+
+describe('createTestContext', () => {
   it('without store, ctx.store says so on first use', async () => {
     ctx = createTestContext();
-    await expect(ctx.store.query('select 1')).rejects.toThrow(/declares no store/);
-    expect(ctx.extension).toMatchObject({ id: 'test', version: '0.0.0', part: 'api' });
+    await expect(ctx.store.query('select 1')).rejects.toThrow(
+      new Error('this extension declares no store: add parts.store to the manifest')
+    );
+    expect(ctx.extension).toEqual({
+      id: 'test',
+      version: '0.0.0',
+      part: 'api',
+      origin: 'http://127.0.0.1',
+      commit: '0'.repeat(40),
+    });
   });
 
   it('runs a scheduled job by name and records its log', async () => {

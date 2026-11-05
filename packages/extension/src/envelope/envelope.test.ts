@@ -85,7 +85,10 @@ describe('parse', () => {
     const failure = failureOf(() => parse(Query, { n: 'x' }));
     expect(failure).toMatchObject({ code: 'VALIDATION_ERROR', status: 400 });
     expect(failure.message).toBe('Invalid request');
-    expect(failure.details?.map((d) => d.field)).toEqual(['msg', 'n']);
+    expect(failure.details).toEqual([
+      { field: 'msg', message: 'Invalid input: expected string, received undefined' },
+      { field: 'n', message: 'Invalid input: expected number, received NaN' },
+    ]);
   });
 
   it('names the root when the value itself is wrong, and takes a message', () => {

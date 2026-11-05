@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestStore, type TestStore } from '../store/test-store.js';
 import { KEEP_RUNS, memoryRuns, storeRuns, type JobRun } from './runs.js';
 
@@ -10,9 +10,6 @@ const runOf = (job: string, n: number, extra: Partial<JobRun> = {}): JobRun => (
   log: `info run ${n}\n`,
   ...extra,
 });
-
-let store: TestStore | undefined;
-afterEach(async () => store?.close());
 
 describe('memoryRuns', () => {
   it('keeps the last 50 runs per job', async () => {
@@ -28,8 +25,14 @@ describe('memoryRuns', () => {
 });
 
 describe('storeRuns', () => {
-  it('saves runs into agentage_job_runs and prunes to the last 50 per job', async () => {
+  let store: TestStore;
+  beforeAll(async () => {
     store = createTestStore(async () => undefined);
+    await store.query('select 1');
+  });
+  afterAll(() => store.close());
+
+  it('saves runs into agentage_job_runs and prunes to the last 50 per job', async () => {
     const runs = storeRuns(store);
     expect(await runs.last('tick')).toBeUndefined();
     for (let n = 0; n < KEEP_RUNS + 3; n += 1) await runs.save(runOf('tick', n));
