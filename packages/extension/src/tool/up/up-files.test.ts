@@ -26,9 +26,9 @@ describe('up files', () => {
     ]);
     const compose = await read('compose.json');
     expect(compose['name']).toBe('agentage-probe');
-    expect((compose['services'] as Record<string, { image?: string }>)['api']?.image).toBe(
-      'ghcr.io/agentage/probe-api:0.2.0'
-    );
+    const services = compose['services'] as Record<string, { image?: string; volumes?: string[] }>;
+    expect(services['api']?.image).toBe('ghcr.io/agentage/probe-api:0.2.0');
+    expect(services['migrate']?.volumes).toEqual([`${join(dir, 'seeds')}:/app/seeds:ro`]);
   });
 });
 

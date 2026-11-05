@@ -1,7 +1,5 @@
-import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { loadCreate } from '../manifest/entry.js';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
-import { entryOf } from '../manifest/parts.js';
 import { readManifest } from '../manifest/read-manifest.js';
 import { parseCommandArgs, usage, UsageError } from './args.js';
 import { type CliContext, type CommandHandler } from './command.types.js';
@@ -22,14 +20,10 @@ export const EXIT_USAGE = 2;
 const writeOut: Write = (text) => void process.stdout.write(text);
 const writeErr: Write = (text) => void process.stderr.write(text);
 
-export const loadHandlers = async (dir: string, pkg: ExtensionPackage, ctx: CliContext) => {
-  const file = join(dir, entryOf(pkg, 'cli'));
-  const mod = (await import(pathToFileURL(file).href)) as { create?: unknown };
-  if (typeof mod.create !== 'function') throw new Error(`${file} does not export create(ctx)`);
-  return (mod.create as (ctx: CliContext) => Record<string, CommandHandler>)(ctx);
-};
+export const loadHandlers = async (dir: string, pkg: ExtensionPackage, ctx: CliContext) =>
+  (await loadCreate<CliContext>(dir, pkg, 'cli'))(ctx) as Record<string, CommandHandler>;
 
-const contextFor = (
+export const contextFor = (
   pkg: ExtensionPackage,
   args: CliContext['args'],
   out: CliContext['out']
@@ -48,10 +42,7 @@ const execute = async (
   const spec = pkg.agentage.commands?.find((command) => command.name === o.command);
   if (!spec) throw new UsageError(`${pkg.agentage.id} has no command ${o.command}`);
   const parsed = parseCommandArgs(spec, o.argv);
-  if (parsed.help) {
-    stdout(`${usage(spec)}\n`);
-    return EXIT_OK;
-  }
+  if (parsed.help) return (stdout(`${usage(spec)}\n`), EXIT_OK);
   const out = createOut({ json: parsed.json, stdout, stderr });
   const handler = (await loadHandlers(o.dir, pkg, contextFor(pkg, parsed.args, out)))[o.command];
   if (typeof handler !== 'function')

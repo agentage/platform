@@ -60,35 +60,41 @@ const testStore = (option: TestContextOptions['store'], log: Log): TestStore | u
   return createTestStore((store) => migrate(store, dir, log));
 };
 
+const TEST_EXTENSION: ExtensionInfo = {
+  id: 'test',
+  version: '0.0.0',
+  part: 'api',
+  origin: 'http://127.0.0.1',
+  commit: '0'.repeat(40),
+};
+
+// Jobs run by hand with runJob, tools recorded as the mcp part registers them.
+const recorders = (log: Log) => {
+  const scheduler = createScheduler({ runs: memoryRuns(), log });
+  return { ...createToolRegistry(), schedule: scheduler.schedule, runJob: scheduler.run };
+};
+
 const serverContext = (options: TestContextOptions): TestContext => {
   const logs: LogEntry[] = [];
   const log = runLog(recordingLog(logs));
-  const extension = {
-    id: 'test',
-    version: '0.0.0',
-    part: 'api' as const,
-    origin: 'http://127.0.0.1',
-    commit: '0'.repeat(40),
-    ...options.extension,
-  };
   const store = testStore(options.store, recordingLog([]));
-  const scheduler = createScheduler({ runs: memoryRuns(), log });
-  const { tool, tools } = createToolRegistry();
-  const base = { extension, log, settings: { ...options.settings }, logs, tool, tools };
-  const close = async () => store?.close();
   return {
-    ...base,
+    extension: { ...TEST_EXTENSION, ...options.extension },
+    log,
+    logs,
+    settings: { ...options.settings },
     store: store ?? NO_STORE,
-    close,
-    schedule: scheduler.schedule,
-    runJob: scheduler.run,
+    close: async () => store?.close(),
+    ...recorders(log),
   };
 };
 
+// One recorded line per line written, the trailing newline dropped.
+const lines = (into: string[]) => (text: string) =>
+  void into.push(...text.replace(/\n$/, '').split('\n'));
+
 const commandContext = (options: TestCommandOptions): TestCommandContext => {
   const output = { stdout: [] as string[], stderr: [] as string[] };
-  const lines = (into: string[]) => (text: string) =>
-    void into.push(...text.replace(/\n$/, '').split('\n'));
   const out = createOut({
     json: options.json ?? false,
     stdout: lines(output.stdout),

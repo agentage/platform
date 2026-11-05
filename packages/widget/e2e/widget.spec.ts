@@ -1,9 +1,11 @@
 import { fileURLToPath } from 'node:url';
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import { bundle } from '../dist/bundle/index.js';
 import { startStub, type McpCall } from './stub-server.js';
 
 const DEV_ISSUER = 'http://localhost:4281/';
+const WCAG = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 const fixture = fileURLToPath(new URL('../src/test-support/fixture', import.meta.url));
 const port = Number(process.env.WIDGET_E2E_PORT ?? 4290);
 let calls: McpCall[] = [];
@@ -23,7 +25,7 @@ test.beforeEach(() => {
 });
 
 for (const colorScheme of ['light', 'dark'] as const) {
-  test(`echo widget answers pong hi (${colorScheme})`, async ({ page }) => {
+  test(`echo widget answers pong hi, axe WCAG A/AA clean (${colorScheme})`, async ({ page }) => {
     const problems: string[] = [];
     page.on('pageerror', (error) => problems.push(error.message));
     page.on('console', (msg) => {
@@ -34,6 +36,8 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await page.goto('/ui/0.2.0/harness.html');
     await page.getByRole('button', { name: 'ping' }).click();
     await expect(page.locator('probe-echo')).toContainText('pong hi');
+    const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+    expect(violations.map((violation) => violation.id)).toEqual([]);
     await expect(page).toHaveScreenshot(`echo-${colorScheme}.png`);
     expect(problems).toEqual([]);
   });

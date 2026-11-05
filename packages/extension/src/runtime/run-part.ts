@@ -4,23 +4,30 @@ import { settingsFromEnv } from '../context/settings.js';
 import { DEFAULT_RECORD_FILE, loadRecord } from '../discovery/discovery.js';
 import { type HealthCheck } from '../health/health.js';
 import { createLog, type Log } from '../log/log.js';
+import { type ImportModule } from '../manifest/entry.js';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
-import { imageParts, normalizeParts } from '../manifest/parts.js';
+import { hasPostgres, imageParts } from '../manifest/parts.js';
 import { type ImagePartKind } from '../manifest/primitives.schema.js';
 import { readManifest } from '../manifest/read-manifest.js';
 import { serve, type ServeOptions } from '../server/serve.js';
 import { createStore, storeCheck } from '../store/store.js';
+import { type Store } from '../store/store.types.js';
 import { buildInfoFromEnv, portFromEnv, type Env } from './build-info.js';
 import { RUNNERS, type RunnerInput } from './part-runners.js';
-
-export { createOf } from './part-runners.js';
 
 export interface RunPartOptions {
   dir: string;
   part: string;
   env: Env;
-  importModule?: (file: string) => Promise<unknown>;
+  importModule?: ImportModule;
   serve?: Pick<ServeOptions, 'signals' | 'exit'>;
+}
+
+interface Start {
+  pkg: ExtensionPackage;
+  part: ImagePartKind;
+  env: Env;
+  log: Log;
 }
 
 const recordFor = async (env: Env, log: Log) => {
@@ -37,50 +44,43 @@ export const partOf = (pkg: ExtensionPackage, part: string): ImagePartKind => {
 };
 
 // ui serves files and gets no ctx; every other part gets the store when the manifest has postgres.
-const storeFor = (pkg: ExtensionPackage, part: ImagePartKind, env: Env, log: Log) =>
-  part !== 'ui' && normalizeParts(pkg.agentage.parts).store === 'postgres'
-    ? createStore(env, log)
-    : undefined;
+const storeFor = ({ pkg, part, env, log }: Start) =>
+  part !== 'ui' && hasPostgres(pkg) ? createStore(env, log) : undefined;
 
-const inputFor = async (
-  options: RunPartOptions,
-  pkg: ExtensionPackage,
-  part: ImagePartKind,
-  log: Log
-) => {
-  const { env } = options;
-  const origin = env['AGENTAGE_ORIGIN'] || undefined;
-  const build = buildInfoFromEnv(env);
-  const store = storeFor(pkg, part, env, log);
-  const settings = settingsFromEnv(pkg, env, log);
-  const ctxOrigin = origin ?? `http://127.0.0.1:${portFromEnv(env)}`;
-  const ctxPart = (part === 'ui' ? 'pages' : part) as ServerPartKind;
-  const ctx = createContext({
-    pkg,
-    part: ctxPart,
-    origin: ctxOrigin,
-    commit: build.commit,
-    log,
-    settings,
+const contextFor = (start: Start, store: Store | undefined) =>
+  createContext({
+    pkg: start.pkg,
+    part: (start.part === 'ui' ? 'pages' : start.part) as ServerPartKind,
+    origin: start.env['AGENTAGE_ORIGIN'] || `http://127.0.0.1:${portFromEnv(start.env)}`,
+    commit: buildInfoFromEnv(start.env).commit,
+    log: start.log,
+    settings: settingsFromEnv(start.pkg, start.env, start.log),
     store,
   });
-  const record = await recordFor(env, log);
+
+const inputFor = async (options: RunPartOptions, start: Start): Promise<RunnerInput> => {
+  const { pkg, env, log } = start;
+  const store = storeFor(start);
   const checks: Record<string, HealthCheck> = store ? { store: storeCheck(store) } : {};
+  const origin = env['AGENTAGE_ORIGIN'] || undefined;
+  const record = await recordFor(env, log);
+  const build = buildInfoFromEnv(env);
   const base = { pkg, build, log, record, origin, ownImage: env['AGENTAGE_IMAGE'], checks };
   return {
     dir: options.dir,
     pkg,
-    ctx,
+    ctx: contextFor(start, store),
     base,
     importModule: options.importModule,
-  } satisfies RunnerInput;
+  };
 };
 
 export const runPart = async (options: RunPartOptions): Promise<Server> => {
   const pkg = await readManifest(options.dir);
   const part = partOf(pkg, options.part);
   const log = createLog({ extension: pkg.agentage.id, part });
-  const { app, stop } = await RUNNERS[part](await inputFor(options, pkg, part, log));
+  const start = { pkg, part, env: options.env, log };
+  const { app, stop } = await RUNNERS[part](await inputFor(options, start));
   if (stop)
     for (const signal of options.serve?.signals ?? ['SIGTERM', 'SIGINT'])
       process.once(signal, stop);

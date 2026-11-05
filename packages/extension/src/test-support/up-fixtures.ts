@@ -27,26 +27,28 @@ const MCP = `import { z } from 'zod';
 export const create = (ctx) => ctx.tool('echo', { description: 'Echo', input: z.object({}), output: z.object({}) }, () => ({}));
 `;
 
+const CREATE = 'export const create = () => null;';
+
+const PROBE_FILES = {
+  'package-lock.json': json({ lockfileVersion: 3 }),
+  'dist/pages/index.js': CREATE,
+  'dist/api/index.js': CREATE,
+  'dist/worker/index.js': CREATE,
+  'dist/mcp/index.js': MCP,
+  'dist/ui/probe.js': 'export {};',
+  'dist/ui/widgets.json': json([
+    { name: 'echo', element: 'probe-echo', module: '/ui/0.2.0/probe.js' },
+  ]),
+  'migrations/001-ticks.sql': 'create table ticks (id int);',
+  'seeds/001-hello.sql': 'insert into ticks values (1);',
+};
+
 export const probeDir = async (
   manifest: object = PROBE,
   cli = "export const create = ({ out }) => ({ ping: () => out.log('pong') });"
 ) => {
-  const create = 'export const create = () => null;';
-  const dir = await tempPackage({
-    'package.json': json(manifest),
-    'package-lock.json': json({ lockfileVersion: 3 }),
-    'dist/pages/index.js': create,
-    'dist/api/index.js': create,
-    'dist/worker/index.js': create,
-    'dist/mcp/index.js': MCP,
-    'dist/ui/probe.js': 'export {};',
-    'dist/ui/widgets.json': json([
-      { name: 'echo', element: 'probe-echo', module: '/ui/0.2.0/probe.js' },
-    ]),
-    'dist/cli/index.js': cli,
-    'migrations/001-ticks.sql': 'create table ticks (id int);',
-    'seeds/001-hello.sql': 'insert into ticks values (1);',
-  });
+  const files = { 'package.json': json(manifest), ...PROBE_FILES, 'dist/cli/index.js': cli };
+  const dir = await tempPackage(files);
   await linkModules(dir);
   return dir;
 };

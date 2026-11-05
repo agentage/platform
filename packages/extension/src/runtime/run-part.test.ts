@@ -3,8 +3,9 @@ import { type AddressInfo } from 'node:net';
 import { Router } from 'express';
 import { afterEach, describe, expect, it } from 'vitest';
 import { API_MANIFEST, DIGEST, json, SHA, tempPackage } from '../test-support/packages.js';
+import { createOf } from '../manifest/entry.js';
 import { buildInfoFromEnv, portFromEnv } from './build-info.js';
-import { createOf, runPart } from './run-part.js';
+import { runPart } from './run-part.js';
 
 const echoModule = {
   create: () => {

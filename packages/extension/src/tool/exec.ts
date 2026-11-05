@@ -17,16 +17,17 @@ export interface RunResult {
 
 export type Run = (command: string, args: string[], options?: RunOptions) => Promise<RunResult>;
 
+const spawnFor = (command: string, args: string[], options: RunOptions) =>
+  spawn(command, args, {
+    cwd: options.cwd,
+    stdio: ['ignore', 'pipe', options.quiet ? 'pipe' : 'inherit'],
+    env: options.env ? { ...process.env, ...options.env } : process.env,
+  }) as ChildProcessByStdio<null, Readable, Readable | null>;
+
 // stdout is captured (and echoed to stderr with `echo`); stderr streams through as progress.
 export const runCommand: Run = (command, args, options = {}) =>
   new Promise((resolve, reject) => {
-    const stdio = ['ignore', 'pipe', options.quiet ? 'pipe' : 'inherit'] as const;
-    const env = options.env ? { ...process.env, ...options.env } : process.env;
-    const child = spawn(command, args, {
-      cwd: options.cwd,
-      stdio: [...stdio],
-      env,
-    }) as ChildProcessByStdio<null, Readable, Readable | null>;
+    const child = spawnFor(command, args, options);
     let stdout = '';
     let stderr = '';
     child.stdout.on('data', (chunk: Buffer) => {

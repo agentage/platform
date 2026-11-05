@@ -1,4 +1,3 @@
-// src/ui/echo.tsx: just a React component
 import { useState } from 'react';
 import { useHost } from '@agentage/widget';
 import { Button, Card } from '@agentage/widget/ds';

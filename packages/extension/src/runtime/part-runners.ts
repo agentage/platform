@@ -1,10 +1,10 @@
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { type Express } from 'express';
 import { type PartContext } from '../context/context.js';
 import { readOpenapi } from '../discovery/openapi.js';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
-import { entryOf, normalizeParts } from '../manifest/parts.js';
+import { loadCreate, type ImportModule } from '../manifest/entry.js';
+import { hasPostgres } from '../manifest/parts.js';
 import { type ImagePartKind } from '../manifest/primitives.schema.js';
 import { createMcpApp } from '../mcp/mcp-app.js';
 import { createToolRegistry } from '../mcp/tools.js';
@@ -21,7 +21,7 @@ export interface RunnerInput {
   pkg: ExtensionPackage;
   ctx: PartContext;
   base: PartAppBase;
-  importModule?: (file: string) => Promise<unknown>;
+  importModule?: ImportModule;
 }
 
 export interface Running {
@@ -29,22 +29,9 @@ export interface Running {
   stop?: () => void;
 }
 
-type PartCreate = (ctx: never) => unknown;
-
-const importFile = (file: string): Promise<unknown> => import(pathToFileURL(file).href);
-
-export const createOf = (mod: unknown, file: string): PartCreate => {
-  const create = (mod as { create?: unknown } | null)?.create;
-  if (typeof create !== 'function') throw new Error(`${file} does not export create(ctx)`);
-  return create as PartCreate;
-};
-
-// Imports the part's entry and calls its create(ctx); ui has no code to run.
-const callCreate = async <C>(input: RunnerInput, part: ImagePartKind, ctx: C): Promise<unknown> => {
-  const file = join(input.dir, entryOf(input.pkg, part));
-  const mod = await (input.importModule ?? importFile)(file);
-  return (createOf(mod, file) as (ctx: C) => unknown)(ctx);
-};
+// ui has no code to run; every other part is its create(ctx).
+const callCreate = async <C>(input: RunnerInput, part: ImagePartKind, ctx: C): Promise<unknown> =>
+  (await loadCreate<C>(input.dir, input.pkg, part, input.importModule))(ctx);
 
 const api = async (input: RunnerInput): Promise<Running> => {
   const router = (await callCreate(input, 'api', input.ctx)) as ApiHandler;
@@ -70,8 +57,7 @@ const ui = async (input: RunnerInput): Promise<Running> => ({
 
 const worker = async (input: RunnerInput): Promise<Running> => {
   const log = runLog(input.ctx.log);
-  const hasStore = normalizeParts(input.pkg.agentage.parts).store === 'postgres';
-  const runs = hasStore ? storeRuns(input.ctx.store) : memoryRuns();
+  const runs = hasPostgres(input.pkg) ? storeRuns(input.ctx.store) : memoryRuns();
   const scheduler = createScheduler({ runs, log });
   await callCreate(input, 'worker', { ...input.ctx, log, schedule: scheduler.schedule });
   const checks = { ...input.base.checks, ...scheduler.checks() };

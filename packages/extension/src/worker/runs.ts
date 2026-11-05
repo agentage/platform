@@ -52,6 +52,17 @@ const fromRow = (row: RunRow): JobRun => ({
   ...(row.timeout_ms === null ? {} : { timeoutMs: row.timeout_ms }),
 });
 
+const LAST = 'select * from agentage_job_runs where job = $1 order by id desc limit 1';
+
+const valuesOf = (run: JobRun): unknown[] => [
+  run.job,
+  run.startedAt,
+  run.endedAt,
+  run.status,
+  run.log,
+  run.timeoutMs ?? null,
+];
+
 // Runs live in the extension's own store, in a table the kit owns; the last 50 per job are kept.
 export const storeRuns = (store: Store): RunStore => {
   let table: Promise<unknown> | undefined;
@@ -59,21 +70,12 @@ export const storeRuns = (store: Store): RunStore => {
   return {
     save: async (run) => {
       await ready();
-      const values = [
-        run.job,
-        run.startedAt,
-        run.endedAt,
-        run.status,
-        run.log,
-        run.timeoutMs ?? null,
-      ];
-      await store.query(INSERT, values);
+      await store.query(INSERT, valuesOf(run));
       await store.query(PRUNE, [run.job]);
     },
     last: async (job) => {
       await ready();
-      const sql = 'select * from agentage_job_runs where job = $1 order by id desc limit 1';
-      const { rows } = await store.query<RunRow & Record<string, unknown>>(sql, [job]);
+      const { rows } = await store.query<RunRow & Record<string, unknown>>(LAST, [job]);
       return rows[0] ? fromRow(rows[0]) : undefined;
     },
   };

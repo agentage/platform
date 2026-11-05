@@ -15,7 +15,8 @@ security, backend); this file only adds what the tree does not say.
 
 - `envelope/` ok, fail, parse, the closed error codes; `agcid/` UUIDv7, the request scope
   (`current.ts` has no express import, so logs and the tool stay loadable by the cli)
-- `manifest/` the Zod manifest (`package.json` `agentage` key), parts normalization, reader
+- `manifest/` the Zod manifest (`package.json` `agentage` key), parts normalization, reader,
+  `entry.ts` (`loadCreate`: the one way part, command and build code reach a part's `create`)
 - `discovery/` the build record, the served discovery document, the committed `openapi.json`
 - `context/` ctx, settings from `AGENTAGE_SETTINGS`, `createTestContext` (parts and commands)
 - `server/` the kit app every part runs (`createPartApp`), errors, listen and shutdown
@@ -40,8 +41,10 @@ security, backend); this file only adds what the tree does not say.
 - `src/register/` `registerWidgets`, the element (`defineWidget`, internal), the error box
 - `src/bundle/` the bundler and the `agentage-widget` bin; `src/harness/` the harness page logic
   (bundled to `dist/ui/harness.js`; the template is `harness/harness.html`)
-- `e2e/` Playwright: bundles the fixture, serves it under the ui CSP with a stub `/mcp`, light
-  and dark screenshots; `src/test-support/fixture` is the probe's echo widget (C7 text)
+- `e2e/` Playwright: bundles the fixture, serves it under the ui CSP with a stub `/mcp`, an axe
+  WCAG A/AA sweep (it reaches into the shadow root) and screenshots in light and dark;
+  `src/test-support/fixture` is the probe's echo widget (C7 text); widget `.tsx` lints with
+  jsx-a11y and react-hooks (`overrides` lets jsx-a11y run on ESLint 10)
 
 ## Gotchas
 
