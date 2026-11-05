@@ -72,7 +72,10 @@ const storeStep = async (s: Session) => {
   await compose(s.deps.run, s.target, ['up', '-d', 'store'], TIMEOUTS.start);
   await waitHealthy(s.target, ['store'], s.deps);
   const run = ['run', '--rm', '--no-deps', 'migrate'];
-  const summary = summaryOf(await compose(s.deps.run, s.target, run, TIMEOUTS.migrate));
+  const out = await compose(s.deps.run, s.target, run, TIMEOUTS.migrate).catch((err: Error) => {
+    throw new Error(`the migrate job failed, no part was started: ${err.message}`);
+  });
+  const summary = summaryOf(out);
   s.line('store', STORE_IMAGE, storePhrase(summary));
 };
 

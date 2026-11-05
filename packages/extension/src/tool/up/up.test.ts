@@ -133,4 +133,13 @@ describe('up', () => {
     const result = await up({ dir, env: ENV }, { run: fakeDocker({}, { running }).run });
     expect(result).toMatchObject({ parts: 7, project: own });
   });
+
+  it('a failed migrate job stops up before any part starts, naming the file', async () => {
+    const migrateFails = 'migration 002-bad.sql failed: syntax error at or near "tabel"\n';
+    const docker = fakeDocker({}, { migrateFails });
+    await expect(up({ dir: await probeDir(), env: ENV }, { run: docker.run })).rejects.toThrow(
+      /^the migrate job failed, no part was started: docker compose failed with exit code 1\nmigration 002-bad\.sql failed/
+    );
+    expect(docker.compose()).not.toContain('up -d --remove-orphans');
+  });
 });

@@ -8,15 +8,13 @@ import { createStore, type StoreTimeouts } from './store.js';
 const MIGRATE_TIMEOUTS: StoreTimeouts = { connectMs: 10_000, statementMs: 300_000 };
 
 // The api image's migrate entry (`node dist/store/migrate.js` in /app), run as a job before a rollout.
-const log = createLog({ extension: 'unknown', part: 'migrate' });
+// Until the manifest is read the id is unknown; every line after it carries the extension.
+let log = createLog({ extension: 'unknown', part: 'migrate' });
 try {
   const pkg = await readManifest(process.cwd());
+  log = createLog({ extension: pkg.agentage.id, part: 'migrate' });
   const store = createStore(process.env, log, MIGRATE_TIMEOUTS);
-  const result = await migrate(
-    store,
-    process.cwd(),
-    createLog({ extension: pkg.agentage.id, part: 'migrate' })
-  );
+  const result = await migrate(store, process.cwd(), log);
   process.stdout.write(`${JSON.stringify(result)}\n`);
   await store.end();
 } catch (err) {

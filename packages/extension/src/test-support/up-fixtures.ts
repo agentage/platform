@@ -59,6 +59,8 @@ export interface FakeDockerOptions {
   // What `docker ps --format` prints: name, compose project and ports, tab-separated.
   running?: string;
   migrate?: string;
+  // The migrate job exits 1 with this on stderr.
+  migrateFails?: string;
 }
 
 // npm, docker build and inspect, and compose: ps answers from `health`, migrate prints its summary.
@@ -76,6 +78,8 @@ export const fakeDocker = (health: Record<string, string> = {}, fake: FakeDocker
   };
   const run: Run = async (command, args, options) => {
     calls.push({ args: [command, ...args], options });
+    if (fake.migrateFails && args.includes('migrate'))
+      return { code: 1, stdout: '', stderr: fake.migrateFails };
     return { code: 0, stdout: answer(args), stderr: '' };
   };
   const compose = () =>

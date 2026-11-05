@@ -53,6 +53,7 @@ describe('the migrate entry', () => {
     expect(stdout).toEqual([]);
     expect(JSON.parse(stderr.join(''))).toMatchObject({
       level: 'error',
+      extension: 'probe',
       msg: expect.stringMatching(/^migration 001-ticks\.sql failed: syntax error/),
     });
   });
