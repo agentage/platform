@@ -44,19 +44,24 @@ const expiry = (child: Child, ms: number) => {
 const timedOut = (command: string, args: string[], ms: number): Error =>
   new Error(`${command} ${args[0] ?? ''} did not finish in ${Math.round(ms / 1000)} s`);
 
-// stdout is captured (and echoed to stderr with `echo`); stderr streams through as progress.
+// stdout is captured (and echoed to stderr with `echo`); a piped stderr is captured too.
+const collect = (child: Child, echo?: boolean) => {
+  const out = { stdout: '', stderr: '' };
+  child.stdout.on('data', (chunk: Buffer) => {
+    out.stdout += chunk.toString();
+    if (echo) process.stderr.write(chunk);
+  });
+  child.stderr?.on('data', (chunk: Buffer) => void (out.stderr += chunk.toString()));
+  return out;
+};
+
+// stderr streams through as progress unless `quiet`; past its timeout the command is killed.
 export const runCommand: Run = (command, args, options = {}) =>
   new Promise((resolve, reject) => {
     const child = spawnFor(command, args, options);
     const ms = options.timeoutMs ?? TIMEOUTS.command;
     const timer = expiry(child, ms);
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString();
-      if (options.echo) process.stderr.write(chunk);
-    });
-    child.stderr?.on('data', (chunk: Buffer) => void (stderr += chunk.toString()));
+    const out = collect(child, options.echo);
     child.on('error', (err: NodeJS.ErrnoException) => {
       timer.clear();
       reject(err.code === 'ENOENT' ? new Error(`${command} is not installed or not on PATH`) : err);
@@ -64,7 +69,8 @@ export const runCommand: Run = (command, args, options = {}) =>
     child.on('close', (code) => {
       timer.clear();
       if (timer.expired.value) return reject(timedOut(command, args, ms));
-      resolve({ code: code ?? 1, stdout, ...(options.quiet ? { stderr } : {}) });
+      const stderr = options.quiet ? { stderr: out.stderr } : {};
+      resolve({ code: code ?? 1, stdout: out.stdout, ...stderr });
     });
   });
 
