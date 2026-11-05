@@ -55,7 +55,9 @@ describe('an api part checks tokens (C5, C6)', () => {
     const url = await start();
     const read = await issuer.bearer({ scope: 'probe:read' });
     const write = await issuer.bearer({ scope: 'probe:write' });
-    for (const path of ['/api/v1/items', '/api/v1/Items', '/api/v1/items/', '/API/V1/ITEMS/']) {
+    const paths = ['/api/v1/items', '/api/v1/Items', '/api/v1/items/', '/API/V1/ITEMS/'];
+    // /items/me is read in OpenAPI, but Express routes it to /items/:id, registered first.
+    for (const path of [...paths, '/api/v1/items/me']) {
       const post = (authorization: string) =>
         fetch(`${url}${path}`, { method: 'POST', headers: { authorization } });
       expect((await post(read)).status, path).toBe(403);

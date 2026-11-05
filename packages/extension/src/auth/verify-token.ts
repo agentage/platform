@@ -52,12 +52,13 @@ export const remoteKeys = (issuer: string) => {
     timeoutDuration: 3000,
     cacheMaxAge: Infinity,
   });
-  return { keys: keysOrOutage(set), read: () => retryOnce(set.reload).catch(() => undefined) };
+  return { keys: keysOrOutage(set), read: () => retryOnce(set.reload) };
 };
 
 const claimsOf = async (authorization: string, deps: TokenCheckDeps) => {
-  const [scheme = '', credential = ''] = authorization.split(' ');
-  const jwt = scheme.toLowerCase() === 'bearer' && credential.startsWith('aga_') ? credential : '';
+  const [scheme = '', credential = '', ...rest] = authorization.split(' ');
+  const bearer = scheme.toLowerCase() === 'bearer' && rest.length === 0;
+  const jwt = bearer && credential.startsWith('aga_') ? credential : '';
   const options = { ...VERIFY, issuer: deps.issuer, audience: deps.audience };
   const verified = await jwtVerify(jwt.slice(4), deps.keys, options).catch((err: unknown) => {
     throw isFailure(err) ? err : invalid(deps.origin);

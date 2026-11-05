@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { OriginSchema } from '../discovery/discovery.schema.js';
-import { type Log } from '../log/log.js';
+import { messageOf, type Log } from '../log/log.js';
 import { formatIssues } from '../manifest/read-manifest.js';
 import { type Env } from '../runtime/build-info.js';
 import { createRevokedList, REVOKED_POLL_MS } from './revoked.js';
@@ -43,7 +43,8 @@ export const partAuth = async (env: Env, id: string, log: Log, scopes: string[])
   const { issuer, audience, origin } = settingsOf(env);
   const { keys, read } = remoteKeys(issuer);
   const revoked = createRevokedList(issuer, log);
-  await Promise.all([read(), revoked.refresh()]);
+  const unread = (err: unknown) => log.warn('key set not read', { reason: messageOf(err) });
+  await Promise.all([read().catch(unread), revoked.refresh()]);
   setInterval(() => void revoked.refresh(), REVOKED_POLL_MS).unref();
   return {
     tokenCheck: createTokenCheck({ issuer, audience, id, origin, keys, revoked }),

@@ -23,6 +23,8 @@ const OPENAPI = {
     '/api/v1/echo': { parameters: [], get: { security: [{ pat: ['probe:read'] }] } },
     '/api/v1/ticks': { get: { security: [] } },
     '/api/v1/items': { post: { security: [{ pat: ['probe:write'] }] } },
+    '/api/v1/items/{id}': { post: { security: [{ pat: ['probe:write'] }] } },
+    '/api/v1/items/me': { post: { security: [{ pat: ['probe:read'] }] } },
   },
 };
 const image = (part: string) => ({ image: `ghcr.io/agentage/probe-${part}@${DIGEST}` });
@@ -45,6 +47,8 @@ export const create = (ctx) => {
   router.get('/echo', caller);
   router.get('/ticks', caller);
   router.post('/items', caller);
+  router.post('/items/:id', caller);
+  router.post('/items/me', caller);
   return router;
 };
 `,

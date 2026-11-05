@@ -34,10 +34,12 @@ describe('access', () => {
     expect(routeAccess(null, 'GET', '/api/v1/echo')).toBe('read');
   });
 
-  it('picks the most specific path: a concrete one over a template listed before it', () => {
+  // Express may route /x/admin to the /x/:id handler (first registered): every match counts.
+  it('takes the strongest access of every path the request matches', () => {
     const doc = {
       paths: {
-        '/x/{id}': { get: { security: [] } },
+        '/x/{id}': { get: { security: [] }, post: { security: [{ agentage: ['probe:write'] }] } },
+        '/x/me': { post: { security: [{ agentage: ['probe:read'] }] } },
         '/x/admin': { get: { security: [{ agentage: ['probe:admin'] }] } },
         '/x/{id}/{part}': { get: { security: [] } },
         '/x/{id}/notes': { get: { security: [{ agentage: ['probe:write'] }] } },
@@ -47,6 +49,7 @@ describe('access', () => {
     expect(routeAccess(doc, 'GET', '/x/42')).toBe('public');
     expect(routeAccess(doc, 'GET', '/x/42/notes')).toBe('write');
     expect(routeAccess(doc, 'GET', '/x/42/other')).toBe('public');
+    expect(routeAccess(doc, 'POST', '/x/me')).toBe('write');
   });
 
   it('takes the strongest of several needs', () => {

@@ -73,7 +73,7 @@ describe('an mcp part checks tokens (C5, C7)', () => {
       id: null,
     };
     for (const body of [message(1, 'tools/call', CALL), batch]) {
-      const bom = await postMcp(url, `﻿${JSON.stringify(body)}`);
+      const bom = await postMcp(url, `\uFEFF${JSON.stringify(body)}`);
       expect([bom.res.status, bom.body]).toEqual([400, parseError]);
     }
     expect((await postMcp(url, JSON.stringify(batch))).res.status).toBe(401);

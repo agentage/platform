@@ -100,9 +100,10 @@ describe('the token check (C4)', () => {
     expect(await check(bearer.replace('Bearer', 'bEARER'), 'read')).toMatchObject({
       sub: 'usr_dev',
     });
-    await expect(check(bearer.replace('aga_', 'AGA_'), 'read')).rejects.toMatchObject(
-      unauthorized('Invalid token')
-    );
+    for (const header of [bearer.replace('aga_', 'AGA_'), `${bearer} junk`, `${bearer}  `])
+      await expect(check(header, 'read'), header.slice(-6)).rejects.toMatchObject(
+        unauthorized('Invalid token')
+      );
   });
 
   it('no token, another scheme or no aga_ prefix is 401 naming the resource document', async () => {

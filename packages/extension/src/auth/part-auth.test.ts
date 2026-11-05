@@ -78,6 +78,13 @@ describe('the token check of a part', () => {
     await expect.poll(() => statusOf(tokenCheck(bearer, 'read'))).toBe(401);
   });
 
+  it('a key set the part cannot read at start is one warning, not a stop', async () => {
+    await issuer.close();
+    const { log, lines } = recordedLog();
+    await partAuth(authEnv(issuer, dir), 'probe', log, []);
+    expect(lines.filter((line) => line['msg'] === 'key set not read')).toHaveLength(1);
+  });
+
   it('until the revoked list is read, a token with a jti is 503 and auth is degraded', async () => {
     const real = globalThis.fetch;
     vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) =>

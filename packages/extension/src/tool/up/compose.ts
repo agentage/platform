@@ -47,14 +47,23 @@ const storeService = (id: string) => ({
   },
 });
 
-const partService = (input: ComposeInput, part: ImagePartKind) => ({
-  image: input.tags[part],
-  environment: partEnv(input.pkg, part),
-  volumes: [`${input.recordFile}:${RECORD_TARGET}:ro`],
-  ...(hasPostgres(input.pkg) && part !== 'ui'
-    ? { depends_on: { store: { condition: 'service_healthy' } } }
-    : {}),
+const HEALTHY = { condition: 'service_healthy' };
+
+// api and mcp read the issuer's keys and revoked list before they serve.
+const dependsOn = (pkg: ExtensionPackage, part: ImagePartKind) => ({
+  ...(hasPostgres(pkg) && part !== 'ui' ? { store: HEALTHY } : {}),
+  ...(part === 'api' || part === 'mcp' ? { issuer: HEALTHY } : {}),
 });
+
+const partService = (input: ComposeInput, part: ImagePartKind) => {
+  const depends_on = dependsOn(input.pkg, part);
+  return {
+    image: input.tags[part],
+    environment: partEnv(input.pkg, part),
+    volumes: [`${input.recordFile}:${RECORD_TARGET}:ro`],
+    ...(Object.keys(depends_on).length > 0 ? { depends_on } : {}),
+  };
+};
 
 const fixedServices = (input: ComposeInput, anyImage: string) => ({
   gateway: {
@@ -79,7 +88,7 @@ const migrateService = (input: ComposeInput) => ({
   command: ['node', 'dist/store/migrate.js'],
   environment: partEnv(input.pkg, 'migrate'),
   ...(input.seedsDir ? { volumes: [`${input.seedsDir}:/app/seeds:ro`] } : {}),
-  depends_on: { store: { condition: 'service_healthy' } },
+  depends_on: { store: HEALTHY },
   profiles: ['jobs'],
   restart: 'no',
 });
