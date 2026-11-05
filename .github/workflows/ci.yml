@@ -64,8 +64,7 @@ jobs:
         run: |
           set -euo pipefail
           npm pack --workspaces --pack-destination /tmp/pack >/dev/null
-          # A PR whose branch also exists in extension-probe runs against that branch: a kit change
-          # and the probe change it needs are tested together; master and other PRs use probe master.
+          # A PR runs against the extension-probe branch of the same name when one exists, else master.
           probe=https://github.com/agentage/extension-probe.git
           branch=master
           if [ -n "${GITHUB_HEAD_REF:-}" ] && git ls-remote --exit-code --heads "$probe" "$GITHUB_HEAD_REF" >/dev/null; then

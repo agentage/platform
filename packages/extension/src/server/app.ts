@@ -3,7 +3,7 @@ import express, { type Express, type Request, type RequestHandler } from 'expres
 import helmet, { type HelmetOptions } from 'helmet';
 import { agcidMiddleware } from '../agcid/scope.js';
 import { routeAccess } from '../auth/route-access.js';
-import { type TokenCheck } from '../auth/token-check.js';
+import { setCaller, type TokenCheck } from '../auth/token-check.js';
 import {
   discoveryDocument,
   recordOf,
@@ -96,10 +96,10 @@ const openapiHandler =
 // Before the body is read: each request checked for the access its OpenAPI operation declares.
 const routeGuard =
   (options: ApiAppOptions): RequestHandler =>
-  async (req, res, next) => {
+  async (req, _res, next) => {
     if (!options.tokenCheck) return next();
     const access = routeAccess(options.openapi, req.method, `/api/v1${req.path}`);
-    res.locals['caller'] = await options.tokenCheck(req.get('authorization'), access);
+    setCaller(req, await options.tokenCheck(req.get('authorization'), access));
     next();
   };
 

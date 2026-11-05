@@ -40,7 +40,7 @@ describe('scheduler', () => {
     expect(runs.all('tick').map((run) => run.status)).toEqual(['ok']);
   });
 
-  it('a run that skips a tick, or runs past its timeout, reads degraded until the next run', async () => {
+  it('degraded while a run skips a tick or outlives its timeout, ok once it ends', async () => {
     const releases: (() => void)[] = [];
     const hang = () => new Promise<void>((resolve) => void releases.push(resolve));
     scheduler.schedule('tick', '* * * * *', hang);

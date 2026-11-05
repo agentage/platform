@@ -70,30 +70,29 @@ const lazyContext = (start: Start, store: Store | undefined): (() => PartContext
   };
 };
 
-const inputFor = async (options: RunPartOptions, start: Start): Promise<RunnerInput> => {
+const baseFor = async (options: RunPartOptions, start: Start, store: Store | undefined) => {
   const { pkg, env, log } = start;
-  const store = storeFor(start);
   const checks: Record<string, HealthCheck> = store ? { store: storeCheck(store) } : {};
-  const origin = env['AGENTAGE_ORIGIN'] || undefined;
-  const record = await recordFor(env, log);
-  const build = buildInfoFromEnv(env);
-  const ownImage = env['AGENTAGE_IMAGE'];
-  const base = {
+  return {
     pkg,
-    build,
     log,
-    record,
-    origin,
-    ownImage,
     checks,
+    build: buildInfoFromEnv(env),
+    record: await recordFor(env, log),
+    origin: env['AGENTAGE_ORIGIN'] || undefined,
+    ownImage: env['AGENTAGE_IMAGE'],
     tokenCheck: options.tokenCheck,
   };
+};
+
+const inputFor = async (options: RunPartOptions, start: Start): Promise<RunnerInput> => {
+  const store = storeFor(start);
   return {
     dir: options.dir,
-    pkg,
-    env,
+    pkg: start.pkg,
+    env: start.env,
     ctx: lazyContext(start, store),
-    base,
+    base: await baseFor(options, start, store),
     importModule: options.importModule,
   };
 };

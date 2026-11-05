@@ -6,12 +6,19 @@ export interface Caller {
   scopes: readonly string[];
 }
 
-// The host's token check: a caller (null for public), or a thrown UNAUTHORIZED, FORBIDDEN or UNAVAILABLE.
-// Kit 0.2 runs none (tokens off): calls stay anonymous; M3 passes one verifying against the JWKS.
+// A caller, or a thrown UNAUTHORIZED, FORBIDDEN or UNAVAILABLE; none runs in kit 0.2 (tokens off).
 export type TokenCheck = (
   authorization: string | undefined,
   access: Access
 ) => Promise<Caller | null>;
+
+// Kit-private until ctx.auth.caller(request) exists (M3): part code never reads it from the request.
+const callers = new WeakMap<object, Caller | null>();
+
+export const setCaller = (request: object, caller: Caller | null): void =>
+  void callers.set(request, caller);
+
+export const callerOf = (request: object): Caller | null => callers.get(request) ?? null;
 
 const RANK: Record<Access, number> = { public: 0, read: 1, write: 2, admin: 3 };
 

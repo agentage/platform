@@ -53,9 +53,22 @@ describe('down', () => {
     ]);
   });
 
-  it('takes the project the rendered compose file names, so an older up is removed too', async () => {
+  it('uses its own rendered compose file, and still removes the shared project of kit 0.2.0', async () => {
     const dir = await probe();
-    await rendered(dir, 'agentage-probe');
+    const project = projectName('probe', await realpath(dir));
+    await rendered(dir, project);
+    const own = fakeRun();
+    await down({ dir }, own.run);
+    const file = join(await realpath(dir), '.agentage', 'compose.json');
+    expect(own.calls[0]?.args.slice(0, 6)).toEqual([
+      'docker',
+      'compose',
+      '-f',
+      file,
+      '-p',
+      project,
+    ]);
+    await writeFile(file, json({ name: 'agentage-probe', services: {} }));
     const { run, calls } = fakeRun(0, ' Container agentage-probe-api-1  Removed\n');
     const lines: string[] = [];
     const result = await down({ dir, keepData: true, onLine: (l) => void lines.push(l) }, run);
@@ -63,16 +76,17 @@ describe('down', () => {
     expect(lines[0]).toMatch(
       /^removed {2}1 container · 0 networks · 0 volumes \(the store volume kept\) +agentage-probe$/
     );
-    const file = join(await realpath(dir), '.agentage', 'compose.json');
-    expect(calls[0]?.args).toEqual([
-      'docker',
-      'compose',
-      '-f',
-      file,
-      '-p',
-      'agentage-probe',
-      ...DOWN,
-    ]);
+    expect(calls[0]?.args).toEqual(['docker', 'compose', '-p', 'agentage-probe', ...DOWN]);
+  });
+
+  it('a copy made with cp -r ignores the compose file it carries: never the original project', async () => {
+    const dir = await probe();
+    await rendered(dir, 'agentage-probe-0a1b2c3d');
+    const { run, calls } = fakeRun();
+    const result = await down({ dir }, run);
+    const own = projectName('probe', await realpath(dir));
+    expect(result.project).toBe(own);
+    expect(calls[0]?.args).toEqual(['docker', 'compose', '-p', own, ...DOWN, '--volumes']);
   });
 
   it('two working copies of one extension are two projects: down in one leaves the other', async () => {

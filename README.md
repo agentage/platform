@@ -55,8 +55,8 @@ export const create = (ctx: PagesContext): PagesSite => ({ '/': versionPage(ctx)
 
 The ui part is a `widgets` map on [`@agentage/widget`](packages/widget). A postgres store adds
 `migrations/NNN-name.sql` (applied in order, each once, recorded in `_migrations`; a failing file
-is named and rolled back) and `seeds/` (applied once, only on an empty store, still owed after a
-failed first run); `ctx.store` is a ready pool: a query gets 10 s (statement timeout), a connection
+is named and rolled back) and `seeds/` (applied once, only on a store with no ledger row and no
+table but the kit's, still owed after a failed first run); `ctx.store` is a ready pool: a query gets 10 s (statement timeout), a connection
 5 s, and a store that cannot answer is `UNAVAILABLE` (503, `Retry-After`), never a 500. Worker
 runs land in `agentage_job_runs` (job, start, end, status, log capped at 64 KB, the last 50 per
 job; in memory without a store), and `/health` reports `job:{name}`. Commands answer

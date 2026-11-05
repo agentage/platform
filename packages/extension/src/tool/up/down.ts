@@ -4,7 +4,7 @@ import { quietly, runCommand, type Run } from '../exec.js';
 import { composeArgs, type ComposeTarget } from './compose-run.js';
 import { plural, stepLine } from './lines.js';
 import { LOCAL_DIR } from './local-record.js';
-import { projectName, renderedProject, workingCopy } from './project.js';
+import { legacyProject, projectName, renderedProject, workingCopy } from './project.js';
 
 export interface DownOptions {
   dir?: string;
@@ -40,12 +40,14 @@ const summary = (removed: Removed, keepData?: boolean): string => {
   return counts.join(' · ') + (keepData ? ' (the store volume kept)' : '');
 };
 
-// The project `up` rendered in this working copy (any kit version), else the one it would render.
+// This folder's own project; a copied compose.json naming another copy's project is ignored.
 const targetOf = async (dir: string): Promise<ComposeTarget> => {
+  const { id } = (await readManifest(dir)).agentage;
   const file = join(dir, LOCAL_DIR, 'compose.json');
   const rendered = await renderedProject(file);
-  if (rendered) return { file, project: rendered };
-  return { project: projectName((await readManifest(dir)).agentage.id, dir) };
+  const project = projectName(id, dir);
+  if (rendered === project) return { file, project };
+  return { project: rendered === legacyProject(id) ? rendered : project };
 };
 
 // Everything `up` started in this working copy goes, and only that; --keep-data keeps the store.

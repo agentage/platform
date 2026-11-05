@@ -1,5 +1,4 @@
-// Every outbound call the tool makes and how long it may take. None retries: a step that times
-// out stops with its name, and running it again is safe (build, up and down are idempotent).
+// Every outbound call the tool makes and its bound; none retries, since a re-run is safe.
 export const TIMEOUTS = {
   // git rev-parse, docker image inspect, compose ps, logs and down, the port check
   command: 120_000,

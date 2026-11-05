@@ -66,6 +66,22 @@ describe('migrate', () => {
     });
   });
 
+  it('never seeds a store that already holds tables, even with no ledger (a restored dump)', async () => {
+    const dir = await tempPackage({
+      'migrations/001-ticks.sql': TICKS,
+      'seeds/001-hello.sql': "insert into ticks (job) values ('seed');",
+    });
+    const s = openStore();
+    await s.query('create table notes (id int); insert into notes values (1);');
+    expect(await migrate(s, dir, recordedLog().log)).toEqual({
+      migrations: 1,
+      applied: 1,
+      seeds: 0,
+      seedsBefore: 0,
+    });
+    expect(await names(s)).toEqual(['001-ticks.sql']);
+  });
+
   it('takes missing folders as empty', async () => {
     const dir = await tempPackage({ 'package.json': '{}' });
     const s = openStore();

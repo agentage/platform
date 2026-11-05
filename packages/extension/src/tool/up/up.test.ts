@@ -115,22 +115,35 @@ describe('up', () => {
   it('refuses before building when another project holds the gateway or issuer port', async () => {
     const dir = await probeDir();
     const other = 'agentage-probe-1-gateway-1\tagentage-probe-ffffffff\t127.0.0.1:4280->80/tcp';
-    const docker = fakeDocker({}, { running: other });
+    const docker = fakeDocker({}, { running: [other] });
     await expect(up({ dir, env: ENV }, { run: docker.run })).rejects.toThrow(
       'localhost:4280 is held by compose project agentage-probe-ffffffff: run agentage extension down in the working copy that started it, then up again'
     );
     expect(docker.calls).toHaveLength(1);
-    const stray = fakeDocker({}, { running: 'web\t\t0.0.0.0:4281->3000/tcp, [::]:4281->3000/tcp' });
+    const stray = fakeDocker(
+      {},
+      { running: ['web\t\t0.0.0.0:4281->3000/tcp, [::]:4281->3000/tcp'] }
+    );
     await expect(up({ dir, env: ENV }, { run: stray.run })).rejects.toThrow(
       'localhost:4281 is held by container web: stop it, then up again'
     );
+  });
+
+  it('checks the ports again after the build, before the store and migrate run', async () => {
+    const other = 'g-1\tagentage-probe-ffffffff\t127.0.0.1:4280->80/tcp';
+    const docker = fakeDocker({}, { running: ['', other] });
+    await expect(up({ dir: await probeDir(), env: ENV }, { run: docker.run })).rejects.toThrow(
+      /^localhost:4280 is held by compose project agentage-probe-ffffffff/
+    );
+    expect(docker.calls.filter((c) => c.args[1] === 'build')).toHaveLength(5);
+    expect(docker.compose()).toEqual([]);
   });
 
   it('runs again over its own project: the ports it holds are no refusal', async () => {
     const dir = await probeDir();
     const own = projectName('probe', await realpath(dir));
     const running = `${own}-gateway-1\t${own}\t127.0.0.1:4280->80/tcp\nother\tx\t0.0.0.0:14280->80/tcp`;
-    const result = await up({ dir, env: ENV }, { run: fakeDocker({}, { running }).run });
+    const result = await up({ dir, env: ENV }, { run: fakeDocker({}, { running: [running] }).run });
     expect(result).toMatchObject({ parts: 7, project: own });
   });
 

@@ -7,7 +7,7 @@ import { createToolRegistry } from '../mcp/tools.js';
 import { createApiApp } from '../server/app.js';
 import { recordedLog, serveApp, type Served } from '../test-support/http.js';
 import { API_MANIFEST } from '../test-support/packages.js';
-import { type Access, type TokenCheck } from './token-check.js';
+import { callerOf, type Access, type TokenCheck } from './token-check.js';
 
 const BUILD = { commit: '0'.repeat(40), buildTime: '2026-11-05T10:00:00Z' };
 const PKG = { ...API_MANIFEST, agentage: { id: 'probe', parts: { api: true, mcp: true } } };
@@ -38,7 +38,7 @@ const recorder = (refuse?: () => Error) => {
 
 const api = async (check?: TokenCheck) => {
   const router = Router();
-  router.get('/echo', (_req, res) => void res.json({ success: true, data: res.locals['caller'] }));
+  router.get('/echo', (req, res) => void res.json({ success: true, data: callerOf(req) }));
   router.post('/body', (_req, res) => void res.json({ success: true, data: 1 }));
   const log = recordedLog().log;
   const app = createApiApp({

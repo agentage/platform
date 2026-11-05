@@ -114,6 +114,8 @@ export const up = async (
   const s = await sessionOf(options, deps);
   await assertPortsFree(s.deps.run, s.target.project);
   await buildStep(s, options.env ?? process.env);
+  // Again after the build: another up may have started meanwhile, and the store comes next.
+  await assertPortsFree(s.deps.run, s.target.project);
   if (hasPostgres(s.pkg)) await storeStep(s);
   await partsStep(s);
   const parts = imageParts(s.pkg).length + (hasPostgres(s.pkg) ? 1 : 0) + cliParts(s.pkg);

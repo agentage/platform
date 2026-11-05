@@ -36,6 +36,14 @@ const SEED = 'seed:';
 // Written by the first run on an empty store, removed once the seeds ran: a failed first run still seeds later.
 export const SEEDS_OWED = 'seeds:owed';
 
+// Tables other than the kit's own: a store holding any (a restored dump) never gets the seeds.
+const USER_TABLES = `select count(*)::int as n from information_schema.tables
+  where table_schema not in ('pg_catalog', 'information_schema')
+  and table_name not in ('_migrations', 'agentage_job_runs')`;
+
+const isEmpty = async (store: Store, done: Set<string>): Promise<boolean> =>
+  done.size === 0 && ((await store.query<{ n: number }>(USER_TABLES)).rows[0]?.n ?? 0) === 0;
+
 const appliedNames = async (store: Store): Promise<Set<string>> => {
   await store.query(LEDGER);
   const { rows } = await store.query<{ name: string }>('select name from _migrations');
@@ -73,11 +81,12 @@ const seedOnce = async (store: Store, dir: string, done: Set<string>): Promise<n
   return seeds;
 };
 
-// Migrations in order, each once; seeds once, only on a store that had no ledger row before.
+// Migrations in order, each once; seeds once, only on a store with no ledger row and no user table.
 export const migrate = async (store: Store, dir: string, log: Log): Promise<MigrateResult> => {
   const done = await appliedNames(store);
-  const owed = done.size === 0 || done.has(SEEDS_OWED);
-  if (done.size === 0) await store.query(`insert into _migrations (name) values ('${SEEDS_OWED}')`);
+  const empty = await isEmpty(store, done);
+  if (empty) await store.query(`insert into _migrations (name) values ('${SEEDS_OWED}')`);
+  const owed = empty || done.has(SEEDS_OWED);
   const migrations = (await sqlFiles(join(dir, 'migrations'))).length;
   const applied = await applyAll(store, join(dir, 'migrations'), '', done);
   const seeds = owed ? await seedOnce(store, dir, done) : 0;
