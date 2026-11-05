@@ -8,11 +8,13 @@ import { type ImagePartKind } from '../manifest/primitives.schema.js';
 import { readManifest } from '../manifest/read-manifest.js';
 import { type Env } from '../runtime/build-info.js';
 import { resolveBuildInfo } from './build-info.js';
+import { assertConforms } from './check.js';
 import { createDocker, type Docker } from './docker.js';
 import { mustRun, runCommand, type Run } from './exec.js';
 import { labelsOf } from './labels.js';
 import { recordExtras } from './record-extras.js';
 import { RECORD_FILE, stageContext } from './stage.js';
+import { TIMEOUTS } from './timeouts.js';
 
 export const DEFAULT_REGISTRY = 'ghcr.io/agentage';
 
@@ -59,7 +61,7 @@ export const imageTag = (registry: string, pkg: ExtensionPackage, part: ImagePar
 const compile = async (dir: string, pkg: ExtensionPackage, run: Run): Promise<void> => {
   const scripts = (pkg as { scripts?: Record<string, unknown> }).scripts;
   if (typeof scripts?.['build'] === 'string')
-    await mustRun(run, 'npm', ['run', 'build'], { cwd: dir });
+    await mustRun(run, 'npm', ['run', 'build'], { cwd: dir, timeoutMs: TIMEOUTS.compile });
 };
 
 const buildImage = async (job: PartJob, docker: Docker, tmpRoot?: string): Promise<void> => {
@@ -119,7 +121,7 @@ const buildParts = async (
   return images;
 };
 
-// Validate, compile, one image per part from the kit recipe; --push pushes and writes the record.
+// Validate, compile, check, one image per part from the kit recipe; --push pushes, writes the record.
 export const build = async (
   options: BuildOptions = {},
   deps: BuildDeps = { run: runCommand }
@@ -128,6 +130,7 @@ export const build = async (
   const pkg = await readManifest(dir);
   const info = await resolveBuildInfo(dir, options.env ?? process.env, deps.run);
   await compile(dir, pkg, deps.run);
+  await assertConforms({ dir, pkg });
   const images = await buildParts({ dir, pkg, info }, options, deps);
   const result: BuildResult = { id: pkg.agentage.id, version: pkg.version, ...info, images };
   if (!options.push) return result;

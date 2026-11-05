@@ -18,6 +18,9 @@ interface Entry {
   running: boolean;
   timer?: NodeJS.Timeout;
   last?: RunStatus;
+  // The current run's start, and whether it already made the job skip a tick.
+  runningSince?: Date;
+  overran: boolean;
 }
 
 export interface SchedulerDeps {
@@ -56,6 +59,7 @@ const fire = async (s: State, entry: Entry): Promise<unknown> => {
   entry.nextAt = nextRun(entry.cron, s.now());
   arm(s, entry);
   if (!entry.running) return execute(s, entry);
+  entry.overran = true;
   s.deps.log.warn('job skipped: its previous run is still running', { job: entry.name });
   return undefined;
 };
@@ -70,7 +74,8 @@ const newEntry = (
   JobNameSchema.parse(name);
   const parsed = parseCron(cron);
   const timeout = JobOptionsSchema.parse(options)?.timeout;
-  const entry: Entry = { name, cron: parsed, job, nextAt: nextRun(parsed, at), running: false };
+  const nextAt = nextRun(parsed, at);
+  const entry: Entry = { name, cron: parsed, job, nextAt, running: false, overran: false };
   if (timeout !== undefined) entry.timeoutMs = toMs(timeout);
   return entry;
 };
@@ -87,9 +92,9 @@ const runJob = async (entry: Entry, log: Log, buffer: RunBuffer) => {
 
 // Never twice at once; every run saved with its log, a failed save is logged and the job goes on.
 const execute = async (s: State, entry: Entry): Promise<JobRun> => {
-  entry.running = true;
-  const buffer: RunBuffer = { text: '', truncated: false };
   const startedAt = s.now();
+  Object.assign(entry, { running: true, runningSince: startedAt, overran: false });
+  const buffer: RunBuffer = { text: '', truncated: false };
   const status = await runJob(entry, s.deps.log, buffer);
   entry.running = false;
   entry.last = status;
@@ -99,12 +104,19 @@ const execute = async (s: State, entry: Entry): Promise<JobRun> => {
   return run;
 };
 
-// ok: the last run ok and the timer on time; a failed or late job is degraded, never a restart.
+// A run still going past its declared timeout, or one that made the job skip a tick.
+const overrunning = (s: State, entry: Entry): boolean => {
+  if (!entry.running) return false;
+  const ranMs = s.now().getTime() - (entry.runningSince?.getTime() ?? 0);
+  return entry.overran || (entry.timeoutMs !== undefined && ranMs > entry.timeoutMs);
+};
+
+// ok: the last run ok, the timer on time, no run overrunning; else degraded, never a restart.
 const check =
   (s: State, entry: Entry): HealthCheck =>
   async () => {
     const late = s.now().getTime() - entry.nextAt.getTime() > LATE_MS;
-    return entry.last === 'failed' || late ? 'degraded' : 'ok';
+    return entry.last === 'failed' || late || overrunning(s, entry) ? 'degraded' : 'ok';
   };
 
 const scheduleOn =

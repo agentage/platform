@@ -61,7 +61,13 @@ security, backend); this file only adds what the tree does not say.
 - `ctx.store` is always present; without a store part it throws on first use.
 - The pages part is a kit-served static map in 0.2 (Next.js pages are a later kit).
 - `mcp.listing: token` closes `tools/list` with 401 until the kit verifies tokens.
-- CI's image smoke clones extension-probe master, installs the packed packages it uses and runs
-  `up`: a probe change can turn this CI red, and a kit change that breaks the probe never reaches
-  npm.
+- Tokens are off in kit 0.2: `tokenCheck` (`auth/token-check.ts`) is an option of the part apps and
+  `runPart`, unset everywhere; with one, each route asks for its OpenAPI operation's access and each
+  `tools/call` for its tool's `scope` (read when undeclared). M3 plugs the JWKS check in there.
+- `up` names its compose project per working copy; scripts reach it with
+  `-f .agentage/compose.json`, never `-p`. The ui CSP allows the dev issuer only when
+  `AGENTAGE_DEV_ISSUER` is set (only `up` sets it).
+- CI's image smoke clones extension-probe master (or, on a PR, the probe branch of the same name
+  when one exists), installs the packed packages it uses and runs `up`: a probe change can turn
+  this CI red, and a kit change that breaks the probe never reaches npm.
 - Public repo: no secrets, no internal hosts, no provider names, no roadmap in code or docs.

@@ -1,6 +1,7 @@
 import { hostError } from './host-error.js';
 import { type FetchLike, type TokenSource } from './host.types.js';
 import { readRpc } from './rpc-read.js';
+import { timedOut, withTimeout } from './timeout.js';
 import {
   TextContentSchema,
   ToolErrorSchema,
@@ -62,7 +63,10 @@ export const callTool = async (
   const id = options.nextId();
   const headers = requestHeaders(name, await options.token());
   const body = JSON.stringify(requestBody(id, name, args, options));
-  const message = await readRpc(await options.fetch('/mcp', { method: 'POST', headers, body }), id);
+  const message = await options
+    .fetch('/mcp', withTimeout({ method: 'POST', headers, body }))
+    .then((res) => readRpc(res, id))
+    .catch(timedOut(name));
   if (message.error) throw hostError(String(message.error.code), message.error.message);
   const result = ToolResultSchema.safeParse(message.result);
   if (!result.success) throw hostError('BAD_RESULT', 'the tool answered an invalid result');

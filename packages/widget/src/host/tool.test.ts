@@ -120,4 +120,26 @@ describe('callTool', () => {
       code: 'HTTP_502',
     });
   });
+
+  it('a refusal before the tool runs keeps the envelope code and message', async () => {
+    const refused = { success: false, error: { code: 'FORBIDDEN', message: 'probe:read needed' } };
+    const { fetch } = fakeFetch(jsonResponse(refused, 403));
+    await expect(callTool(options(fetch), 'probe__echo', {})).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'probe:read needed',
+    });
+  });
+
+  it('gives every call a timeout and names the tool that did not answer', async () => {
+    const { fetch, calls } = fakeFetch(toolAnswer(echo, 7));
+    await callTool(options(fetch), 'probe__echo', {});
+    expect(calls[0]?.init.signal).toBeInstanceOf(AbortSignal);
+    const hung = async () => Promise.reject(new DOMException('timed out', 'TimeoutError'));
+    await expect(callTool(options(hung), 'probe__echo', {})).rejects.toMatchObject({
+      code: 'TIMEOUT',
+      message: 'probe__echo did not answer in 30 s',
+    });
+    const offline = async () => Promise.reject(new TypeError('Failed to fetch'));
+    await expect(callTool(options(offline), 'probe__echo', {})).rejects.toThrow('Failed to fetch');
+  });
 });

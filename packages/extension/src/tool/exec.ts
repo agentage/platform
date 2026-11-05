@@ -1,5 +1,6 @@
 import { spawn, type ChildProcessByStdio } from 'node:child_process';
 import { type Readable } from 'node:stream';
+import { KILL_GRACE_MS, TIMEOUTS } from './timeouts.js';
 
 export interface RunOptions {
   cwd?: string;
@@ -7,6 +8,8 @@ export interface RunOptions {
   // Capture stderr instead of streaming it: `up` prints its own lines, the tail only on failure.
   quiet?: boolean;
   env?: Record<string, string | undefined>;
+  // Default TIMEOUTS.command; past it the command is killed and the call rejects.
+  timeoutMs?: number;
 }
 
 export interface RunResult {
@@ -17,30 +20,58 @@ export interface RunResult {
 
 export type Run = (command: string, args: string[], options?: RunOptions) => Promise<RunResult>;
 
-const spawnFor = (command: string, args: string[], options: RunOptions) =>
+type Child = ChildProcessByStdio<null, Readable, Readable | null>;
+
+const spawnFor = (command: string, args: string[], options: RunOptions): Child =>
   spawn(command, args, {
     cwd: options.cwd,
     stdio: ['ignore', 'pipe', options.quiet ? 'pipe' : 'inherit'],
     env: options.env ? { ...process.env, ...options.env } : process.env,
-  }) as ChildProcessByStdio<null, Readable, Readable | null>;
+  }) as Child;
 
-// stdout is captured (and echoed to stderr with `echo`); stderr streams through as progress.
+// Resolves true once the command is past its time and has been told to stop.
+const expiry = (child: Child, ms: number) => {
+  let timer: NodeJS.Timeout | undefined;
+  const expired = { value: false };
+  timer = setTimeout(() => {
+    expired.value = true;
+    child.kill('SIGTERM');
+    timer = setTimeout(() => child.kill('SIGKILL'), KILL_GRACE_MS).unref();
+  }, ms).unref();
+  return { expired, clear: () => clearTimeout(timer) };
+};
+
+const timedOut = (command: string, args: string[], ms: number): Error =>
+  new Error(`${command} ${args[0] ?? ''} did not finish in ${Math.round(ms / 1000)} s`);
+
+// stdout is captured (and echoed to stderr with `echo`); a piped stderr is captured too.
+const collect = (child: Child, echo?: boolean) => {
+  const out = { stdout: '', stderr: '' };
+  child.stdout.on('data', (chunk: Buffer) => {
+    out.stdout += chunk.toString();
+    if (echo) process.stderr.write(chunk);
+  });
+  child.stderr?.on('data', (chunk: Buffer) => void (out.stderr += chunk.toString()));
+  return out;
+};
+
+// stderr streams through as progress unless `quiet`; past its timeout the command is killed.
 export const runCommand: Run = (command, args, options = {}) =>
   new Promise((resolve, reject) => {
     const child = spawnFor(command, args, options);
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString();
-      if (options.echo) process.stderr.write(chunk);
+    const ms = options.timeoutMs ?? TIMEOUTS.command;
+    const timer = expiry(child, ms);
+    const out = collect(child, options.echo);
+    child.on('error', (err: NodeJS.ErrnoException) => {
+      timer.clear();
+      reject(err.code === 'ENOENT' ? new Error(`${command} is not installed or not on PATH`) : err);
     });
-    child.stderr?.on('data', (chunk: Buffer) => void (stderr += chunk.toString()));
-    child.on('error', (err: NodeJS.ErrnoException) =>
-      reject(err.code === 'ENOENT' ? new Error(`${command} is not installed or not on PATH`) : err)
-    );
-    child.on('close', (code) =>
-      resolve({ code: code ?? 1, stdout, ...(options.quiet ? { stderr } : {}) })
-    );
+    child.on('close', (code) => {
+      timer.clear();
+      if (timer.expired.value) return reject(timedOut(command, args, ms));
+      const stderr = options.quiet ? { stderr: out.stderr } : {};
+      resolve({ code: code ?? 1, stdout: out.stdout, ...stderr });
+    });
   });
 
 const tail = (text: string | undefined): string =>

@@ -78,10 +78,20 @@ describe('runPart per part', () => {
     expect((await fetch(`${url}/nope`)).status).toBe(404);
   });
 
-  it('ui: serves dist/ui under /ui/{version}/ and runs no code', async () => {
-    const url = await start('ui');
-    expect(await (await fetch(`${url}/ui/0.2.0/probe.js`)).text()).toBe(
-      'export const widget = 1;\n'
+  it('ui: serves dist/ui under /ui/{version}/, runs no code and builds no ctx', async () => {
+    // Settings that would stop any part with a ctx: ui never reads them.
+    const url = await start('ui', { AGENTAGE_SETTINGS: 'not json' });
+    const res = await fetch(`${url}/ui/0.2.0/probe.js`);
+    expect(await res.text()).toBe('export const widget = 1;\n');
+    expect(res.headers.get('content-security-policy')).toMatch(/connect-src 'self'(;|$)/);
+  });
+
+  it('ui: lets widgets reach the dev issuer only when up sets AGENTAGE_DEV_ISSUER', async () => {
+    const url = await start('ui', { AGENTAGE_DEV_ISSUER: 'http://localhost:4281' });
+    const csp = (await fetch(`${url}/ui/0.2.0/probe.js`)).headers.get('content-security-policy');
+    expect(csp).toMatch(/connect-src 'self' http:\/\/localhost:4281(;|$)/);
+    await expect(start('ui', { AGENTAGE_DEV_ISSUER: 'https://auth.agentage.io' })).rejects.toThrow(
+      /not a loopback http origin/
     );
   });
 

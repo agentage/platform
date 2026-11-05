@@ -1,4 +1,5 @@
 import { mustRun, type Run } from './exec.js';
+import { TIMEOUTS } from './timeouts.js';
 
 export interface DockerBuild {
   context: string;
@@ -38,7 +39,8 @@ export const digestOf = (pushOutput: string): string => {
 
 export const createDocker = (run: Run): Docker => ({
   build: async (options) => {
-    await mustRun(run, 'docker', buildArgsOf(options));
+    await mustRun(run, 'docker', buildArgsOf(options), { timeoutMs: TIMEOUTS.build });
   },
-  push: async (tag) => digestOf(await mustRun(run, 'docker', ['push', tag], { echo: true })),
+  push: async (tag) =>
+    digestOf(await mustRun(run, 'docker', ['push', tag], { echo: true, timeoutMs: TIMEOUTS.push })),
 });

@@ -38,8 +38,24 @@ describe('the migrate entry', () => {
       'seeds/001-hello.sql': 'insert into ticks values (1);',
     });
     await run(dir);
-    expect(stdout).toEqual(['{"migrations":1,"applied":1,"seeds":1}\n']);
+    expect(stdout).toEqual(['{"migrations":1,"applied":1,"seeds":1,"seedsBefore":0}\n']);
     expect(ended.count).toBe(1);
+  });
+
+  it('exits 1 on a bad migration, the log naming the file, and prints no summary', async () => {
+    const exit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+    const dir = await tempPackage({
+      'package.json': json(SPEC_MANIFEST),
+      'migrations/001-ticks.sql': 'create tabel ticks (id int);',
+    });
+    await run(dir);
+    expect(exit).toHaveBeenCalledWith(1);
+    expect(stdout).toEqual([]);
+    expect(JSON.parse(stderr.join(''))).toMatchObject({
+      level: 'error',
+      extension: 'probe',
+      msg: expect.stringMatching(/^migration 001-ticks\.sql failed: syntax error/),
+    });
   });
 
   it('logs the error and exits 1 when the package is not an extension', async () => {

@@ -59,10 +59,22 @@ describe('token', () => {
       'no dev issuer at http://127.0.0.1:1: run agentage extension up first'
     );
     const fake = (async () => new Response('{"token":"jwt"}')) as typeof fetch;
-    await expect(token({ scope: 'probe:read', fetch: fake })).rejects.toThrow();
+    await expect(token({ scope: 'probe:read', fetch: fake })).rejects.toThrow(
+      'the dev issuer answered without an aga_ token'
+    );
     const html = (async () => new Response('<html>', { status: 502 })) as typeof fetch;
     await expect(token({ scope: 'probe:read', fetch: html })).rejects.toThrow(
       'the dev issuer refused: null'
+    );
+  });
+
+  it('gives up on an issuer that does not answer in 5 s, with its own message', async () => {
+    const hung = (async (_url: string, init?: RequestInit) => {
+      expect(init?.signal).toBeInstanceOf(AbortSignal);
+      throw new DOMException('The operation timed out.', 'TimeoutError');
+    }) as typeof fetch;
+    await expect(token({ scope: 'probe:read', issuer: url, fetch: hung })).rejects.toThrow(
+      `the dev issuer at ${url} did not answer in 5 s`
     );
   });
 });

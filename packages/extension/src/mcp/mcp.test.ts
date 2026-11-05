@@ -3,7 +3,11 @@ import { z } from 'zod';
 import { createTestContext } from '../context/test-context.js';
 import { fail } from '../envelope/envelope.js';
 import { startTestMcp, type TestServer } from '../testing/test-server.js';
+import { createMcpHandler } from '@modelcontextprotocol/server';
+import { AGCID_PATTERN } from '../agcid/agcid.js';
+import { serverFactory } from './server.js';
 import { mcpSnapshot } from './snapshot.js';
+import { createToolRegistry } from './tools.js';
 import { type McpContext } from './tools.js';
 
 const probe = (ctx: McpContext) => {
@@ -121,5 +125,43 @@ describe('mcp part', () => {
       expect(res.headers.get('allow')).toBe('POST');
       expect(await res.json()).toMatchObject({ jsonrpc: '2.0', error: { code: -32000 } });
     }
+  });
+
+  it('a tool error outside any request scope still carries a valid agcid', async () => {
+    const ctx = createTestContext({ extension: { id: 'probe', version: '0.2.0' } });
+    const registry = createToolRegistry();
+    probe({ ...ctx, tool: registry.tool });
+    const handler = createMcpHandler(
+      serverFactory({ id: 'probe', version: '0.2.0' }, registry.tools, ctx.log),
+      { legacy: 'stateless' }
+    );
+    const body = {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/call',
+      params: { name: 'probe__refuse', arguments: {} },
+    };
+    const res = await handler.fetch(
+      new Request('http://mcp/mcp', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/json, text/event-stream',
+          'mcp-protocol-version': '2025-11-25',
+        },
+        body: JSON.stringify(body),
+      }),
+      { parsedBody: body }
+    );
+    const text = await res.text();
+    const data =
+      text
+        .split('\n')
+        .find((line) => line.startsWith('data:'))
+        ?.slice(5) ?? text;
+    const result = (JSON.parse(data) as { result: { structuredContent: { error: object } } })
+      .result;
+    const { agcid } = result.structuredContent.error as { agcid: string };
+    expect(agcid).toMatch(AGCID_PATTERN);
   });
 });

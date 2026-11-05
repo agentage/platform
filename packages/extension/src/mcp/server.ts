@@ -1,4 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/server';
+import { agcidOf } from '../agcid/agcid.js';
 import { currentAgcid } from '../agcid/current.js';
 import { fail, isFailure, type Failure } from '../envelope/envelope.js';
 import { type Log } from '../log/log.js';
@@ -12,10 +13,11 @@ export interface ServerIdentity {
 const text = (value: unknown) => [{ type: 'text' as const, text: JSON.stringify(value) }];
 
 // A failed tool is isError with the REST error shape; anything unexpected is a generic INTERNAL.
+// Outside a request (no agcid in scope) the error still carries a valid one, minted here.
 const errorResult = (err: unknown, log: Log) => {
   const failure: Failure = isFailure(err) ? err : fail('INTERNAL', 'Internal error');
   if (failure.status >= 500) log.error(err);
-  const error = { code: failure.code, message: failure.message, agcid: currentAgcid() ?? '' };
+  const error = { code: failure.code, message: failure.message, agcid: agcidOf(currentAgcid()) };
   return { isError: true, content: text({ error }), structuredContent: { error } };
 };
 

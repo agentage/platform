@@ -1,7 +1,8 @@
 import { type Server } from 'node:http';
-import { createContext, type ServerPartKind } from '../context/context.js';
+import { createContext, type PartContext, type ServerPartKind } from '../context/context.js';
 import { settingsFromEnv } from '../context/settings.js';
 import { DEFAULT_RECORD_FILE, loadRecord } from '../discovery/discovery.js';
+import { type TokenCheck } from '../auth/token-check.js';
 import { type HealthCheck } from '../health/health.js';
 import { createLog, type Log } from '../log/log.js';
 import { type ImportModule } from '../manifest/entry.js';
@@ -21,6 +22,8 @@ export interface RunPartOptions {
   env: Env;
   importModule?: ImportModule;
   serve?: Pick<ServeOptions, 'signals' | 'exit'>;
+  // The host's token check for every route and tool; none in kit 0.2 (see auth/token-check.ts).
+  tokenCheck?: TokenCheck;
 }
 
 interface Start {
@@ -47,10 +50,10 @@ export const partOf = (pkg: ExtensionPackage, part: string): ImagePartKind => {
 const storeFor = ({ pkg, part, env, log }: Start) =>
   part !== 'ui' && hasPostgres(pkg) ? createStore(env, log) : undefined;
 
-const contextFor = (start: Start, store: Store | undefined) =>
+const contextFor = (start: Start, part: ServerPartKind, store: Store | undefined) =>
   createContext({
     pkg: start.pkg,
-    part: (start.part === 'ui' ? 'pages' : start.part) as ServerPartKind,
+    part,
     origin: start.env['AGENTAGE_ORIGIN'] || `http://127.0.0.1:${portFromEnv(start.env)}`,
     commit: buildInfoFromEnv(start.env).commit,
     log: start.log,
@@ -58,19 +61,38 @@ const contextFor = (start: Start, store: Store | undefined) =>
     store,
   });
 
-const inputFor = async (options: RunPartOptions, start: Start): Promise<RunnerInput> => {
+// Built on first use, so the ui runner, which never asks, has no ctx at all.
+const lazyContext = (start: Start, store: Store | undefined): (() => PartContext) => {
+  let ctx: PartContext | undefined;
+  return () => {
+    if (start.part === 'ui') throw new Error('the ui part gets no ctx');
+    return (ctx ??= contextFor(start, start.part, store));
+  };
+};
+
+const baseFor = async (options: RunPartOptions, start: Start, store: Store | undefined) => {
   const { pkg, env, log } = start;
-  const store = storeFor(start);
   const checks: Record<string, HealthCheck> = store ? { store: storeCheck(store) } : {};
-  const origin = env['AGENTAGE_ORIGIN'] || undefined;
-  const record = await recordFor(env, log);
-  const build = buildInfoFromEnv(env);
-  const base = { pkg, build, log, record, origin, ownImage: env['AGENTAGE_IMAGE'], checks };
+  return {
+    pkg,
+    log,
+    checks,
+    build: buildInfoFromEnv(env),
+    record: await recordFor(env, log),
+    origin: env['AGENTAGE_ORIGIN'] || undefined,
+    ownImage: env['AGENTAGE_IMAGE'],
+    tokenCheck: options.tokenCheck,
+  };
+};
+
+const inputFor = async (options: RunPartOptions, start: Start): Promise<RunnerInput> => {
+  const store = storeFor(start);
   return {
     dir: options.dir,
-    pkg,
-    ctx: contextFor(start, store),
-    base,
+    pkg: start.pkg,
+    env: start.env,
+    ctx: lazyContext(start, store),
+    base: await baseFor(options, start, store),
     importModule: options.importModule,
   };
 };

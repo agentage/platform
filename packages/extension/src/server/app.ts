@@ -2,6 +2,8 @@ import cors, { type CorsOptions } from 'cors';
 import express, { type Express, type Request, type RequestHandler } from 'express';
 import helmet, { type HelmetOptions } from 'helmet';
 import { agcidMiddleware } from '../agcid/scope.js';
+import { routeAccess } from '../auth/route-access.js';
+import { setCaller, type TokenCheck } from '../auth/token-check.js';
 import {
   discoveryDocument,
   recordOf,
@@ -24,6 +26,8 @@ export interface PartAppBase {
   ownImage?: string;
   origin?: string;
   checks?: Record<string, HealthCheck>;
+  // Off (undefined) in kit 0.2: no route or tool checks a token; M3 passes the JWKS check.
+  tokenCheck?: TokenCheck;
 }
 
 export interface PartAppOptions extends PartAppBase {
@@ -89,6 +93,16 @@ const openapiHandler =
   (_req, res) =>
     void res.json(doc);
 
+// Before the body is read: each request checked for the access its OpenAPI operation declares.
+const routeGuard =
+  (options: ApiAppOptions): RequestHandler =>
+  async (req, _res, next) => {
+    if (!options.tokenCheck) return next();
+    const access = routeAccess(options.openapi, req.method, `/api/v1${req.path}`);
+    setCaller(req, await options.tokenCheck(req.get('authorization'), access));
+    next();
+  };
+
 export const createApiApp = (options: ApiAppOptions): Express =>
   createPartApp({
     ...options,
@@ -96,6 +110,7 @@ export const createApiApp = (options: ApiAppOptions): Express =>
     mount: (app) => {
       app.use('/api/v1', cors(PUBLIC_CORS));
       if (options.openapi) app.get('/api/v1/openapi.json', openapiHandler(options.openapi));
-      app.use('/api/v1', express.json({ limit: BODY_LIMIT }), options.router);
+      const json = express.json({ limit: BODY_LIMIT });
+      app.use('/api/v1', routeGuard(options), json, options.router);
     },
   });

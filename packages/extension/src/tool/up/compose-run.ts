@@ -20,8 +20,12 @@ export const composeArgs = (target: ComposeTarget, args: string[]): string[] => 
   ...args,
 ];
 
-export const compose = (run: Run, target: ComposeTarget, args: string[]): Promise<string> =>
-  mustRun(run, 'docker', composeArgs(target, args));
+export const compose = (
+  run: Run,
+  target: ComposeTarget,
+  args: string[],
+  timeoutMs?: number
+): Promise<string> => mustRun(run, 'docker', composeArgs(target, args), { timeoutMs });
 
 interface PsRow {
   Service?: string;

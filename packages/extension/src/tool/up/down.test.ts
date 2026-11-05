@@ -1,9 +1,10 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, realpath, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { json, SPEC_MANIFEST, tempPackage } from '../../test-support/packages.js';
 import { type Run, type RunOptions } from '../exec.js';
 import { down } from './down.js';
+import { projectName } from './project.js';
 
 const COMPOSE_LOG = [
   ...['api', 'mcp', 'pages', 'ui', 'worker', 'store'].flatMap((s) => [
@@ -26,60 +27,81 @@ const fakeRun = (code = 0, stderr = COMPOSE_LOG) => {
 
 const probe = () => tempPackage({ 'package.json': json(SPEC_MANIFEST) });
 
+const rendered = async (dir: string, name: string) => {
+  await mkdir(join(dir, '.agentage'));
+  await writeFile(join(dir, '.agentage', 'compose.json'), json({ name, services: {} }));
+};
+
+const DOWN = ['--profile', 'jobs', 'down', '--remove-orphans'];
+
 describe('down', () => {
-  it('removes everything up started, store volume included, and counts it from compose', async () => {
+  it("removes this working copy's project, store volume included, and names it", async () => {
     const dir = await probe();
+    const project = projectName('probe', await realpath(dir));
     const { run, calls } = fakeRun();
     const lines: string[] = [];
     const result = await down({ dir, onLine: (line) => void lines.push(line) }, run);
-    expect(result).toEqual({ containers: 6, networks: 1, volumes: 1 });
-    expect(lines).toEqual(['removed  6 containers · 1 network · 1 volume']);
+    expect(result).toEqual({ project, containers: 6, networks: 1, volumes: 1 });
+    expect(lines).toEqual([
+      `removed  ${'6 containers · 1 network · 1 volume'.padEnd(45)}${project}`,
+    ]);
     expect(calls).toEqual([
       {
-        args: [
-          'docker',
-          'compose',
-          '-p',
-          'agentage-probe',
-          '--profile',
-          'jobs',
-          'down',
-          '--remove-orphans',
-          '--volumes',
-        ],
+        args: ['docker', 'compose', '-p', project, ...DOWN, '--volumes'],
         options: { quiet: true },
       },
     ]);
   });
 
-  it('with keepData keeps the store volume, and uses the rendered compose file when there is one', async () => {
+  it('uses its own rendered compose file, and still removes the shared project of kit 0.2.0', async () => {
     const dir = await probe();
-    await mkdir(join(dir, '.agentage'));
-    await writeFile(join(dir, '.agentage', 'compose.json'), '{}');
-    const { run, calls } = fakeRun(0, ' Container agentage-probe-api-1  Removed\n');
-    const lines: string[] = [];
-    expect(
-      await down({ dir, keepData: true, onLine: (line) => void lines.push(line) }, run)
-    ).toEqual({
-      containers: 1,
-      networks: 0,
-      volumes: 0,
-    });
-    expect(lines).toEqual([
-      'removed  1 container · 0 networks · 0 volumes (the store volume kept)',
-    ]);
-    expect(calls[0]?.args).toEqual([
+    const project = projectName('probe', await realpath(dir));
+    await rendered(dir, project);
+    const own = fakeRun();
+    await down({ dir }, own.run);
+    const file = join(await realpath(dir), '.agentage', 'compose.json');
+    expect(own.calls[0]?.args.slice(0, 6)).toEqual([
       'docker',
       'compose',
       '-f',
-      join(dir, '.agentage', 'compose.json'),
+      file,
       '-p',
-      'agentage-probe',
-      '--profile',
-      'jobs',
-      'down',
-      '--remove-orphans',
+      project,
     ]);
+    await writeFile(file, json({ name: 'agentage-probe', services: {} }));
+    const { run, calls } = fakeRun(0, ' Container agentage-probe-api-1  Removed\n');
+    const lines: string[] = [];
+    const result = await down({ dir, keepData: true, onLine: (l) => void lines.push(l) }, run);
+    expect(result).toEqual({ project: 'agentage-probe', containers: 1, networks: 0, volumes: 0 });
+    expect(lines[0]).toMatch(
+      /^removed {2}1 container · 0 networks · 0 volumes \(the store volume kept\) +agentage-probe$/
+    );
+    expect(calls[0]?.args).toEqual(['docker', 'compose', '-p', 'agentage-probe', ...DOWN]);
+  });
+
+  it('a copy made with cp -r ignores the compose file it carries: never the original project', async () => {
+    const dir = await probe();
+    await rendered(dir, 'agentage-probe-0a1b2c3d');
+    const { run, calls } = fakeRun();
+    const result = await down({ dir }, run);
+    const own = projectName('probe', await realpath(dir));
+    expect(result.project).toBe(own);
+    expect(calls[0]?.args).toEqual(['docker', 'compose', '-p', own, ...DOWN, '--volumes']);
+  });
+
+  it('two working copies of one extension are two projects: down in one leaves the other', async () => {
+    const [a, b] = [await probe(), await probe()];
+    const first = fakeRun();
+    const second = fakeRun();
+    await down({ dir: a }, first.run);
+    await down({ dir: b }, second.run);
+    expect(first.calls[0]?.args[3]).not.toBe(second.calls[0]?.args[3]);
+  });
+
+  it('says so when nothing was running', async () => {
+    const lines: string[] = [];
+    await down({ dir: await probe(), onLine: (l) => void lines.push(l) }, fakeRun(0, '').run);
+    expect(lines[0]).toMatch(/^removed {2}nothing was running +agentage-probe-[0-9a-f]{8}$/);
   });
 
   it('throws with the compose error when down fails', async () => {
