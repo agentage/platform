@@ -17,6 +17,8 @@ jobs:
   verify:
     name: Verify
     runs-on: ubuntu-latest
+    # Every outbound call has its own bound; this one catches a hung runner or registry.
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -62,7 +64,15 @@ jobs:
         run: |
           set -euo pipefail
           npm pack --workspaces --pack-destination /tmp/pack >/dev/null
-          git clone --depth 1 https://github.com/agentage/extension-probe.git /tmp/probe
+          # A PR whose branch also exists in extension-probe runs against that branch: a kit change
+          # and the probe change it needs are tested together; master and other PRs use probe master.
+          probe=https://github.com/agentage/extension-probe.git
+          branch=master
+          if [ -n "${GITHUB_HEAD_REF:-}" ] && git ls-remote --exit-code --heads "$probe" "$GITHUB_HEAD_REF" >/dev/null; then
+            branch="$GITHUB_HEAD_REF"
+          fi
+          echo "extension-probe branch: $branch" >> "$GITHUB_STEP_SUMMARY"
+          git clone --depth 1 --branch "$branch" "$probe" /tmp/probe
           mkdir -p /tmp/probe/.kit
           cd /tmp/probe
           # The probe's @agentage/* dependencies built here replace the registry copies.
@@ -88,11 +98,12 @@ jobs:
 
       - name: Container logs on failure
         if: failure()
-        run: docker compose -p agentage-probe logs --no-color --tail 80 || true
+        run: docker compose -f /tmp/probe/.agentage/compose.json logs --no-color --tail 80 || true
 
   widget-screenshots:
     name: Widget screenshots
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     container:
       image: mcr.microsoft.com/playwright:v1.64.1-noble
       options: --user 1001
