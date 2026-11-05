@@ -58,6 +58,6 @@ jobs:
               echo "${name}@${version} is already on npm"
               continue
             fi
-            if [ -n "${NPM_TOKEN:-}" ] && ! npm view "${name}" name >/dev/null 2>&1; then npm stage publish -w "${name}" --access public --provenance; else npm publish -w "${name}" --access public --provenance; fi
+            if [ -n "${NPM_TOKEN:-}" ] && ! npm view "${name}" name >/dev/null 2>&1; then npm stage publish -w "${name}" --access public --provenance; elif ! npm publish -w "${name}" --access public --provenance; then echo "direct publish of ${name}@${version} not authorized (no validated trusted publisher): staging it for approval"; npm stage publish -w "${name}" --access public --provenance; fi
             echo "published ${name}@${version}" >> "$GITHUB_STEP_SUMMARY"
           done
