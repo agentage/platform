@@ -41,7 +41,7 @@ describe('stage per part', () => {
     );
   });
 
-  it('the api image with a postgres store adds migrations, seeds, openapi.json and the migrate shim', async () => {
+  it('the api image with a postgres store adds migrations, openapi.json and the migrate shim, never the seeds', async () => {
     const dir = await fullPackage();
     const root = await stageContext(dir, FULL, 'api', dir);
     expect(await tree(join(root, 'app'))).toEqual([
@@ -51,7 +51,6 @@ describe('stage per part', () => {
       'migrations/001-ticks.sql',
       'openapi.json',
       'package.json',
-      'seeds/001-hello.sql',
     ]);
     expect(await readFile(join(root, 'app/dist/store/migrate.js'), 'utf8')).toBe(MIGRATE_SHIM);
     expect(MIGRATE_SHIM).toContain("import '@agentage/extension/migrate';");

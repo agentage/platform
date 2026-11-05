@@ -8,6 +8,7 @@ import { readManifest } from '../../manifest/read-manifest.js';
 import { type Env } from '../../runtime/build-info.js';
 import { build } from '../build.js';
 import { quietly, runCommand } from '../exec.js';
+import { exists } from '../stage.js';
 import { compose, type ComposeTarget } from './compose-run.js';
 import { composeFile, projectName, STORE_IMAGE } from './compose.js';
 import { GATEWAY_PORT, gatewayConfig, ISSUER_PORT, PART_PATHS, partPath } from './gateway.js';
@@ -64,8 +65,11 @@ const jsonFile = (file: string, value: unknown) =>
 
 const renderFiles = async (s: Session, recordFile: string, tags: Record<string, string>) => {
   const gatewayFile = join(s.dir, LOCAL_DIR, 'gateway.yml');
+  const seeds = join(s.dir, 'seeds');
+  const seedsDir = (await exists(seeds)) ? seeds : undefined;
   await jsonFile(gatewayFile, gatewayConfig(imageParts(s.pkg), s.pkg.version));
-  await jsonFile(s.target.file ?? '', composeFile({ pkg: s.pkg, tags, recordFile, gatewayFile }));
+  const file = composeFile({ pkg: s.pkg, tags, recordFile, gatewayFile, seedsDir });
+  await jsonFile(s.target.file ?? '', file);
 };
 
 const buildStep = async (s: Session, env: Env) => {

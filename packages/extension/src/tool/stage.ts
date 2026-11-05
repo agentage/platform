@@ -51,19 +51,16 @@ const copyDeps = async (dir: string, root: string, pkg: ExtensionPackage): Promi
   for (const path of localTarballs(pkg)) await copyInto(join(dir, path), join(root, 'deps', path));
 };
 
-// The api image runs the migrate job, so it alone carries the store's files.
+// The api image runs the migrate job, so it alone carries the migrations; seeds never ship.
 const migrates = (pkg: ExtensionPackage, part: ImagePartKind): boolean =>
   part === 'api' && hasPostgres(pkg);
 
-// What a part image carries: its own dist/{part}, the shared dist/lib, and for api the store files.
+// What a part image carries: its own dist/{part}, the shared dist/lib, and for api the migrations.
 export const appPaths = async (dir: string, pkg: ExtensionPackage, part: ImagePartKind) => {
   const paths = ['package.json', join('dist', part)];
   if (part === 'api' && (await exists(join(dir, OPENAPI_FILE)))) paths.push(OPENAPI_FILE);
   if (await exists(join(dir, 'dist', 'lib'))) paths.push(join('dist', 'lib'));
-  if (migrates(pkg, part)) {
-    for (const folder of ['migrations', 'seeds'])
-      if (await exists(join(dir, folder))) paths.push(folder);
-  }
+  if (migrates(pkg, part) && (await exists(join(dir, 'migrations')))) paths.push('migrations');
   return paths;
 };
 

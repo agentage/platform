@@ -58,6 +58,13 @@ describe('composeFile', () => {
     });
   });
 
+  it('mounts the package seeds into the migrate job only when there are any', () => {
+    const seeded = composeFile({ pkg: FULL, tags: TAGS, ...FILES, seedsDir: '/x/seeds' });
+    const services = seeded.services as Record<string, Service>;
+    expect(services['migrate']?.['volumes']).toEqual(['/x/seeds:/app/seeds:ro']);
+    expect(servicesOf()['migrate']).not.toHaveProperty('volumes');
+  });
+
   it('mounts the record into every part; the store reaches every part but ui', () => {
     const services = servicesOf();
     for (const part of PARTS) {

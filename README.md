@@ -83,17 +83,18 @@ node packages/extension/dist/tool/cli.js token --scope probe:read
 --omit=dev`, `USER node`, `COMMIT_SHA`/`BUILD_TIME`, a `HEALTHCHECK` on `127.0.0.1`), tagged
 `ghcr.io/agentage/{id}-{part}:{version}` with the OCI revision and created labels. Each image
 carries only `dist/{part}` and `dist/lib`; the api image also carries `openapi.json`,
-`migrations/`, `seeds/` and the migrate entry `node dist/store/migrate.js`. `--push` pushes and
-writes `dist/agentage-extension.json` (images by digest, tools, commands, widgets, the store and
-its migration count, the OpenAPI path).
+`migrations/` and the migrate entry `node dist/store/migrate.js`; seeds never ship in an image.
+`--push` pushes and writes `dist/agentage-extension.json` (images by digest, tools, commands,
+widgets, the store and its migration count, the OpenAPI path).
 
 `up` builds the same images, writes `.agentage/record.json` from the local digests, renders one
-compose file (postgres 18 with the migrate job first, a dev token issuer on `localhost:4281`, a
-Traefik gateway on `localhost:4280` with the deployment URL layout, one container per part) and
-prints one line per step, ending `ready N parts healthy`. `down` removes it all (`--keep-data`
-keeps the store volume). `token` mints a dev token (`aga_` + EdDSA JWT, `{id}:{verb}` scopes) that
-nothing verifies yet. The cli runs the same code as `agentage extension build|up|down|token`
-through `@agentage/extension/tool`, plus `runCommand` and `checkCli` for installed commands.
+compose file (postgres 18 with the migrate job first and the package's `seeds/` mounted into it, a
+dev token issuer on `localhost:4281`, a Traefik gateway on `localhost:4280` with the deployment URL
+layout, one container per part) and prints one line per step, ending `ready N parts healthy`.
+`down` removes it all (`--keep-data` keeps the store volume). `token` mints a dev token (`aga_` +
+EdDSA JWT, `{id}:{verb}` scopes) that nothing verifies yet. The cli runs the same code as
+`agentage extension build|up|down|token` through `@agentage/extension/tool`, plus `runCommand` and
+`checkCli` for installed commands.
 
 ## Run a part image
 

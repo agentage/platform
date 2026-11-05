@@ -12,6 +12,8 @@ export interface ComposeInput {
   tags: Record<string, string>;
   recordFile: string;
   gatewayFile: string;
+  // The package's seeds/: local runs only, so they reach the migrate job as a mount.
+  seedsDir?: string;
 }
 
 export const projectName = (pkg: ExtensionPackage): string => `agentage-${pkg.agentage.id}`;
@@ -72,6 +74,7 @@ const migrateService = (input: ComposeInput) => ({
   image: input.tags['api'],
   command: ['node', 'dist/store/migrate.js'],
   environment: partEnv(input.pkg, 'migrate'),
+  ...(input.seedsDir ? { volumes: [`${input.seedsDir}:/app/seeds:ro`] } : {}),
   depends_on: { store: { condition: 'service_healthy' } },
   profiles: ['jobs'],
   restart: 'no',
