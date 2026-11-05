@@ -14,6 +14,7 @@ const fakeHost = (extension: string): Host => ({
 });
 
 const Hello = () => <p>hello from {useHost().context.extension}</p>;
+const Version = () => <p>{useHost().context.version}</p>;
 const Boom = (): never => {
   throw new Error('kaboom');
 };
@@ -64,14 +65,14 @@ describe('registerWidgets', () => {
   });
 
   it('takes the page hook before the default bridge, and the bridge last', async () => {
-    registerWidgets('gamma', { a: Hello, b: () => <p>{useHost().context.version}</p> });
+    registerWidgets('gamma', { a: Hello, b: Version });
     const hook = vi.fn(() => fakeHost('hooked'));
     globalThis.__agentageHost = hook;
     const a = await mount('gamma-a');
     expect(hook).toHaveBeenCalledWith(a);
     expect(a.shadowRoot?.textContent).toBe('hello from hooked');
     globalThis.__agentageHost = undefined;
-    registerWidgets('delta', { b: () => <p>{useHost().context.version}</p> }, { version: '1.2.3' });
+    registerWidgets('delta', { b: Version }, { version: '1.2.3' });
     const b = await mount('delta-b');
     expect(b.shadowRoot?.textContent).toBe('1.2.3');
   });

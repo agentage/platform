@@ -142,7 +142,7 @@ element uses `globalThis.__agentageHost?.(element)`, else an anonymous same-orig
 
 ```bash
 npm run verify
-npm run test:e2e      # widget harness and screenshots, Chromium; baselines come from the CI container
+npm run test:e2e      # widget harness, axe WCAG A/AA and screenshots in both themes, Chromium; baselines come from the CI container
 ```
 
 ## Release
