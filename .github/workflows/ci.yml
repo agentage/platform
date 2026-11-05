@@ -80,15 +80,10 @@ jobs:
         working-directory: /tmp/probe
         run: |
           set -euo pipefail
-          version=$(jq -r .version package.json)
-          for part in $(jq -r '.agentage.parts | to_entries[] | select(.value != false) | .key' package.json); do
-            case "$part" in pages | ui | api | mcp | worker) ;; *) continue ;; esac
-            docker inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' "ghcr.io/agentage/probe-$part:$version" | grep -qx "$GITHUB_SHA"
-            echo "PASS $part carries $GITHUB_SHA"
-          done
+          scripts/image-smoke.sh "$GITHUB_SHA"
           curl -sf http://localhost:4280/.well-known/agentage-extension.json > /tmp/discovery.json
           node --input-type=module -e "import { DiscoveryDocumentSchema } from '@agentage/extension'; import { readFileSync } from 'node:fs'; DiscoveryDocumentSchema.parse(JSON.parse(readFileSync('/tmp/discovery.json', 'utf8'))); console.log('PASS discovery valid')"
-          if [ -x scripts/image-smoke.sh ]; then scripts/image-smoke.sh "$GITHUB_SHA" && npm run test:e2e; fi
+          npm run test:e2e
 
       - name: Container logs on failure
         if: failure()
