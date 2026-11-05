@@ -33,8 +33,15 @@ describe('server part recipe', () => {
     const runner = recipe.slice(recipe.indexOf('AS runner'));
     expect(runner).toContain('ARG COMMIT_SHA');
     expect(runner).toContain('ARG BUILD_TIME');
-    expect(runner).toContain('COMMIT_SHA=$COMMIT_SHA');
-    expect(runner).toContain('BUILD_TIME=$BUILD_TIME');
+    const env = [
+      'ENV NODE_ENV=production \\',
+      '    NODE_OPTIONS=--enable-source-maps \\',
+      '    PORT=3000 \\',
+      '    COMMIT_SHA=$COMMIT_SHA \\',
+      '    BUILD_TIME=$BUILD_TIME \\',
+      '    AGENTAGE_IMAGE=$IMAGE',
+    ];
+    expect(runner).toContain(env.join('\n'));
   });
 
   it('runs as node, probes 127.0.0.1 and starts the kit entry for the part', () => {

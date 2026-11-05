@@ -38,6 +38,8 @@ describe('local record', () => {
   it('fails when the daemon does not know the image', async () => {
     const dir = await tempPackage({ 'package.json': json(API_MANIFEST) });
     const run: Run = async () => ({ code: 1, stdout: '', stderr: 'No such image' });
-    await expect(writeLocalRecord(dir, API_MANIFEST, BUILT, run)).rejects.toThrow(/No such image/);
+    await expect(writeLocalRecord(dir, API_MANIFEST, BUILT, run)).rejects.toThrow(
+      'docker image failed with exit code 1\nNo such image'
+    );
   });
 });

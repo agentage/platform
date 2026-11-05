@@ -63,13 +63,26 @@ describe('runPart per part', () => {
   it('mcp: imports dist/mcp/index.js and serves its tools as {id}__{name}', async () => {
     const url = await start('mcp');
     const snapshot = await mcpSnapshot(`${url}/mcp`, '2025-11-25');
-    expect(snapshot.serverInfo).toEqual({ name: 'agentage-probe', version: '0.2.0' });
-    expect(snapshot.tools.map((tool) => tool['name'])).toEqual(['probe__echo']);
+    const $schema = 'https://json-schema.org/draft/2020-12/schema';
+    const object = { $schema, properties: { msg: { type: 'string' } }, required: ['msg'] };
+    expect(snapshot).toEqual({
+      serverInfo: { name: 'agentage-probe', version: '0.2.0' },
+      tools: [
+        {
+          name: 'probe__echo',
+          description: 'Echo',
+          inputSchema: { ...object, type: 'object' },
+          outputSchema: { ...object, type: 'object', additionalProperties: false },
+        },
+      ],
+    });
   });
 
   it('mcp: the mcp.listing setting token closes tools/list', async () => {
     const url = await start('mcp', { AGENTAGE_SETTINGS: '{"mcp.listing":"token"}' });
-    await expect(mcpSnapshot(`${url}/mcp`, '2026-07-28')).rejects.toThrow(/401/);
+    await expect(mcpSnapshot(`${url}/mcp`, '2026-07-28')).rejects.toThrow(
+      /^mcp answered 401: .*"tools\/list needs a token"/
+    );
   });
 
   it('pages: serves the site its create(ctx) returns', async () => {
@@ -116,6 +129,6 @@ describe('runPart per part', () => {
 
   it('refuses a part the manifest does not have and the cli part', async () => {
     await expect(start('api')).rejects.toThrow('part api is not an image part of this manifest');
-    await expect(start('cli')).rejects.toThrow(/not an image part/);
+    await expect(start('cli')).rejects.toThrow('part cli is not an image part of this manifest');
   });
 });

@@ -1,40 +1,42 @@
 import { realpath } from 'node:fs/promises';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { API_MANIFEST } from '../../test-support/packages.js';
 import { ENV, fakeDocker, PROBE, probeDir } from '../../test-support/up-fixtures.js';
+import { type Run } from '../exec.js';
+import { TIMEOUTS } from '../timeouts.js';
 import { projectName } from './project.js';
 import { up } from './up.js';
 
+// up on a clock the package build moves forward, so the ready line is exact.
+const upLines = async (dir: string, docker = fakeDocker(), buildSeconds = 48) => {
+  vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-05T10:00:00Z') });
+  const lines: string[] = [];
+  const run: Run = (command, args, options) => {
+    if (command === 'npm') vi.setSystemTime(Date.now() + buildSeconds * 1000);
+    return docker.run(command, args, options);
+  };
+  const result = await up({ dir, env: ENV, onLine: (line) => void lines.push(line) }, { run });
+  return { lines, result };
+};
+
+afterEach(() => void vi.useRealTimers());
+
+// C8, line for line.
+const C8_UP = [
+  'build    5 images from the release recipes            same recipe and tags as a release',
+  'record   .agentage/record.json                        discovery valid',
+  'store    postgres:18-alpine                           1 migration applied · 1 seed',
+  'issuer   dev tokens                                   http://localhost:4281',
+  'gateway  http://localhost:4280                        / · /ui/0.2.0/ · /api/v1/ · /mcp',
+  'ready    7 parts healthy                              48 s',
+];
+
 describe('up', () => {
-  it('builds, records, migrates, starts and prints six lines ending ready 7 parts healthy', async () => {
-    const dir = await probeDir();
-    const docker = fakeDocker();
-    const lines: string[] = [];
-    const result = await up(
-      { dir, env: ENV, onLine: (line) => void lines.push(line) },
-      { run: docker.run }
-    );
-    expect(result.parts).toBe(7);
-    expect(lines).toHaveLength(6);
-    expect(lines[0]).toMatch(
-      /^build {4}5 images from the release recipes +same recipe and tags as a release$/
-    );
-    expect(lines[1]).toMatch(/^record {3}\.agentage\/record\.json +discovery valid$/);
-    expect(lines[2]).toMatch(/^store {4}postgres:18-alpine +1 migration applied · 1 seed$/);
-    expect(lines[3]).toMatch(/^issuer {3}dev tokens +http:\/\/localhost:4281$/);
-    expect(lines[4]).toMatch(
-      /^gateway {2}http:\/\/localhost:4280 +\/ · \/ui\/0\.2\.0\/ · \/api\/v1\/ · \/mcp$/
-    );
-    expect(lines[5]).toMatch(/^ready {4}7 parts healthy +\d+ s$/);
-    const details = [
-      'same recipe and tags as a release',
-      'discovery valid',
-      '1 migration applied · 1 seed',
-      'http://localhost:4281',
-      '/ · /ui/0.2.0/ · /api/v1/ · /mcp',
-    ];
-    expect(lines.slice(0, 5).map((line) => line.slice(54))).toEqual(details);
+  it('builds, records, migrates, starts and prints the six lines of C8', async () => {
+    const { lines, result } = await upLines(await probeDir());
+    expect(result).toMatchObject({ parts: 7, seconds: 48 });
+    expect(lines).toEqual(C8_UP);
   });
 
   it('runs the migrate job before any part starts, every command quiet', async () => {
@@ -63,24 +65,30 @@ describe('up', () => {
     ]);
   });
 
-  it('without a store or cli skips those steps', async () => {
-    const dir = await probeDir({ ...API_MANIFEST, scripts: {} });
-    const lines: string[] = [];
-    const result = await up(
-      { dir, env: ENV, onLine: (line) => void lines.push(line) },
-      { run: fakeDocker().run }
-    );
-    expect(result.parts).toBe(1);
-    expect(lines.map((line) => line.split(' ')[0])).toEqual([
-      'build',
-      'record',
-      'issuer',
-      'gateway',
-      'ready',
+  it('bounds compose up and the migrate job by their own timeouts, the rest by the default', async () => {
+    const docker = fakeDocker();
+    await up({ dir: await probeDir(), env: ENV }, { run: docker.run });
+    const compose = docker.calls.filter((c) => c.args[1] === 'compose');
+    // Unset is exec's TIMEOUTS.command.
+    expect(compose.map((c) => c.options?.timeoutMs)).toEqual([
+      TIMEOUTS.start,
+      undefined,
+      TIMEOUTS.migrate,
+      TIMEOUTS.start,
+      undefined,
     ]);
-    expect(lines[0]).toMatch(/^build {4}1 image from the release recipes/);
-    expect(lines[3]).toMatch(/\/api\/v1\/$/);
-    expect(lines[4]).toMatch(/^ready {4}1 part healthy/);
+  });
+
+  it('without a store or cli skips those steps', async () => {
+    const { lines, result } = await upLines(await probeDir({ ...API_MANIFEST, scripts: {} }));
+    expect(result.parts).toBe(1);
+    expect(lines).toEqual([
+      'build    1 image from the release recipes             same recipe and tags as a release',
+      'record   .agentage/record.json                        discovery valid',
+      'issuer   dev tokens                                   http://localhost:4281',
+      'gateway  http://localhost:4280                        /api/v1/',
+      'ready    1 part healthy                               0 s',
+    ]);
   });
 
   it('fails on a cli entry that does not match the commands, and on a broken part', async () => {
@@ -96,19 +104,15 @@ describe('up', () => {
     );
     const broken = fakeDocker({ mcp: 'unhealthy' });
     await expect(up({ dir: await probeDir(), env: ENV }, { run: broken.run })).rejects.toThrow(
-      /^mcp is unhealthy/
+      /^mcp is unhealthy\n$/
     );
   });
 
   it('says what a kept store already had, migrations and seeds', async () => {
-    const lines: string[] = [];
     const migrate = '{"migrations":2,"applied":0,"seeds":0,"seedsBefore":1}\n';
-    await up(
-      { dir: await probeDir(), env: ENV, onLine: (line) => void lines.push(line) },
-      { run: fakeDocker({}, { migrate }).run }
-    );
-    expect(lines[2]).toMatch(
-      /^store {4}postgres:18-alpine +2 migrations already applied · 1 seed already applied$/
+    const { lines } = await upLines(await probeDir(), fakeDocker({}, { migrate }));
+    expect(lines[2]).toBe(
+      'store    postgres:18-alpine                           2 migrations already applied · 1 seed already applied'
     );
   });
 
@@ -150,9 +154,13 @@ describe('up', () => {
   it('a failed migrate job stops up before any part starts, naming the file', async () => {
     const migrateFails = 'migration 002-bad.sql failed: syntax error at or near "tabel"\n';
     const docker = fakeDocker({}, { migrateFails });
-    await expect(up({ dir: await probeDir(), env: ENV }, { run: docker.run })).rejects.toThrow(
-      /^the migrate job failed, no part was started: docker compose failed with exit code 1\nmigration 002-bad\.sql failed/
+    await expect(upLines(await probeDir(), docker)).rejects.toThrow(
+      'the migrate job failed, no part was started: docker compose failed with exit code 1\nmigration 002-bad.sql failed: syntax error at or near "tabel"'
     );
-    expect(docker.compose()).not.toContain('up -d --remove-orphans');
+    expect(docker.compose()).toEqual([
+      'up -d store',
+      'ps -a --format json',
+      'run --rm --no-deps migrate',
+    ]);
   });
 });

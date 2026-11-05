@@ -1,16 +1,35 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { adoptWidgetStyles, registerProperties } from './sheet.js';
 import { propertyCss, widgetCss } from './styles.generated.js';
 
-const shadow = () => document.createElement('div').attachShadow({ mode: 'open' });
+const shadow = (doc: Document = document) =>
+  doc.createElement('div').attachShadow({ mode: 'open' });
+
+// The sheets are cached per document, so their text is recorded before the first one is built.
+const texts = new WeakMap<CSSStyleSheet, string>();
+const replaceSync = CSSStyleSheet.prototype.replaceSync;
+vi.spyOn(CSSStyleSheet.prototype, 'replaceSync').mockImplementation(function (
+  this: CSSStyleSheet,
+  text: string
+) {
+  texts.set(this, text);
+  replaceSync.call(this, text);
+});
+const cssOf = (sheet: CSSStyleSheet | undefined) => sheet && texts.get(sheet);
 
 describe('the widget sheet', () => {
-  it('registers the @property block once on the document', () => {
-    adoptWidgetStyles(shadow());
-    adoptWidgetStyles(shadow());
-    registerProperties(document);
-    expect(document.adoptedStyleSheets).toHaveLength(1);
+  // A document of its own: the sheets are cached per document, so no other test's order counts.
+  it('adds only the @property block to the document, once, after the page sheets', () => {
+    const doc = document.implementation.createHTMLDocument('');
+    const page = new CSSStyleSheet();
+    doc.adoptedStyleSheets = [page];
+    adoptWidgetStyles(shadow(doc));
+    adoptWidgetStyles(shadow(doc));
+    registerProperties(doc);
+    expect(doc.adoptedStyleSheets).toHaveLength(2);
+    expect(doc.adoptedStyleSheets[0]).toBe(page);
+    expect(cssOf(doc.adoptedStyleSheets[1])).toBe(propertyCss);
   });
 
   it('adopts one shared sheet into each shadow root, once per root', () => {
@@ -20,7 +39,7 @@ describe('the widget sheet', () => {
     adoptWidgetStyles(b);
     expect(a.adoptedStyleSheets).toHaveLength(1);
     expect(a.adoptedStyleSheets[0]).toBe(b.adoptedStyleSheets[0]);
-    expect(a.adoptedStyleSheets[0]).not.toBe(document.adoptedStyleSheets[0]);
+    expect(cssOf(a.adoptedStyleSheets[0])).toBe(widgetCss);
   });
 });
 

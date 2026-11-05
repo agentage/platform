@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { matches, nextRun, parseCron } from './cron.js';
+
+// A host zone 5:30 off UTC, so a local-time reading of a date shows on a UTC host too.
+beforeAll(() => void vi.stubEnv('TZ', 'Asia/Kolkata'));
+afterAll(() => void vi.unstubAllEnvs());
 
 const at = (iso: string) => new Date(`${iso}Z`);
 const values = (expression: string, field: number) => [
@@ -64,6 +68,9 @@ describe('nextRun', () => {
     expect(matches(cron, at('2026-11-05T12:00:00'))).toBe(true);
     expect(matches(cron, at('2026-11-05T12:01:00'))).toBe(false);
     expect(matches(cron, at('2026-12-03T12:00:00'))).toBe(false);
+    // 20:00 UTC on Monday 30 November is already Tuesday 1 December in the host zone.
+    expect(matches(parseCron('0 20 30 11 *'), at('2026-11-30T20:00:00'))).toBe(true);
+    expect(matches(parseCron('0 20 * * 1'), at('2026-11-30T20:00:00'))).toBe(true);
   });
 
   it('throws for an expression that never runs', () => {

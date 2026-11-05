@@ -20,6 +20,12 @@ const start = async (devIssuer?: string) => {
   return served;
 };
 
+// Helmet's defaults plus the kit's directives; script-src stays 'self' only, no upgrade.
+const CSP =
+  "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';" +
+  "frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';" +
+  "script-src-attr 'none';style-src 'self' 'unsafe-inline';connect-src 'self'";
+
 const cspOf = async (s: Served) =>
   (await fetch(`${s.url}/ui/0.2.0/harness.html`)).headers.get('content-security-policy') ?? '';
 
@@ -36,17 +42,12 @@ describe('ui app', () => {
   });
 
   it('sends a CSP that keeps widgets on their own origin, without upgrade-insecure-requests', async () => {
-    const csp = await cspOf(await start());
-    expect(csp).toContain("default-src 'self'");
-    expect(csp).toMatch(/connect-src 'self'(;|$)/);
-    expect(csp).not.toContain('4281');
-    expect(csp).toContain("img-src 'self' data:");
-    expect(csp).not.toContain('upgrade-insecure-requests');
+    expect(await cspOf(await start())).toBe(CSP);
   });
 
   it('lets widgets reach the dev issuer only when up names it', async () => {
     const csp = await cspOf(await start('http://localhost:4281/'));
-    expect(csp).toMatch(/connect-src 'self' http:\/\/localhost:4281(;|$)/);
+    expect(csp).toBe(`${CSP} http://localhost:4281`);
   });
 
   it('refuses to start with a dev issuer that is not a loopback http origin', () => {

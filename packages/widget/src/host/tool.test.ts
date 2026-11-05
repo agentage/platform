@@ -1,5 +1,11 @@
-import { describe, expect, it } from 'vitest';
-import { fakeFetch, jsonResponse, toolAnswer } from '../test-support/fetch.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  controlledTimeout,
+  fakeFetch,
+  hangingFetch,
+  jsonResponse,
+  toolAnswer,
+} from '../test-support/fetch.js';
 import { callTool, PROTOCOL_VERSION, type ToolCallOptions } from './tool.js';
 
 const options = (fetch: ToolCallOptions['fetch'], token?: string): ToolCallOptions => ({
@@ -13,6 +19,8 @@ const echo = {
   content: [{ type: 'text', text: '{"msg":"pong hi"}' }],
   structuredContent: { msg: 'pong hi' },
 };
+
+afterEach(() => vi.restoreAllMocks());
 
 describe('callTool', () => {
   it('POSTs a 2026-07-28 tools/call and resolves the structuredContent', async () => {
@@ -94,6 +102,7 @@ describe('callTool', () => {
     });
     await expect(callTool(options(fetch), 'probe__echo', {})).rejects.toMatchObject({
       code: 'BAD_RESULT',
+      message: 'the tool answered an invalid result',
     });
   });
 
@@ -108,6 +117,7 @@ describe('callTool', () => {
       'data: {"jsonrpc":"2.0","method":"notifications/progress","params":{}}',
       'data: not json',
       `data: ${JSON.stringify({ jsonrpc: '2.0', id: 7, result: echo })}`,
+      'data: {"jsonrpc":"2.0","method":"notifications/message","params":{}}',
       '',
     ].join('\n');
     const { fetch } = fakeFetch(jsonResponse(stream, 200, 'text/event-stream'));
@@ -118,27 +128,43 @@ describe('callTool', () => {
     const { fetch } = fakeFetch(jsonResponse('<html>bad gateway</html>', 502, 'text/html'));
     await expect(callTool(options(fetch), 'probe__echo', {})).rejects.toMatchObject({
       code: 'HTTP_502',
+      message: 'MCP answered 502 without a JSON-RPC message',
     });
   });
 
-  it('a refusal before the tool runs keeps the envelope code and message', async () => {
-    const refused = { success: false, error: { code: 'FORBIDDEN', message: 'probe:read needed' } };
-    const { fetch } = fakeFetch(jsonResponse(refused, 403));
-    await expect(callTool(options(fetch), 'probe__echo', {})).rejects.toMatchObject({
-      code: 'FORBIDDEN',
-      message: 'probe:read needed',
-    });
+  it('a refusal before the tool runs (401, 403, 503) keeps the envelope code', async () => {
+    const refusals = [
+      [401, 'UNAUTHORIZED'],
+      [403, 'FORBIDDEN'],
+      [503, 'UNAVAILABLE'],
+    ] as const;
+    for (const [status, code] of refusals) {
+      const message = `${status} before the tool`;
+      const { fetch } = fakeFetch(
+        jsonResponse({ success: false, error: { code, message } }, status)
+      );
+      await expect(callTool(options(fetch), 'probe__echo', {})).rejects.toMatchObject({
+        code,
+        message,
+      });
+    }
   });
 
-  it('gives every call a timeout and names the tool that did not answer', async () => {
-    const { fetch, calls } = fakeFetch(toolAnswer(echo, 7));
-    await callTool(options(fetch), 'probe__echo', {});
-    expect(calls[0]?.init.signal).toBeInstanceOf(AbortSignal);
-    const hung = async () => Promise.reject(new DOMException('timed out', 'TimeoutError'));
-    await expect(callTool(options(hung), 'probe__echo', {})).rejects.toMatchObject({
+  it('bounds every call at 30 s and names the tool that did not answer', async () => {
+    const { timeout, signal, expire } = controlledTimeout();
+    const { fetch, calls, called } = hangingFetch();
+    const pending = callTool(options(fetch), 'probe__echo', {});
+    await called;
+    expect(timeout).toHaveBeenCalledWith(30_000);
+    expect(calls[0]?.init.signal).toBe(signal);
+    expire();
+    await expect(pending).rejects.toMatchObject({
       code: 'TIMEOUT',
       message: 'probe__echo did not answer in 30 s',
     });
+  });
+
+  it('passes a network failure through as it is', async () => {
     const offline = async () => Promise.reject(new TypeError('Failed to fetch'));
     await expect(callTool(options(offline), 'probe__echo', {})).rejects.toThrow('Failed to fetch');
   });

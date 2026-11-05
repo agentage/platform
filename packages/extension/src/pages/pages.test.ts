@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { ZodError } from 'zod';
 import { createTestContext } from '../context/test-context.js';
 import { recordedLog, serveApp, type Served } from '../test-support/http.js';
 import { API_MANIFEST, SHA } from '../test-support/packages.js';
@@ -57,8 +58,18 @@ describe('pages app', () => {
     const log = recordedLog().log;
     const pages = (site: Record<string, unknown>) =>
       createPagesApp({ pkg: PKG, build: BUILD, log, site: site as Record<string, string> });
-    expect(() => pages({ 'about.html': '<p></p>' })).toThrow();
-    expect(() => pages({ '/a b': '<p></p>' })).toThrow();
-    expect(() => pages({ '/': 42 })).toThrow();
+    const codes = (site: Record<string, unknown>): string[] => {
+      try {
+        pages(site);
+        return [];
+      } catch (err) {
+        return err instanceof ZodError
+          ? err.issues.map((i) => `${i.path.join('.')} ${i.code}`)
+          : [];
+      }
+    };
+    expect(codes({ 'about.html': '<p></p>' })).toEqual(['about.html invalid_key']);
+    expect(codes({ '/a b': '<p></p>' })).toEqual(['/a b invalid_key']);
+    expect(codes({ '/': 42 })).toEqual(['/ invalid_type']);
   });
 });

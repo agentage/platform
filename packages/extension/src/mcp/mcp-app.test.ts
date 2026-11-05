@@ -1,11 +1,9 @@
-import { createServer, type Server } from 'node:http';
-import { type AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { recordedLog, serveApp, type Served } from '../test-support/http.js';
 import { API_MANIFEST } from '../test-support/packages.js';
 import { createMcpApp } from './mcp-app.js';
-import { canonical, mcpSnapshot } from './snapshot.js';
+import { mcpSnapshot } from './snapshot.js';
 import { createToolRegistry } from './tools.js';
 
 const BUILD = { commit: '0'.repeat(40), buildTime: '2026-11-05T10:00:00Z' };
@@ -16,42 +14,61 @@ const HEADERS = {
   'mcp-protocol-version': '2025-11-25',
 };
 
+const META = {
+  'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+  'io.modelcontextprotocol/clientInfo': { name: 't', version: '1' },
+  'io.modelcontextprotocol/clientCapabilities': {},
+};
+const SCHEMA = 'https://json-schema.org/draft/2020-12/schema';
+const ECHO = {
+  name: 'probe__echo',
+  description: 'Echo',
+  inputSchema: { $schema: SCHEMA, type: 'object', properties: {} },
+  outputSchema: { $schema: SCHEMA, type: 'object', properties: {}, additionalProperties: false },
+};
+
 let served: Served | undefined;
-let raw: Server | undefined;
 afterEach(async () => {
   await served?.close();
-  raw?.close();
   served = undefined;
-  raw = undefined;
 });
 
-const tokenApp = async () => {
+const app = async (listing: 'open' | 'token') => {
   const { tool, tools } = createToolRegistry();
   tool('echo', { description: 'Echo', input: z.object({}), output: z.object({}) }, () => ({}));
   served = await serveApp(
-    createMcpApp({ pkg: PKG, build: BUILD, log: recordedLog().log, tools, listing: 'token' })
+    createMcpApp({ pkg: PKG, build: BUILD, log: recordedLog().log, tools, listing })
   );
   return served;
 };
 
-const post = (url: string, body: unknown) =>
-  fetch(`${url}/mcp`, { method: 'POST', headers: HEADERS, body: JSON.stringify(body) });
+const post = (url: string, body: unknown, headers: Record<string, string> = HEADERS) =>
+  fetch(`${url}/mcp`, { method: 'POST', headers, body: JSON.stringify(body) });
+
+const MODERN = { ...HEADERS, 'mcp-protocol-version': '2026-07-28', 'mcp-method': 'tools/list' };
+const LIST = { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} };
 
 describe('mcp listing', () => {
   it('with listing token, tools/list is refused with 401, alone or in a batch', async () => {
-    const s = await tokenApp();
-    const list = { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} };
-    const res = await post(s.url, list);
+    const s = await app('token');
+    const res = await post(s.url, LIST, { ...HEADERS, agcid: 'trace-list-check' });
     expect(res.status).toBe(401);
-    expect(await res.json()).toMatchObject({ success: false, error: { code: 'UNAUTHORIZED' } });
-    expect((await post(s.url, [{ jsonrpc: '2.0', method: 'notifications/x' }, list])).status).toBe(
+    expect(await res.json()).toEqual({
+      success: false,
+      error: {
+        code: 'UNAUTHORIZED',
+        message: 'tools/list needs a token',
+        agcid: 'trace-list-check',
+      },
+    });
+    expect((await post(s.url, [{ jsonrpc: '2.0', method: 'notifications/x' }, LIST])).status).toBe(
       401
     );
     await expect(mcpSnapshot(`${s.url}/mcp`, '2025-11-25')).rejects.toThrow(/mcp answered 401/);
   });
 
   it('still answers initialize, and refuses a body that is not JSON', async () => {
-    const s = await tokenApp();
+    const s = await app('token');
     const init = await post(s.url, {
       jsonrpc: '2.0',
       id: 1,
@@ -64,24 +81,56 @@ describe('mcp listing', () => {
     });
     expect(init.status).toBe(200);
     const bad = await fetch(`${s.url}/mcp`, { method: 'POST', headers: HEADERS, body: '{nope' });
-    expect(bad.status).toBeGreaterThanOrEqual(400);
+    expect(bad.status).toBe(400);
+    expect(await bad.json()).toMatchObject({ jsonrpc: '2.0', error: { code: -32700 }, id: null });
   });
 });
 
-describe('mcp snapshot', () => {
-  it('throws on a JSON-RPC error answer', async () => {
-    raw = createServer((_req, res) => {
-      res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ jsonrpc: '2.0', id: 1, error: { code: -32601, message: 'no' } }));
-    });
-    await new Promise<void>((resolve) => raw?.listen(0, '127.0.0.1', resolve));
-    const url = `http://127.0.0.1:${(raw.address() as AddressInfo).port}/mcp`;
-    await expect(mcpSnapshot(url, '2026-07-28')).rejects.toThrow(/mcp error: .*-32601/);
+describe('mcp wire per protocol era', () => {
+  it('answers a 2025-11-25 client with a one-event SSE stream, anonymous while listing is open', async () => {
+    const res = await post((await app('open')).url, LIST);
+    expect(res.headers.get('content-type')).toBe('text/event-stream');
+    const data = (await res.text()).split('\n').filter((line) => line.startsWith('data:'));
+    expect(data).toHaveLength(1);
+    const message = JSON.parse(data[0]?.slice(5) ?? '') as unknown;
+    expect(message).toEqual({ jsonrpc: '2.0', id: 1, result: { tools: [ECHO] } });
   });
 
-  it('sorts keys at every depth and keeps array order', () => {
-    expect(JSON.stringify(canonical({ b: [{ z: 1, a: 2 }, 3], a: null }))).toBe(
-      '{"a":null,"b":[{"a":2,"z":1},3]}'
+  it('answers a 2026-07-28 client with one JSON message carrying serverInfo', async () => {
+    const res = await post((await app('open')).url, { ...LIST, params: { _meta: META } }, MODERN);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('application/json');
+    const message = (await res.json()) as { id: number; result: Record<string, unknown> };
+    expect([message.id, message.result['tools']]).toEqual([1, [ECHO]]);
+    expect(message.result['_meta']).toEqual({
+      'io.modelcontextprotocol/serverInfo': { name: 'agentage-probe', version: '0.1.0' },
+    });
+  });
+
+  it('refuses a 2026-07-28 tools/list without _meta, naming what is missing', async () => {
+    const res = await post((await app('open')).url, LIST, MODERN);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      jsonrpc: '2.0',
+      id: 1,
+      error: {
+        code: -32602,
+        message: expect.stringContaining('_meta'),
+        data: { envelope: { missing: ['_meta'] } },
+      },
+    });
+  });
+
+  it('lets a browser client send the MCP headers cross-origin, without credentials', async () => {
+    const res = await fetch(`${(await app('open')).url}/mcp`, {
+      method: 'OPTIONS',
+      headers: { origin: 'https://a.example', 'access-control-request-method': 'POST' },
+    });
+    expect(res.status).toBe(204);
+    expect(res.headers.get('access-control-allow-origin')).toBe('*');
+    expect(res.headers.get('access-control-allow-credentials')).toBeNull();
+    expect(res.headers.get('access-control-allow-headers')).toBe(
+      'Authorization,Content-Type,agcid,traceparent,If-Match,Mcp-Protocol-Version,Mcp-Method,Mcp-Name,Accept'
     );
   });
 });

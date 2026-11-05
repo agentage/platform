@@ -73,9 +73,9 @@ describe('down', () => {
     const lines: string[] = [];
     const result = await down({ dir, keepData: true, onLine: (l) => void lines.push(l) }, run);
     expect(result).toEqual({ project: 'agentage-probe', containers: 1, networks: 0, volumes: 0 });
-    expect(lines[0]).toMatch(
-      /^removed {2}1 container · 0 networks · 0 volumes \(the store volume kept\) +agentage-probe$/
-    );
+    expect(lines).toEqual([
+      'removed  1 container · 0 networks · 0 volumes (the store volume kept)  agentage-probe',
+    ]);
     expect(calls[0]?.args).toEqual(['docker', 'compose', '-p', 'agentage-probe', ...DOWN]);
   });
 
@@ -99,9 +99,11 @@ describe('down', () => {
   });
 
   it('says so when nothing was running', async () => {
+    const dir = await probe();
     const lines: string[] = [];
-    await down({ dir: await probe(), onLine: (l) => void lines.push(l) }, fakeRun(0, '').run);
-    expect(lines[0]).toMatch(/^removed {2}nothing was running +agentage-probe-[0-9a-f]{8}$/);
+    await down({ dir, onLine: (l) => void lines.push(l) }, fakeRun(0, '').run);
+    const project = projectName('probe', await realpath(dir));
+    expect(lines).toEqual([`removed  ${'nothing was running'.padEnd(45)}${project}`]);
   });
 
   it('throws with the compose error when down fails', async () => {

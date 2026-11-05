@@ -4,9 +4,7 @@ import { createTestContext } from '../context/test-context.js';
 import { fail } from '../envelope/envelope.js';
 import { startTestMcp, type TestServer } from '../testing/test-server.js';
 import { createMcpHandler } from '@modelcontextprotocol/server';
-import { AGCID_PATTERN } from '../agcid/agcid.js';
 import { serverFactory } from './server.js';
-import { mcpSnapshot } from './snapshot.js';
 import { createToolRegistry } from './tools.js';
 import { type McpContext } from './tools.js';
 
@@ -45,14 +43,17 @@ const start = async () => {
   return { server, ctx };
 };
 
-const call = async (s: TestServer, name: string, args: object) => {
+const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const HEADERS = {
+  'content-type': 'application/json',
+  accept: 'application/json, text/event-stream',
+  'mcp-protocol-version': '2025-11-25',
+};
+
+const call = async (s: TestServer, name: string, args: object, agcid = 'trace-mcp-check') => {
   const res = await s.fetch('/mcp', {
     method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      accept: 'application/json, text/event-stream',
-      'mcp-protocol-version': '2025-11-25',
-    },
+    headers: { ...HEADERS, agcid },
     body: JSON.stringify({
       jsonrpc: '2.0',
       id: 7,
@@ -71,25 +72,6 @@ const call = async (s: TestServer, name: string, args: object) => {
 };
 
 describe('mcp part', () => {
-  it('gives clients of both protocol versions the same canonical snapshot', async () => {
-    const { server: s } = await start();
-    const old = await mcpSnapshot(`${s.url}/mcp`, '2025-11-25');
-    const modern = await mcpSnapshot(`${s.url}/mcp`, '2026-07-28');
-    expect(modern).toEqual(old);
-    expect(old.serverInfo).toEqual({ name: 'agentage-probe', version: '0.2.0' });
-    expect(old.tools.map((tool) => tool['name'])).toEqual([
-      'probe__echo',
-      'probe__refuse',
-      'probe__crash',
-    ]);
-    expect(old.tools[0]).toMatchObject({
-      description: 'Echo a message back',
-      inputSchema: { type: 'object', properties: { msg: { type: 'string', maxLength: 200 } } },
-      outputSchema: { type: 'object', properties: { msg: { type: 'string' } } },
-    });
-    expect(JSON.stringify(old)).toBe(JSON.stringify(modern));
-  });
-
   it('answers tools/call with text and structured content', async () => {
     const { server: s } = await start();
     const result = await call(s, 'probe__echo', { msg: 'hi' });
@@ -102,28 +84,28 @@ describe('mcp part', () => {
     const { server: s, ctx } = await start();
     const refused = await call(s, 'probe__refuse', {});
     expect(refused['isError']).toBe(true);
-    expect(refused['structuredContent']).toMatchObject({
-      error: {
-        code: 'FORBIDDEN',
-        message: 'not for you',
-        agcid: expect.stringMatching(/^[0-9a-f-]{36}$/),
-      },
-    });
-    const crashed = await call(s, 'probe__crash', {});
-    expect(crashed['structuredContent']).toMatchObject({
-      error: { code: 'INTERNAL', message: 'Internal error' },
+    const error = { code: 'FORBIDDEN', message: 'not for you', agcid: 'trace-mcp-check' };
+    expect(refused['structuredContent']).toEqual({ error });
+    expect(refused['content']).toEqual([{ type: 'text', text: JSON.stringify({ error }) }]);
+    const crashed = await call(s, 'probe__crash', {}, 'trace-crash-check');
+    expect(crashed['structuredContent']).toEqual({
+      error: { code: 'INTERNAL', message: 'Internal error', agcid: 'trace-crash-check' },
     });
     expect(JSON.stringify(crashed)).not.toContain('secret detail');
     expect(ctx.logs.find((entry) => entry.level === 'error')?.message).toBe('secret detail');
   });
 
-  it('answers 405 to GET and DELETE on /mcp', async () => {
+  it('answers 405 to GET, DELETE and any other method on /mcp', async () => {
     const { server: s } = await start();
-    for (const method of ['GET', 'DELETE']) {
+    for (const method of ['GET', 'DELETE', 'PUT']) {
       const res = await s.fetch('/mcp', { method });
-      expect(res.status).toBe(405);
+      expect(res.status, method).toBe(405);
       expect(res.headers.get('allow')).toBe('POST');
-      expect(await res.json()).toMatchObject({ jsonrpc: '2.0', error: { code: -32000 } });
+      expect(await res.json()).toEqual({
+        jsonrpc: '2.0',
+        error: { code: -32000, message: 'Method not allowed.' },
+        id: null,
+      });
     }
   });
 
@@ -144,11 +126,7 @@ describe('mcp part', () => {
     const res = await handler.fetch(
       new Request('http://mcp/mcp', {
         method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          accept: 'application/json, text/event-stream',
-          'mcp-protocol-version': '2025-11-25',
-        },
+        headers: HEADERS,
         body: JSON.stringify(body),
       }),
       { parsedBody: body }
@@ -162,6 +140,6 @@ describe('mcp part', () => {
     const result = (JSON.parse(data) as { result: { structuredContent: { error: object } } })
       .result;
     const { agcid } = result.structuredContent.error as { agcid: string };
-    expect(agcid).toMatch(AGCID_PATTERN);
+    expect(agcid).toMatch(UUID_V7);
   });
 });

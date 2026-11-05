@@ -89,23 +89,31 @@ describe('token check on api routes', () => {
     const s = await api(recorder(() => fail('UNAUTHORIZED', 'No token')).check);
     const res = await fetch(`${s.url}/api/v1/body`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', agcid: 'trace-401-check' },
       body: '{nope',
     });
     expect(res.status).toBe(401);
-    expect(await res.json()).toMatchObject({
-      error: { code: 'UNAUTHORIZED', agcid: expect.any(String) },
+    expect(await res.json()).toEqual({
+      success: false,
+      error: { code: 'UNAUTHORIZED', message: 'No token', agcid: 'trace-401-check' },
     });
     await served?.close();
     const down = await api(recorder(() => fail('UNAVAILABLE', 'JWKS unreachable')).check);
-    const busy = await fetch(`${down.url}/api/v1/echo`);
+    const busy = await fetch(`${down.url}/api/v1/echo`, { headers: { agcid: 'trace-503-check' } });
     expect(busy.status).toBe(503);
     expect(busy.headers.get('retry-after')).toBe('30');
+    expect(await busy.json()).toEqual({
+      success: false,
+      error: { code: 'UNAVAILABLE', message: 'JWKS unreachable', agcid: 'trace-503-check' },
+    });
   });
 
   it('tokens off: no check runs and every route stays anonymous', async () => {
     const s = await api();
-    expect((await fetch(`${s.url}/api/v1/echo`)).status).toBe(200);
+    const echo = await fetch(`${s.url}/api/v1/echo`);
+    expect(await echo.json()).toEqual({ success: true, data: null });
+    const body = await fetch(`${s.url}/api/v1/body`, { method: 'POST' });
+    expect([body.status, await body.json()]).toEqual([200, { success: true, data: 1 }]);
   });
 });
 
@@ -122,11 +130,19 @@ describe('token check on mcp tools', () => {
     ]);
   });
 
-  it('a refused call is HTTP 403 with the envelope, never a tool result', async () => {
+  it('a refused call is HTTP 403 or 503 with Retry-After, the envelope, never a tool result', async () => {
     const s = await mcp(recorder(() => fail('FORBIDDEN', 'insufficient_scope probe:admin')).check);
     const res = await rpc(s, 'tools/call', { name: 'probe__wipe', arguments: {} });
     expect(res.status).toBe(403);
-    expect(await res.json()).toMatchObject({ success: false, error: { code: 'FORBIDDEN' } });
+    expect(await res.json()).toMatchObject({
+      success: false,
+      error: { code: 'FORBIDDEN', message: 'insufficient_scope probe:admin' },
+    });
+    await served?.close();
+    const down = await mcp(recorder(() => fail('UNAVAILABLE', 'JWKS unreachable')).check);
+    const busy = await rpc(down, 'tools/call', { name: 'probe__echo', arguments: {} });
+    expect([busy.status, busy.headers.get('retry-after')]).toEqual([503, '30']);
+    expect(await busy.json()).toMatchObject({ error: { code: 'UNAVAILABLE' } });
   });
 
   it('a closed listing asks for read once tokens are on; off it refuses as before', async () => {

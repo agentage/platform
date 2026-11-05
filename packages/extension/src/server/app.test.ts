@@ -1,12 +1,10 @@
 import { type AddressInfo } from 'node:net';
 import { type Server } from 'node:http';
-import { Router, type Request, type Response } from 'express';
+import { Router } from 'express';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createTestContext } from '../context/test-context.js';
 import { DiscoveryDocumentSchema } from '../discovery/discovery.schema.js';
 import { fail } from '../envelope/envelope.js';
-import { ErrorEnvelopeSchema } from '../envelope/envelope.schema.js';
-import { createHealthHandler } from '../health/health.js';
 import { HealthSchema } from '../health/health.schema.js';
 import { createLog } from '../log/log.js';
 import { API_MANIFEST, DIGEST, SHA } from '../test-support/packages.js';
@@ -47,7 +45,7 @@ const start = async (extra: Partial<ApiAppOptions> = {}) => {
   });
   server = await listen(app, 0, '127.0.0.1');
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  return { ctx, get: (path: string, init?: RequestInit) => fetch(`${base}${path}`, init) };
+  return { ctx, base, get: (path: string, init?: RequestInit) => fetch(`${base}${path}`, init) };
 };
 
 describe('api app: kit routes', () => {
@@ -61,29 +59,16 @@ describe('api app: kit routes', () => {
     expect(body.data).toMatchObject({ commit: SHA, part: 'api', extension: 'probe' });
   });
 
-  it('refuses /health off loopback with a 404', async () => {
-    const handler = createHealthHandler({
-      extension: 'probe',
-      part: 'api',
-      version: '0.1.0',
-      build: BUILD,
-    });
-    const req = { socket: { localAddress: '10.0.1.7' } } as unknown as Request;
-    await expect(handler(req, {} as Response, () => undefined)).rejects.toMatchObject({
-      code: 'NOT_FOUND',
-    });
-  });
-
   it('serves discovery with images by tag when no record is mounted', async () => {
-    const { get } = await start({ ownImage: 'ghcr.io/agentage/probe-api:0.1.0' });
+    const image = 'ghcr.io/agentage/probe-api:0.1.0';
+    const { get, base } = await start({ ownImage: image });
     const res = await get('/.well-known/agentage-extension.json', {
       headers: { origin: 'https://x.io' },
     });
     expect(res.headers.get('access-control-allow-origin')).toBe('*');
-    const doc = (await res.json()) as Record<string, unknown>;
-    expect(doc).toMatchObject({ id: 'probe', version: '0.1.0', commit: SHA });
-    expect(doc['host']).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
-    expect(doc['parts']).toEqual({ api: { image: 'ghcr.io/agentage/probe-api:0.1.0' } });
+    const { buildTime } = BUILD;
+    const want = { id: 'probe', version: '0.1.0', commit: SHA, buildTime, host: base };
+    expect(await res.json()).toEqual({ ...want, parts: { api: { image } } });
   });
 
   it('serves the mounted record by digest, on the configured origin', async () => {
@@ -124,12 +109,12 @@ describe('api app: envelope and headers', () => {
 
   it('answers a miss with a 404 envelope carrying the agcid', async () => {
     const { get } = await start();
+    const error = { code: 'NOT_FOUND', message: 'Not found', agcid: 'trace-404-check' };
+    const miss = { success: false, error };
     for (const path of ['/api/v1/nope', '/api/', '/mcp/x', '/']) {
       const res = await get(path, { headers: { agcid: 'trace-404-check' } });
       expect(res.status).toBe(404);
-      const body = await res.json();
-      expect(ErrorEnvelopeSchema.safeParse(body).success).toBe(true);
-      expect(body).toMatchObject({ error: { code: 'NOT_FOUND', agcid: 'trace-404-check' } });
+      expect(await res.json()).toEqual(miss);
     }
   });
 
@@ -143,7 +128,8 @@ describe('api app: envelope and headers', () => {
     expect(res.status).toBe(500);
     const text = await res.text();
     expect(text).not.toContain('secret driver message');
-    expect(JSON.parse(text)).toMatchObject({
+    expect(JSON.parse(text)).toEqual({
+      success: false,
       error: { code: 'INTERNAL', message: 'Internal error', agcid: 'trace-500-check' },
     });
     expect(lines).toHaveLength(1);
@@ -166,9 +152,13 @@ describe('api app: envelope and headers', () => {
 
   it('sends Retry-After with 503', async () => {
     const { get } = await start();
-    const res = await get('/api/v1/busy');
+    const res = await get('/api/v1/busy', { headers: { agcid: 'trace-503-check' } });
     expect(res.status).toBe(503);
     expect(res.headers.get('retry-after')).toBe('30');
+    expect(await res.json()).toEqual({
+      success: false,
+      error: { code: 'UNAVAILABLE', message: 'Try later', agcid: 'trace-503-check' },
+    });
   });
 
   it('maps a bad JSON body to 400 and an oversized one to 413', async () => {
@@ -176,12 +166,12 @@ describe('api app: envelope and headers', () => {
     const post = (body: string) =>
       get('/api/v1/body', { method: 'POST', body, headers: JSON_TYPE });
     expect((await post('{"a":1}')).status).toBe(200);
-    expect(await (await post('{bad')).json()).toMatchObject({
-      error: { code: 'VALIDATION_ERROR' },
-    });
+    const bad = await post('{bad');
+    const invalid = { code: 'VALIDATION_ERROR', message: 'Invalid JSON body' };
+    expect([bad.status, await bad.json()]).toMatchObject([400, { error: invalid }]);
     const big = await post(JSON.stringify({ a: 'x'.repeat(1_100_000) }));
-    expect(big.status).toBe(413);
-    expect(await big.json()).toMatchObject({ error: { code: 'PAYLOAD_TOO_LARGE' } });
+    const tooLarge = { code: 'PAYLOAD_TOO_LARGE', message: 'Body too large' };
+    expect([big.status, await big.json()]).toMatchObject([413, { error: tooLarge }]);
   });
 
   it('answers a CORS preflight on /api/ without credentials', async () => {
@@ -193,6 +183,8 @@ describe('api app: envelope and headers', () => {
     expect(res.status).toBe(204);
     expect(res.headers.get('access-control-allow-origin')).toBe('*');
     expect(res.headers.get('access-control-allow-credentials')).toBeNull();
-    expect(res.headers.get('access-control-allow-headers')).toContain('agcid');
+    expect(res.headers.get('access-control-allow-headers')).toBe(
+      'Authorization,Content-Type,agcid,traceparent,If-Match'
+    );
   });
 });

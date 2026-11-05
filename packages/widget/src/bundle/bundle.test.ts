@@ -1,8 +1,14 @@
 import { readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { type Host } from '../host/host.types.js';
 import { FIXTURE, probePackage, tempExtension } from '../test-support/extensions.js';
 import { bundle, type BundleResult } from './bundle.js';
+import { main } from './main.js';
+
+interface JsdomModule {
+  JSDOM: new (html: string, options: { runScripts: 'outside-only' }) => { window: typeof window };
+}
 
 let result: BundleResult;
 const temps: string[] = [];
@@ -11,6 +17,23 @@ const temp = async (pkg: unknown, index?: string) => {
   const dir = await tempExtension(pkg, index);
   temps.push(dir);
   return dir;
+};
+
+// A page of its own (jsdom has no types here): the module runs as the browser would run it.
+const pageWith = async (host: Host) => {
+  const { JSDOM } = (await import('jsdom' as string)) as JsdomModule;
+  const { window } = new JSDOM('<!doctype html><head></head><body></body>', {
+    runScripts: 'outside-only',
+  });
+  window.__agentageHost = () => host;
+  window.eval(await readFile(result.files.module, 'utf8'));
+  return window;
+};
+
+const shown = (el: Element, selector: string) => {
+  const found = el.shadowRoot?.querySelector<HTMLElement>(selector);
+  if (!found) throw new Error(`${selector} not shown: ${el.shadowRoot?.textContent}`);
+  return found;
 };
 
 beforeAll(async () => {
@@ -29,15 +52,31 @@ describe('bundle on the fixture extension', () => {
     expect(result).toMatchObject({ id: 'probe', version: '0.2.0', widgets });
   });
 
-  it('writes one minified self-contained module that registers on load', async () => {
+  it('writes one minified self-contained module, no full zod, that registers on load', async () => {
     const code = await readFile(result.files.module, 'utf8');
     expect(result.files.module).toBe(join(FIXTURE, 'dist/ui/probe.js'));
     expect(code).not.toMatch(/^\s*import\s/m);
     expect(code).not.toContain('process.env');
-    expect(code).toContain('"probe",');
-    expect(code).toContain('customElements');
+    expect(code).not.toContain('"ZodString"');
     expect(code).toContain('--tw-border-style');
     expect(code.split('\n').length).toBeLessThan(200);
+  });
+
+  it('runs as one widget runtime: the echo calls its tool and shows the answer', async () => {
+    const tool = vi.fn(() => Promise.resolve({ msg: 'pong hi' }));
+    const context = { extension: 'probe', version: '0.2.0', path: '/', theme: 'dark' } as const;
+    const window = await pageWith({
+      tool: tool as Host['tool'],
+      api: () => Promise.resolve(null),
+      context,
+    });
+    const el = window.document.createElement('probe-echo');
+    window.document.body.append(el);
+    (await vi.waitFor(() => shown(el, 'button'))).click();
+    await vi.waitFor(() => expect(shown(el, 'p').textContent).toBe('pong hi'));
+    expect(tool).toHaveBeenCalledWith('probe__echo', { msg: 'hi' });
+    expect(el.shadowRoot?.adoptedStyleSheets).toHaveLength(1);
+    expect(window.document.head.innerHTML).toBe('');
   });
 
   it('writes harness.html for the id and version with its logic in harness.js', async () => {
@@ -74,4 +113,18 @@ describe('bundle refuses', () => {
     const badName = await temp(probePackage, "export const widgets = { '9x': () => null };");
     await expect(bundle({ dir: badName })).rejects.toThrow(/widget name/);
   });
+});
+
+// Here, not in main.test.ts: two files bundling the fixture at once write the same dist/ui.
+describe('agentage-widget bundle', () => {
+  it('bundles the fixture and prints one line per file', async () => {
+    const log: string[] = [];
+    const out = {
+      log: (line: string) => void log.push(line),
+      error: (line: string) => void log.push(line),
+    };
+    expect(await main(['bundle', '--dir', FIXTURE], out)).toBe(0);
+    expect(log.map((line) => line.split(/\s+/)[0])).toEqual(['module', 'widgets', 'harness']);
+    expect(log[1]).toMatch(/^widgets {2}\S*dist\/ui\/widgets\.json {2}probe-echo$/);
+  }, 60_000);
 });

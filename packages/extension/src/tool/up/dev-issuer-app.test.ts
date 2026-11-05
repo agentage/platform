@@ -35,14 +35,17 @@ describe('dev issuer', () => {
     expect(claims['sub']).toBe('usr_1');
     expect(Number(claims['exp']) - Number(claims['iat'])).toBe(60);
     expect(new Date(expiresAt).getTime()).toBe(Number(claims['exp']) * 1000);
+    const refused = { error: 'scope must be {id}:{read|write|admin}, space-separated' };
+    // The padded body is valid but for its size: only the 4096 cap refuses it.
     for (const body of [
       '{"scope":"probe:read","admin":true}',
       '{nope',
-      JSON.stringify({ scope: 'probe:read', pad: 'x'.repeat(5000) }),
+      `{"scope":"probe:read"${' '.repeat(5000)}}`,
       '',
       '{"scope":"probe:read","ttlSeconds":5}',
     ]) {
-      expect((await post(body)).status).toBe(400);
+      const res = await post(body);
+      expect([res.status, await res.json()]).toEqual([400, refused]);
     }
   });
 

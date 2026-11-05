@@ -2,9 +2,11 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    // An in-process postgres (the store tests) boots in seconds when the whole suite runs at once.
+    // An in-process postgres boots in seconds when the whole suite runs at once (tests and hooks).
     testTimeout: 30_000,
+    hookTimeout: 30_000,
     include: ['packages/*/src/**/*.test.{ts,tsx}'],
+    setupFiles: ['packages/extension/src/test-support/cleanup.ts'],
     coverage: {
       provider: 'v8',
       include: ['packages/*/src/**/*.{ts,tsx}'],

@@ -11,6 +11,17 @@ const port = Number(process.env.WIDGET_E2E_PORT ?? 4290);
 let calls: McpCall[] = [];
 let close: () => void = () => undefined;
 
+type HostHook = (el: Element | null) => object;
+
+// Everything widget code on the page can reach: the DOM, the URL, storage and the host it is given.
+const widgetReach = () => {
+  const el = document.querySelector('probe-echo');
+  const host = (globalThis as { __agentageHost?: HostHook }).__agentageHost?.(el) ?? {};
+  const seen = [document.documentElement.outerHTML, el?.shadowRoot?.innerHTML, location.href];
+  seen.push(JSON.stringify(host), JSON.stringify({ ...localStorage, ...sessionStorage }));
+  return { keys: Object.keys(host).sort(), seen: seen.join('\n') };
+};
+
 test.beforeAll(async () => {
   const result = await bundle({ dir: fixture });
   const stub = await startStub(result.outDir, port);
@@ -56,8 +67,14 @@ test('the harness speaks 2026-07-28 tools/call and keeps the token in the bridge
     'mcp-method': 'tools/call',
     'mcp-name': 'probe__echo',
   });
-  expect(call?.body).toMatchObject({ method: 'tools/call', params: { name: 'probe__echo' } });
+  expect(call?.body).toMatchObject({
+    method: 'tools/call',
+    params: { name: 'probe__echo', arguments: { msg: 'hi' } },
+  });
   await expect(page).not.toHaveURL(/token=/);
+  const reach = await page.evaluate(widgetReach);
+  expect(reach.keys).toEqual(['api', 'context', 'tool']);
+  expect(reach.seen).not.toContain('aga_e2e');
 });
 
 test('without a dev issuer the harness warns once and calls anonymously', async ({ page }) => {
@@ -67,5 +84,6 @@ test('without a dev issuer the harness warns once and calls anonymously', async 
   await page.getByRole('button', { name: 'ping' }).click();
   await expect(page.locator('probe-echo')).toContainText('pong hi');
   expect(warnings.filter((w) => w.includes('no dev token'))).toHaveLength(1);
+  expect(calls).toHaveLength(1);
   expect(calls[0]?.headers.authorization).toBeUndefined();
 });

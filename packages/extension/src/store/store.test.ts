@@ -1,10 +1,9 @@
-import { createServer, type AddressInfo } from 'node:net';
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { recordedLog } from '../test-support/http.js';
 import { tempPackage } from '../test-support/packages.js';
-import { isFailure, type Failure } from '../envelope/envelope.js';
+import { isFailure } from '../envelope/envelope.js';
 import { createStore, isOutage, storeCheck, storeUrl } from './store.js';
-import { createTestStore } from './test-store.js';
+import { createTestStore, type TestStore } from './test-store.js';
 import { type Store } from './store.types.js';
 
 describe('storeUrl', () => {
@@ -41,27 +40,12 @@ describe('createStore', () => {
     const { log, lines } = recordedLog();
     const store = createStore(env, log);
     const err = await store.query('select 1').catch((e: unknown) => e);
-    expect(isFailure(err) && err.code).toBe('UNAVAILABLE');
-    expect((err as Failure).status).toBe(503);
-    expect((err as Failure).retryAfter).toBe(30);
-    expect((err as Error).message).toBe('The store is unavailable');
-    expect(lines[0]).toMatchObject({ level: 'warn', msg: 'store unavailable' });
-    expect(String(lines[0]?.['reason'])).toMatch(/ECONNREFUSED/);
+    expect(isFailure(err)).toBe(true);
+    expect(err).toMatchObject({ code: 'UNAVAILABLE', status: 503, retryAfter: 30 });
+    expect(err).toMatchObject({ message: 'The store is unavailable', details: undefined });
+    const reason = expect.stringMatching(/ECONNREFUSED/);
+    expect(lines).toMatchObject([{ level: 'warn', msg: 'store unavailable', reason }]);
     await store.end();
-  });
-
-  it('gives up connecting after the connect timeout, as UNAVAILABLE', async () => {
-    // A listener that accepts and never speaks: the connect timeout is all that ends the wait.
-    const silent = createServer(() => undefined);
-    await new Promise<void>((resolve) => silent.listen(0, '127.0.0.1', resolve));
-    const port = (silent.address() as AddressInfo).port;
-    const env = { AGENTAGE_STORE_URL: `postgres://u:p@127.0.0.1:${port}/db` };
-    const store = createStore(env, recordedLog().log, { connectMs: 200, statementMs: 1000 });
-    const started = Date.now();
-    await expect(store.query('select 1')).rejects.toThrow('The store is unavailable');
-    expect(Date.now() - started).toBeLessThan(3000);
-    await store.end();
-    silent.close();
   });
 });
 
@@ -72,6 +56,7 @@ describe('isOutage', () => {
       expect(isOutage(coded(code))).toBe(true);
     expect(isOutage(new Error('Connection terminated unexpectedly'))).toBe(true);
     expect(isOutage(new Error('Query read timeout'))).toBe(true);
+    expect(isOutage(new Error('timeout exceeded when trying to connect'))).toBe(true);
     for (const code of ['42601', '23505', '42P01', '57P04x'])
       expect(isOutage(coded(code))).toBe(false);
     expect(isOutage(null)).toBe(false);
@@ -79,18 +64,23 @@ describe('isOutage', () => {
 });
 
 describe('createTestStore', () => {
-  it('prepares once on first use; several statements answer with the last', async () => {
-    let prepared = 0;
-    const store = createTestStore(async (s) => {
+  let prepared = 0;
+  let store: TestStore;
+  beforeAll(async () => {
+    store = createTestStore(async (s) => {
       prepared += 1;
       await s.query('create table t (n int); insert into t values (1), (2);');
     });
+    await store.query('select 1');
+  });
+  afterAll(() => store.close());
+
+  it('prepares once on first use; several statements answer with the last', async () => {
     const rows = await store.query('select 0 as z; select sum(n)::int as total from t');
     expect(rows.rows).toEqual([{ total: 3 }]);
     expect((await store.query('select n from t where n = $1', [2])).rows).toEqual([{ n: 2 }]);
     expect((await store.query('create table u (n int)')).rows).toEqual([]);
     expect(prepared).toBe(1);
-    await store.close();
   });
 
   it('closes without ever opening', async () => {

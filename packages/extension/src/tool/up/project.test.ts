@@ -6,10 +6,8 @@ import { projectName, renderedProject, workingCopy } from './project.js';
 
 describe('the compose project', () => {
   it('is one name per working copy: the id and a short hash of the folder', () => {
-    expect(projectName('probe', '/a/extension-probe')).toMatch(/^agentage-probe-[0-9a-f]{8}$/);
-    expect(projectName('probe', '/a/extension-probe')).toBe(
-      projectName('probe', '/a/extension-probe')
-    );
+    // Fixed across kit versions: down after an upgrade must still find the containers.
+    expect(projectName('probe', '/a/extension-probe')).toBe('agentage-probe-cc5e72d7');
     expect(projectName('probe', '/b/extension-probe')).not.toBe(
       projectName('probe', '/a/extension-probe')
     );
@@ -17,7 +15,7 @@ describe('the compose project', () => {
 
   it('resolves a symlinked folder to its real path, and keeps a missing one as given', async () => {
     const dir = await tempPackage({ 'package.json': '{}' });
-    const link = `${dir}-link`;
+    const link = join(await tempPackage({}), 'link');
     await symlink(dir, link, 'dir');
     expect(await workingCopy(link)).toBe(await workingCopy(dir));
     expect(await workingCopy('/no/such/folder')).toBe('/no/such/folder');

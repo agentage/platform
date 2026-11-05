@@ -7,6 +7,18 @@ import { loadWidgets, mountWidgets, pickWidgets, showProblem } from './mount.js'
 const echo = { name: 'echo', element: 'probe-echo', module: '/ui/0.2.0/probe.js' };
 const stats = { name: 'stats', element: 'probe-stats', module: '/ui/0.2.0/probe.js' };
 
+const issuePaths = (error: unknown) =>
+  (error as { issues: { path: PropertyKey[] }[] }).issues.map((issue) => issue.path.join('.'));
+
+const thrown = (fn: () => unknown): unknown => {
+  try {
+    fn();
+  } catch (error) {
+    return error;
+  }
+  return undefined;
+};
+
 beforeEach(() => {
   document.head.innerHTML =
     '<meta name="agentage-extension" content="probe"><meta name="agentage-version" content="0.2.0">';
@@ -25,9 +37,9 @@ describe('readConfig', () => {
   });
 
   it('refuses a bad widget name and a page without the meta', () => {
-    expect(() => readConfig(document, '?widget=<b>')).toThrow();
+    expect(() => readConfig(document, '?widget=<b>')).toThrow(/a widget name is lowercase kebab/);
     document.head.replaceChildren();
-    expect(() => readConfig(document, '')).toThrow();
+    expect(issuePaths(thrown(() => readConfig(document, '')))).toEqual(['id', 'version']);
   });
 });
 
@@ -39,8 +51,9 @@ describe('mount', () => {
       jsonResponse([{ ...echo, element: 'echo' }])
     );
     await expect(loadWidgets(fetch, './widgets.json')).resolves.toEqual([echo]);
-    await expect(loadWidgets(fetch, './widgets.json')).rejects.toThrow(/404/);
-    await expect(loadWidgets(fetch, './widgets.json')).rejects.toThrow();
+    await expect(loadWidgets(fetch, './widgets.json')).rejects.toThrow('widgets.json answered 404');
+    const invalid = await loadWidgets(fetch, './widgets.json').catch((error: unknown) => error);
+    expect(issuePaths(invalid)).toEqual(['0.element']);
   });
 
   it('mounts every widget, or only ?widget=', () => {

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { recordOf, validateRecord } from '../discovery/discovery.js';
-import { ExtensionRecordSchema } from '../discovery/discovery.schema.js';
 import { validateManifest } from '../manifest/read-manifest.js';
 import { linkModules } from '../test-support/http.js';
 import { DIGEST, json, SHA, SPEC_MANIFEST, tempPackage } from '../test-support/packages.js';
@@ -50,7 +49,6 @@ describe('recordExtras', () => {
       migrations: 2,
     });
     const record = validateRecord(recordOf(FULL, BUILD, images, extras));
-    expect(ExtensionRecordSchema.safeParse(record).success).toBe(true);
     expect(record).toMatchObject({
       tools: ['probe__echo', 'probe__count'],
       commands: ['ping'],
@@ -79,11 +77,13 @@ describe('recordExtras', () => {
     ).rejects.toThrow(/dist\/mcp\/index\.js does not export create\(ctx\)/);
     await expect(
       recordExtras(await probe({ 'dist/ui/widgets.json': '[]' }), FULL)
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({ issues: [expect.objectContaining({ code: 'too_small', path: [] })] });
     const extra = json([{ ...WIDGETS[0], size: 1 }]);
     await expect(
       recordExtras(await probe({ 'dist/ui/widgets.json': extra }), FULL)
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({
+      issues: [expect.objectContaining({ code: 'unrecognized_keys', keys: ['size'] })],
+    });
     const swagger = json({ swagger: '2.0', paths: {} });
     await expect(recordExtras(await probe({ 'openapi.json': swagger }), FULL)).rejects.toThrow(
       'openapi.json is not an OpenAPI 3.1 document'

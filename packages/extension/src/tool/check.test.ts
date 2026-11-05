@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { validateManifest } from '../manifest/read-manifest.js';
 import { json, SPEC_MANIFEST, tempPackage } from '../test-support/packages.js';
@@ -27,9 +28,14 @@ describe('check', () => {
       Object.entries(BUILT).filter(([file]) => !file.includes('mcp'))
     );
     const dir = await tempPackage({ ...rest, 'dist/cli/index.js': 'export const x = 1;' });
-    expect((await check({ dir, pkg: PKG })).map((p) => p.rule)).toEqual(['entries', 'entries']);
+    const mcp = 'dist/mcp/index.js not found: the package build must write the mcp part there';
+    const cli = `cli part: ${join(dir, 'dist/cli/index.js')} does not export create(ctx)`;
+    expect(await check({ dir, pkg: PKG })).toEqual([
+      { rule: 'entries', problem: mcp },
+      { rule: 'entries', problem: cli },
+    ]);
     await expect(assertConforms({ dir, pkg: PKG })).rejects.toThrow(
-      /^check failed: entries: dist\/mcp\/index\.js not found.*; entries: cli part: .*does not export create/
+      `check failed: entries: ${mcp}; entries: ${cli}`
     );
   });
 

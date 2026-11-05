@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest';
-import { fakeFetch, jsonResponse } from '../test-support/fetch.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { controlledTimeout, fakeFetch, hangingFetch, jsonResponse } from '../test-support/fetch.js';
 import { callApi } from './api.js';
 
 const anonymous = () => Promise.resolve(undefined);
 const withToken = () => Promise.resolve('aga_t');
+
+afterEach(() => vi.restoreAllMocks());
 
 describe('callApi', () => {
   it('fetches /api/v1{path} and resolves the envelope data', async () => {
@@ -34,24 +36,41 @@ describe('callApi', () => {
     });
   });
 
-  it('rejects a body that is not an envelope and a relative path', async () => {
-    const { fetch } = fakeFetch(jsonResponse('oops', 500, 'text/plain'));
-    await expect(callApi(fetch, anonymous, '/echo')).rejects.toMatchObject({ code: 'HTTP_500' });
-    await expect(callApi(fetch, anonymous, 'echo')).rejects.toMatchObject({ code: 'BAD_PATH' });
+  it('rejects a body that is not an envelope, and a relative path before any fetch', async () => {
+    const { fetch, calls } = fakeFetch(jsonResponse('oops', 500, 'text/plain'));
+    await expect(callApi(fetch, anonymous, '/echo')).rejects.toMatchObject({
+      code: 'HTTP_500',
+      message: 'api answered 500',
+    });
+    await expect(callApi(fetch, anonymous, 'echo')).rejects.toMatchObject({
+      code: 'BAD_PATH',
+      message: 'api path must start with /: echo',
+    });
+    expect(calls).toHaveLength(1);
   });
 
-  it('bounds every call, keeps the caller signal, and names the path that did not answer', async () => {
-    const { fetch, calls } = fakeFetch(jsonResponse({ success: true, data: 1 }));
-    const own = new AbortController();
-    await callApi(fetch, anonymous, '/ticks', { signal: own.signal });
-    const signal = calls[0]?.init.signal;
-    expect(signal?.aborted).toBe(false);
-    own.abort();
-    expect(signal?.aborted).toBe(true);
-    const hung = async () => Promise.reject(new DOMException('timed out', 'TimeoutError'));
-    await expect(callApi(hung, anonymous, '/ticks')).rejects.toMatchObject({
+  it('bounds a call at 30 s, also beside a caller signal, and names the path', async () => {
+    const { timeout, expire } = controlledTimeout();
+    const { fetch, calls, called } = hangingFetch();
+    const pending = callApi(fetch, anonymous, '/ticks', { signal: new AbortController().signal });
+    await called;
+    expect(timeout).toHaveBeenCalledWith(30_000);
+    expire();
+    expect(calls[0]?.init.signal?.aborted).toBe(true);
+    await expect(pending).rejects.toMatchObject({
       code: 'TIMEOUT',
       message: '/api/v1/ticks did not answer in 30 s',
     });
+  });
+
+  it('keeps the caller signal, and its abort is not reported as a timeout', async () => {
+    controlledTimeout();
+    const { fetch, calls, called } = hangingFetch();
+    const own = new AbortController();
+    const pending = callApi(fetch, anonymous, '/ticks', { signal: own.signal });
+    await called;
+    own.abort();
+    expect(calls[0]?.init.signal?.aborted).toBe(true);
+    await expect(pending).rejects.toHaveProperty('name', 'AbortError');
   });
 });

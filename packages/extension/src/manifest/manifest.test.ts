@@ -3,8 +3,35 @@ import cloud from '../test-support/fixtures/neg-package-commands-no-cli.json' wi
 import memory from '../test-support/fixtures/package-memory.json' with { type: 'json' };
 import { API_MANIFEST, json, SPEC_MANIFEST, tempPackage } from '../test-support/packages.js';
 import { PackageSchema } from './manifest.schema.js';
-import { entryOf, imageParts, normalizeParts } from './parts.js';
+import { entryOf, hasPostgres, imageParts, normalizeParts } from './parts.js';
 import { readManifest, validateManifest } from './read-manifest.js';
+
+// C1 of the M2 sheet, as an author writes it.
+const C1_MANIFEST = {
+  name: '@agentage/extension-probe',
+  version: '0.2.0',
+  engines: { agentage: '^0.2' },
+  agentage: {
+    id: 'probe',
+    parts: {
+      pages: true,
+      ui: true,
+      api: true,
+      mcp: true,
+      worker: true,
+      cli: true,
+      store: 'postgres',
+    },
+    commands: [
+      {
+        name: 'ping',
+        summary: 'answer pong',
+        args: [{ name: 'msg', type: 'string', optional: true }],
+      },
+    ],
+    settings: { 'mcp.listing': { type: 'string', enum: ['open', 'token'], default: 'open' } },
+  },
+};
 
 const withAgentage = (agentage: Record<string, unknown>) => ({
   ...API_MANIFEST,
@@ -17,7 +44,8 @@ const issuesOf = (value: unknown): string[] => {
 };
 
 describe('manifest schema', () => {
-  it('takes the full probe manifest of the spec and the api-only form', () => {
+  it('takes the C1 manifest, the full probe manifest of the spec and the api-only form', () => {
+    expect(issuesOf(C1_MANIFEST)).toEqual([]);
     expect(issuesOf(SPEC_MANIFEST)).toEqual([]);
     expect(issuesOf(API_MANIFEST)).toEqual([]);
   });
@@ -33,8 +61,11 @@ describe('manifest schema', () => {
   });
 
   it('refuses reserved ids, no routed part and duplicate commands', () => {
-    expect(issuesOf(withAgentage({ id: 'auth' }))).toHaveLength(1);
-    expect(issuesOf(withAgentage({ id: 'Probe' }))).toHaveLength(1);
+    const owned = ['lowercase id, never a name the platform owns'];
+    for (const id of ['auth', 'Probe', 'extension', 'com1'])
+      expect(issuesOf(withAgentage({ id }))).toEqual(owned);
+    expect(issuesOf(withAgentage({ id: 'x'.repeat(33) }))).toEqual([expect.stringMatching(/<=32/)]);
+    expect(issuesOf(withAgentage({ id: 'authors' }))).toEqual([]);
     expect(issuesOf(withAgentage({ parts: { worker: true } }))).toContain(
       'at least one routed part (pages, ui, api or mcp)'
     );
@@ -60,7 +91,9 @@ describe('manifest schema', () => {
   });
 
   it('refuses unknown keys in the manifest block', () => {
-    expect(issuesOf(withAgentage({ contributes: {} }))).toHaveLength(1);
+    expect(issuesOf(withAgentage({ contributes: {} }))).toEqual([
+      expect.stringContaining('"contributes"'),
+    ]);
   });
 });
 
@@ -81,13 +114,19 @@ describe('parts', () => {
     expect(entryOf(spec, 'api')).toBe('./dist/api/index.js');
     const custom = validateManifest(withAgentage({ parts: { api: { entry: './out/a.js' } } }));
     expect(entryOf(custom, 'api')).toBe('./out/a.js');
+    const git = validateManifest(memory);
+    expect([hasPostgres(spec), hasPostgres(git), hasPostgres(custom)]).toEqual([
+      true,
+      false,
+      false,
+    ]);
   });
 });
 
 describe('readManifest', () => {
   it('reads and validates package.json from a folder', async () => {
     const dir = await tempPackage({ 'package.json': json(API_MANIFEST) });
-    await expect(readManifest(dir)).resolves.toMatchObject({ agentage: { id: 'probe' } });
+    await expect(readManifest(dir)).resolves.toEqual(API_MANIFEST);
   });
 
   it('says which folder has no package.json, and passes any other read error through', async () => {
@@ -105,6 +144,10 @@ describe('readManifest', () => {
 
   it('names the failing field', async () => {
     const dir = await tempPackage({ 'package.json': json(withAgentage({ id: 'www' })) });
-    await expect(readManifest(dir)).rejects.toThrow(/agentage\.id/);
+    await expect(readManifest(dir)).rejects.toThrow(
+      new Error(
+        'invalid agentage manifest in package.json: agentage.id: lowercase id, never a name the platform owns'
+      )
+    );
   });
 });

@@ -47,6 +47,7 @@ describe('discovery document', () => {
     const record = validateRecord(recordOf(API_MANIFEST, BUILD, { api: API_IMAGE }));
     const doc = discoveryDocument(record, 'https://probe.next.agentage.io');
     expect(Object.keys(doc)).toEqual(['id', 'version', 'commit', 'buildTime', 'host', 'parts']);
+    expect(doc).toEqual({ ...record, host: 'https://probe.next.agentage.io' });
     expect(DiscoveryDocumentSchema.safeParse(doc).success).toBe(true);
   });
 

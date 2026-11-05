@@ -5,7 +5,7 @@ import { EXIT_FAILED, EXIT_OK, EXIT_USAGE, runCommand } from './run-command.js';
 
 const CLI = `export const create = ({ out, args }) => ({
   ping: async () => { out.log(args.msg ? 'pong ' + args.msg : 'pong'); return 0; },
-  fail: () => out.fail(3, 'nope'),
+  fail: () => { out.fail(3, 'nope'); return 0; },
   crash: () => { throw new Error('boom'); },
   code: () => 5,
   report: () => { out.log('working'); out.json({ ok: true }); },
@@ -66,7 +66,7 @@ describe('runCommand', () => {
     });
   });
 
-  it('exits with out.fail, a returned number, or 1 on a throw', async () => {
+  it('exits with out.fail over a returned number, a returned number, or 1 on a throw', async () => {
     const dir = await probe();
     expect(await runIn(dir, 'fail')).toEqual({ code: 3, stdout: '', stderr: 'nope\n' });
     expect((await runIn(dir, 'code')).code).toBe(5);
@@ -79,8 +79,15 @@ describe('runCommand', () => {
       code: EXIT_USAGE,
       stderr: 'probe has no command deploy\n',
     });
-    expect((await runIn(dir, 'ping', ['a', 'b'])).code).toBe(EXIT_USAGE);
-    expect((await runIn(dir, 'ping', ['--nope'])).code).toBe(EXIT_USAGE);
+    expect(await runIn(dir, 'ping', ['a', 'b'])).toEqual({
+      code: EXIT_USAGE,
+      stdout: '',
+      stderr: 'too many arguments: b\n',
+    });
+    expect(await runIn(dir, 'ping', ['--nope'])).toMatchObject({
+      code: EXIT_USAGE,
+      stderr: expect.stringMatching(/^Unknown option '--nope'/),
+    });
   });
 
   it('prints usage for --help without loading the entry', async () => {
@@ -96,9 +103,16 @@ describe('runCommand', () => {
       stderr: 'the cli entry has no handler for missing\n',
     });
     const noCreate = await probe(ALL, 'export const handlers = {};');
-    expect((await runIn(noCreate, 'ping')).stderr).toMatch(/does not export create\(ctx\)/);
+    expect(await runIn(noCreate, 'ping')).toEqual({
+      code: EXIT_FAILED,
+      stdout: '',
+      stderr: `${noCreate}/dist/cli/index.js does not export create(ctx)\n`,
+    });
     const bad = await tempPackage({ 'package.json': json({ name: 'x' }) });
-    expect((await runIn(bad, 'ping')).code).toBe(EXIT_FAILED);
+    expect(await runIn(bad, 'ping')).toMatchObject({
+      code: EXIT_FAILED,
+      stderr: expect.stringMatching(/^invalid agentage manifest in package\.json: version: /),
+    });
   });
 
   it('exits 1 saying to build first when the cli entry was never built', async () => {
@@ -108,7 +122,13 @@ describe('runCommand', () => {
       stderr: expect.stringMatching(/dist\/cli\/index\.js not found: build the package first/),
     });
     const brokenImport = await probe(ALL, "import './nope.js';\nexport const create = () => ({});");
-    expect((await runIn(brokenImport, 'ping')).stderr).toMatch(/nope\.js/);
+    expect(await runIn(brokenImport, 'ping')).toMatchObject({
+      code: EXIT_FAILED,
+      // Node's own one-line message, passed through (its spelling of the path varies by loader).
+      stderr: expect.stringMatching(
+        /^Cannot find module '\S*nope\.js' imported from \S+\/dist\/cli\/index\.js\n$/
+      ),
+    });
   });
 });
 

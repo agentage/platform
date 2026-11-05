@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import { fakeFetch, jsonResponse } from '../test-support/fetch.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { controlledTimeout, fakeFetch, jsonResponse } from '../test-support/fetch.js';
 import { DEV_ISSUER, resolveToken } from './token.js';
 
 const input = (hostname: string, answers: Response[], token?: string) => {
@@ -8,6 +8,8 @@ const input = (hostname: string, answers: Response[], token?: string) => {
   return { calls, warn, input: { id: 'probe', hostname, token, fetch, warn } };
 };
 
+afterEach(() => vi.restoreAllMocks());
+
 describe('resolveToken', () => {
   it('takes ?token= first, without calling the issuer', async () => {
     const { calls, input: args } = input('localhost', [], 'aga_query');
@@ -15,14 +17,16 @@ describe('resolveToken', () => {
     expect(calls).toHaveLength(0);
   });
 
-  it('asks the dev issuer for {id}:read on localhost and 127.0.0.1', async () => {
+  it('asks the dev issuer for {id}:read on localhost and 127.0.0.1, bounded at 5 s', async () => {
+    const { timeout, signal } = controlledTimeout();
     for (const hostname of ['localhost', '127.0.0.1']) {
       const { calls, input: args } = input(hostname, [jsonResponse({ token: 'aga_dev' })]);
       await expect(resolveToken(args)).resolves.toBe('aga_dev');
       expect(calls[0]?.url).toBe(DEV_ISSUER);
       expect(calls[0]?.init).toMatchObject({ method: 'POST', body: '{"scope":"probe:read"}' });
-      expect(calls[0]?.init.signal).toBeInstanceOf(AbortSignal);
+      expect(calls[0]?.init.signal).toBe(signal);
     }
+    expect(timeout.mock.calls).toEqual([[5_000], [5_000]]);
   });
 
   it('stays anonymous on a deployed host, without a warning', async () => {
@@ -33,11 +37,17 @@ describe('resolveToken', () => {
   });
 
   it('warns once and goes anonymous when the issuer is down or answers nonsense', async () => {
-    for (const answers of [[], [jsonResponse({}, 503)], [jsonResponse({ nope: 1 })]]) {
+    const failures: [Response[], string][] = [
+      [[], 'no more answers'],
+      [[jsonResponse({}, 503)], 'dev issuer answered 503'],
+      [[jsonResponse({ nope: 1 })], 'dev issuer answered without a token'],
+    ];
+    for (const [answers, reason] of failures) {
       const { warn, input: args } = input('localhost', answers);
       await expect(resolveToken(args)).resolves.toBeUndefined();
-      expect(warn).toHaveBeenCalledTimes(1);
-      expect(warn.mock.calls[0]?.[0]).toMatch(/no dev token .*calling anonymously/);
+      expect(warn.mock.calls).toEqual([
+        [`agentage harness: no dev token (${reason}), calling anonymously`],
+      ]);
     }
   });
 });
