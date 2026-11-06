@@ -122,7 +122,9 @@ describe('dev issuer', () => {
       expect(await status({ host }), host).toBe(204);
     for (const origin of ['http://localhost:4280', 'http://127.0.0.1:4280'])
       expect(await status({ origin }), origin).toBe(204);
-    for (const headers of [{ host: 'evil.example' }, { origin: 'https://evil.example' }] as const)
+    const lookalikes = ['http://localhost.evil.example', 'http://localhost:4280.evil.example'];
+    const refusedOrigins = ['https://evil.example', ...lookalikes].map((origin) => ({ origin }));
+    for (const headers of [{ host: 'evil.example' }, ...refusedOrigins])
       expect(await status(headers), JSON.stringify(headers)).toBe(403);
     expect(await status({ origin: 'http://localhost:3000' })).toBe(403);
     const refused = await fetch(`${url}/token`, { method: 'POST', headers: { origin: 'null' } });
