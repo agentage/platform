@@ -1,6 +1,5 @@
 import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { messageOf } from '../../log/log.js';
 import { hasPostgres } from '../../manifest/parts.js';
 import { sqlFiles } from '../../store/migrations.js';
 import { type CheckRule, type Finding } from '../check.js';
@@ -48,16 +47,11 @@ const dockerAnswers = (run: Run): Promise<boolean> =>
     () => false
   );
 
-const migrationFiles = (dir: string) =>
-  sqlFiles(join(dir, 'migrations')).catch((err: unknown) => {
-    throw new Error(messageOf(err).replace(join(dir, 'migrations'), 'migrations'));
-  });
-
 export const store: CheckRule = {
   name: 'store',
   run: async ({ dir, pkg, run, requireDocker }) => {
     if (!hasPostgres(pkg)) return { skipped: 'no store' };
-    const files = await migrationFiles(dir);
+    const files = await sqlFiles(join(dir, 'migrations'));
     const meta = await metaCommands(dir, files);
     if (files.length === 0 || meta.length > 0) return meta;
     if (!(await dockerAnswers(run)))
