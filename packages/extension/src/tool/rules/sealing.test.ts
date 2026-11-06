@@ -1,4 +1,4 @@
-import { mkdir, symlink, writeFile } from 'node:fs/promises';
+import { symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { API_MANIFEST, json, tempPackage } from '../../test-support/packages.js';
@@ -61,6 +61,7 @@ describe('sealing: part code never names process', () => {
     'this.process = 1;',
     'export const Note = () => <p>We process your data</p>;',
     "const note = 'We process your data';",
+    "const note = 'Stop the process.';",
     'const later = self.process(job);',
   ];
 
@@ -121,16 +122,19 @@ describe('sealing: part code never names process', () => {
     ]);
   });
 
-  it('refuses an installed dependency that carries an agentage manifest', async () => {
-    const deps = { '@agentage/extension': '^0.4.0', notes: '^2.0.0' };
-    const manifest = { ...API_MANIFEST, dependencies: deps, peerDependencies: { other: '^1' } };
-    const dir = await tempPackage({ 'package.json': json(manifest) });
-    await mkdir(join(dir, 'node_modules', 'notes'), { recursive: true });
-    await writeFile(join(dir, 'node_modules', 'notes', 'package.json'), json({ agentage: {} }));
-    await mkdir(join(dir, 'node_modules', '@agentage', 'extension'), { recursive: true });
-    await writeFile(join(dir, 'node_modules', '@agentage', 'extension', 'package.json'), json({}));
-    expect((await check(dir, { rules: [sealing] })).problems.map((p) => p.problem)).toEqual([
-      'depends on another extension, notes',
-    ]);
+  it('refuses an installed dependency, optional or peer, that carries an agentage manifest', async () => {
+    const dependencies = { '@agentage/extension': '^0.4.0', notes: '^2.0.0' };
+    const more = { optionalDependencies: { lists: '^1' }, peerDependencies: { other: '^1' } };
+    const extension = json({ agentage: {} });
+    const dir = await tempPackage({
+      'package.json': json({ ...API_MANIFEST, dependencies, ...more }),
+      'node_modules/@agentage/extension/package.json': json({}),
+      ...Object.fromEntries(
+        ['notes', 'lists', 'other'].map((n) => [`node_modules/${n}/package.json`, extension])
+      ),
+    });
+    expect((await check(dir, { rules: [sealing] })).problems.map((p) => p.problem)).toEqual(
+      ['notes', 'lists', 'other'].map((name) => `depends on another extension, ${name}`)
+    );
   });
 });
