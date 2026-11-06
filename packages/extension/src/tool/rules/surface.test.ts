@@ -95,6 +95,20 @@ export const create = () => {
     expect(await surfaceOf({ 'dist/api/index.js': code, 'openapi.json': json(doc) })).toEqual([]);
   });
 
+  it('reads the routes of an express() app too, and survives a null path item', async () => {
+    const app = `import express from 'express';
+export const create = () => {
+  const app = express();
+  app.get('/hidden', (_req, res) => res.json({}));
+  return app;
+};
+`;
+    const doc = { ...OPENAPI, paths: { '/api/v1/echo': null } };
+    expect(await surfaceOf({ 'dist/api/index.js': app, 'openapi.json': json(doc) })).toEqual([
+      'openapi.json differs from the generated contract (GET /api/v1/hidden)',
+    ]);
+  });
+
   it('needs the committed contract; leaves a part that does not load to entries', async () => {
     expect(await surfaceOf({ 'dist/api/index.js': API })).toEqual([
       'openapi.json is missing: the api part commits its contract',

@@ -43,11 +43,13 @@ describe('entries', () => {
     const dir = await tempPackage({
       ...rest,
       'dist/api/index.js': `${CREATE}\nexport const helper = 1;`,
+      'dist/worker/index.js': 'export const create = 42;',
       'dist/cli/index.js': 'export const x = 1;',
     });
     expect((await check(dir, only('entries'))).problems.map((p) => p.problem)).toEqual([
       'part api exports helper beside create',
       'dist/mcp/index.js not found: the package build must write the mcp part there',
+      'part worker create is not a function',
       'part cli does not export create',
     ]);
   });
@@ -67,13 +69,18 @@ describe('manifest', () => {
   it('names each schema issue and an image recipe; an invalid manifest stops every later rule', async () => {
     const bad = { ...SPEC_MANIFEST, agentage: { ...SPEC_MANIFEST.agentage, id: 'Probe!' } };
     const recipes = { Dockerfile: '', 'docker-compose.yaml': '', Containerfile: '' };
-    const report = await check(await tempPackage({ 'package.json': json(bad), ...recipes }));
+    const variants = { 'Dockerfile.dev': '', dockerfile: '', 'compose.override.yml': '' };
+    const files = { 'package.json': json(bad), ...recipes, ...variants, 'composer.json': '' };
+    const report = await check(await tempPackage(files));
     const recipe = 'is not allowed: the kit writes every image recipe';
     expect(report.problems).toEqual([
       { rule: 'manifest', problem: 'agentage.id: lowercase id, never a name the platform owns' },
       { rule: 'manifest', file: 'Containerfile', problem: recipe },
       { rule: 'manifest', file: 'Dockerfile', problem: recipe },
+      { rule: 'manifest', file: 'Dockerfile.dev', problem: recipe },
+      { rule: 'manifest', file: 'compose.override.yml', problem: recipe },
       { rule: 'manifest', file: 'docker-compose.yaml', problem: recipe },
+      { rule: 'manifest', file: 'dockerfile', problem: recipe },
     ]);
   });
 
@@ -81,7 +88,7 @@ describe('manifest', () => {
     const report = await check(await tempPackage({ 'package.json': '{ "name": ' }));
     expect(report.conforms).toBe(false);
     expect(report.problems.map((p) => [p.rule, p.problem.split(':')[0]])).toEqual([
-      ['manifest', expect.stringContaining('package.json is not valid JSON')],
+      ['manifest', 'package.json is not valid JSON'],
     ]);
   });
 });

@@ -33,24 +33,43 @@ describe('sealing: part code never names process', () => {
     ]);
   });
 
-  it('refuses any other use of process: destructuring, an alias, globalThis, the module', async () => {
-    expect(
-      await lines({
-        'src/api/a.ts': 'const { env } = process;\nconst { argv } = process;',
-        'src/api/b.ts': 'const p = process;\np.env;',
-        'src/api/c.ts': "const p = globalThis['process'];",
-        'src/api/d.mjs': "import { env } from 'node:process';\nconst q = await import('process');",
-        'src/api/e.cjs': "const { env } = require('node:process');",
-      })
-    ).toEqual([
-      'src/api/a.ts:1 names process',
-      'src/api/a.ts:2 names process',
-      'src/api/b.ts:1 names process',
-      'src/api/c.ts:1 names process',
-      'src/api/d.mjs:1 imports process',
-      'src/api/d.mjs:2 imports process',
-      'src/api/e.cjs:1 imports process',
-    ]);
+  // The reviewer's cases, both sides: process used as a value is refused, the bare word is not.
+  const VALUE_USES: [string, string][] = [
+    ['const { env } = process;', 'names process'],
+    ['const { argv } = process\n', 'names process'],
+    ['const p = process;', 'names process'],
+    ['use(process);', 'names process'],
+    ['const all = [process];', 'names process'],
+    ['const o = { a: process };', 'names process'],
+    ['use({ process });', 'names process'],
+    ['const v = process.version;', 'names process'],
+    ['const e = global.process.env;', 'reads process.env'],
+    ["const e = global['process'].env;", 'names process'],
+    ['const s = self.process;', 'names process'],
+    ["const p = globalThis['process'];", 'names process'],
+    ["import { env } from 'node:process';", 'imports process'],
+    ["const q = await import('process');", 'imports process'],
+    ["const { env } = require('node:process');", 'imports process'],
+  ];
+  const WORDS = [
+    'const o = { process: 1 };',
+    'const run = ({ process }) => 1;',
+    'export function run({ process }: Ctx) { return 1; }',
+    'function process(job) { return job; }',
+    'const { process } = ctx;',
+    'queue.process(job);',
+    'this.process = 1;',
+    'export const Note = () => <p>We process your data</p>;',
+    "const note = 'We process your data';",
+    'const later = self.process(job);',
+  ];
+
+  it.each(VALUE_USES)('refuses %j: %s', async (code, problem) => {
+    expect(await lines({ 'src/api/a.tsx': code })).toEqual([`src/api/a.tsx:1 ${problem}`]);
+  });
+
+  it.each(WORDS)('passes %j: the word, not the process value', async (code) => {
+    expect(await lines({ 'src/ui/a.tsx': code })).toEqual([]);
   });
 
   it('refuses listen() in any form and an absolute agentage URL as the probe test did', async () => {

@@ -25,18 +25,22 @@ const routeKeys = ({ path, stack }: Route): string[] =>
     return stack.flatMap(({ method }) => (method ? [`${method.toUpperCase()} ${at}`] : []));
   });
 
-// Express routes as OpenAPI keys; a sub-router hides its routes, so it never matches one.
+const stackOf = (router: unknown) => (router as { stack?: Layer[] } | null)?.stack;
+
+// Express routes (of a Router or an express() app) as OpenAPI keys; a sub-router hides its routes, so it never matches one.
 const servedRoutes = (router: unknown): string[] =>
-  ((router as { stack?: Layer[] } | null)?.stack ?? []).flatMap(({ name, route, handle }) => {
-    if (route) return routeKeys(route);
-    return handle?.stack ? [`${name} sub-router`] : [];
-  });
+  (stackOf(router) ?? stackOf((router as { router?: unknown } | null)?.router) ?? []).flatMap(
+    ({ name, route, handle }) => {
+      if (route) return routeKeys(route);
+      return handle?.stack ? [`${name} sub-router`] : [];
+    }
+  );
 
 const METHODS = new Set(['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace']);
 
 const operations = (doc: Json): [string, Json][] =>
   Object.entries((doc['paths'] ?? {}) as Record<string, Json>).flatMap(([path, ops]) =>
-    Object.entries(ops)
+    Object.entries(ops ?? {})
       .filter(([method]) => METHODS.has(method))
       .map(([method, op]): [string, Json] => [`${method.toUpperCase()} ${path}`, op as Json])
   );

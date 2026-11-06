@@ -12,13 +12,22 @@ const QUOTED = /'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"/g;
 
 type Pattern = [RegExp, (match: RegExpExecArray) => string];
 
-// extension-model section 9: ctx gives a part all it may read, so part code never names process.
+const QUOTE = '[\'"`]';
+const GLOBAL = String.raw`\b(?:globalThis|global|self)\s*`;
+// A value: read, passed, assigned or listed; not a key, a parameter or a name being declared.
+const VALUE = String.raw`(?=[ \t]*(?:[.[),;\]}]|\?\.|\n|$))(?![ \t]*\}?\s*\)\s*(?:=>|\{|:)|\s*\}\s*[:=](?![=>]))`;
+const PROCESS = String.raw`(?:${GLOBAL}\??\.\s*|(?<![.\w$:/-]|${QUOTE}))process\b${VALUE}`;
+
+// extension-model section 9: ctx gives a part all it may read, so part code never uses process.
 const ON_CODE: Pattern[] = [
   [
-    /(?:\bglobalThis\s*\??\.\s*|(?<![.\w$:'"`/-]))process\b(?:\s*(?:\?\.|\.|\[\s*['"`])\s*(env|argv)\b)?/g,
+    new RegExp(String.raw`${PROCESS}(?:\s*(?:\?\.|\.|\[\s*${QUOTE})\s*(env|argv)\b)?`, 'g'),
     (m) => (m[1] ? `reads process.${m[1]}` : 'names process'),
   ],
-  [/\bglobalThis\s*(?:\?\.)?\s*\[\s*['"`]process['"`]/g, () => 'names process'],
+  [
+    new RegExp(String.raw`${GLOBAL}(?:\?\.)?\s*\[\s*${QUOTE}process${QUOTE}`, 'g'),
+    () => 'names process',
+  ],
   [/\blisten\s*(?:\?\.\s*)?\(|\[\s*['"`]listen['"`]\s*\]/g, () => 'calls listen()'],
 ];
 const ON_STRINGS: Pattern[] = [

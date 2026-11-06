@@ -52,12 +52,14 @@ export interface CheckReport {
   skipped: Record<string, string>;
 }
 
-const RECIPE = /^(?:Dockerfile|Containerfile|(?:docker-)?compose\.ya?ml)$/;
+const RECIPE = /^(?:dockerfile|containerfile)(?:\..+)?$|^(?:docker-)?compose(?:\.[\w-]+)?\.ya?ml$/i;
 
 const manifest: CheckRule = {
   name: 'manifest',
   run: async ({ dir }) => {
-    const value = await readJsonIfExists(join(dir, 'package.json'));
+    const value = await readJsonIfExists(join(dir, 'package.json')).catch((err: unknown) => {
+      throw new Error(messageOf(err).replace(`${dir}/`, ''));
+    });
     const issues = PackageSchema.safeParse(value).error?.issues ?? [];
     const recipes = (await readdir(dir)).filter((file) => RECIPE.test(file)).sort();
     const recipe = 'is not allowed: the kit writes every image recipe';
@@ -77,8 +79,11 @@ const problemsOf = (work: Promise<unknown>): Promise<string[]> =>
   );
 
 const exportProblems = async (dir: string, pkg: ExtensionPackage, part: Part) => {
-  const names = Object.keys(await import(pathToFileURL(join(dir, entryOf(pkg, part))).href));
+  const mod = (await import(pathToFileURL(join(dir, entryOf(pkg, part))).href)) as object;
+  const names = Object.keys(mod);
   if (!names.includes('create')) return [`part ${part} does not export create`];
+  if (typeof (mod as { create: unknown }).create !== 'function')
+    return [`part ${part} create is not a function`];
   const others = names.filter((name) => name !== 'create');
   return others.length > 0 ? [`part ${part} exports ${others.join(', ')} beside create`] : [];
 };
