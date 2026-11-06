@@ -14,7 +14,7 @@ import { sealing } from './rules/sealing.js';
 import { store } from './rules/store.js';
 import { surface } from './rules/surface.js';
 import { KIT_VERSION } from './kit-version.js';
-import { assertBuilt } from './stage.js';
+import { assertBuilt, exists } from './stage.js';
 
 export interface CheckOptions {
   run?: Run;
@@ -46,10 +46,13 @@ export interface CheckReport {
 
 const RECIPE = /^(?:dockerfile|containerfile)(?:\..+)?$|^(?:docker-)?compose(?:\.[\w-]+)?\.ya?ml$/i;
 
+const NO_PACKAGE = 'is missing: run it in an extension package folder';
+
 const manifest: CheckRule = {
   name: 'manifest',
   run: async ({ dir }) => {
     const value = await readJsonIfExists(join(dir, 'package.json'));
+    if (value === undefined) return [{ file: 'package.json', problem: NO_PACKAGE }];
     const issues = PackageSchema.safeParse(value).error?.issues ?? [];
     const recipes = (await readdir(dir)).filter((file) => RECIPE.test(file)).sort();
     const recipe = 'is not allowed: the kit writes every image recipe';
@@ -63,7 +66,10 @@ const manifest: CheckRule = {
 type Part = ImagePartKind | 'cli';
 
 const exportProblem = async (dir: string, pkg: ExtensionPackage, part: Part) => {
-  const mod = (await import(pathToFileURL(join(dir, entryOf(pkg, part))).href)) as object;
+  const href = pathToFileURL(join(dir, entryOf(pkg, part))).href;
+  const mod = (await import(href).catch((err: unknown) => {
+    throw new Error(`part ${part} fails at import: ${messageOf(err)}`);
+  })) as object;
   const others = Object.keys(mod).filter((name) => name !== 'create');
   if (typeof (mod as { create?: unknown }).create !== 'function')
     return `part ${part} does not export create${'create' in mod ? ' as a function' : ''}`;
@@ -81,6 +87,8 @@ const partProblem = async ({ dir, pkg }: CheckInput, part: Part): Promise<string
 const entries: CheckRule = {
   name: 'entries',
   run: async (input) => {
+    if (!(await exists(join(input.dir, 'dist'))))
+      return [{ file: 'dist', problem: 'is missing: build the package first (npm run build)' }];
     const parts = Object.keys(normalizeParts(input.pkg.agentage.parts).code) as Part[];
     const found = parts.map((part) => partProblem(input, part).catch(messageOf));
     return (await Promise.all(found)).flatMap((problem) => (problem ? [{ problem }] : []));

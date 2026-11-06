@@ -66,6 +66,24 @@ describe('store', () => {
     ]);
   });
 
+  it('says the store image does not run when docker itself fails, and a run past its bound', async () => {
+    const pull = `Unable to find image 'postgres:18-alpine' locally\ndocker: Error response from daemon: manifest unknown\n\nRun 'docker run --help' for more information\n`;
+    const { report } = await storeOf(MIGRATIONS, { run: fakeDocker(0, 125, pull).run });
+    expect(report.problems).toEqual([
+      {
+        rule: 'store',
+        problem: 'postgres:18-alpine does not run: Error response from daemon: manifest unknown',
+      },
+    ]);
+    const hung: Run = async (_c, args) => {
+      if (args[0] === 'version') return { code: 0, stdout: '' };
+      throw new Error('docker run did not finish in 600 s');
+    };
+    expect((await storeOf(MIGRATIONS, { run: hung })).report.problems).toEqual([
+      { rule: 'store', problem: 'docker run did not finish in 600 s' },
+    ]);
+  });
+
   it('refuses a psql meta-command anywhere in a statement, and a bad file name, before docker', async () => {
     const docker = fakeDocker();
     const metas = [
