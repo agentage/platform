@@ -110,6 +110,7 @@ describe('composeFile', () => {
       command: ['node', 'node_modules/@agentage/extension/dist/tool/up/dev-issuer.js'],
       ports: ['127.0.0.1:4281:3000'],
       healthcheck: { start_period: '15s', start_interval: '1s' },
+      init: true,
     });
   });
 

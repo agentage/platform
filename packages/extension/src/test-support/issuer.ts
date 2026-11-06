@@ -2,7 +2,8 @@ import { type AddressInfo } from 'node:net';
 import { createIssuer, newKeys, type IssuerSettings } from '../tool/up/dev-issuer-app.js';
 
 export const AUDIENCE = '*.agentage.io';
-export const ORIGIN = 'https://probe.next.agentage.io';
+// http, as the test issuer is: an https origin needs an https issuer (part-auth.ts).
+export const ORIGIN = 'http://probe.next.agentage.io';
 
 export interface TestIssuer {
   url: string;

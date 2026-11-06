@@ -35,13 +35,15 @@ const settingsOf = (env: Env) => {
   const { origin, hostname } = new URL(parsed.data.AGENTAGE_ORIGIN);
   if (!covers(audience, hostname))
     throw new Error(`the host ${hostname} is not under the audience ${audience}`);
+  if (origin.startsWith('https:') && !issuer.startsWith('https:'))
+    throw new Error(`the issuer ${issuer} is not https under the origin ${origin}`);
   return { issuer, audience, origin };
 };
 
 // Keys and revoked list read once before the part serves; an issuer down at start is no stop.
 export const partAuth = async (env: Env, id: string, log: Log, scopes: string[]) => {
   const { issuer, audience, origin } = settingsOf(env);
-  const { keys, read } = remoteKeys(issuer);
+  const { keys, read, held } = remoteKeys(issuer);
   const revoked = createRevokedList(issuer, log);
   const unread = (err: unknown) => log.warn('key set not read', { reason: messageOf(err) });
   await Promise.all([read().catch(unread), revoked.refresh()]);
@@ -54,7 +56,7 @@ export const partAuth = async (env: Env, id: string, log: Log, scopes: string[])
       scopes_supported: scopes,
       bearer_methods_supported: ['header'],
     },
-    checks: { auth: revoked.check },
+    checks: { auth: async () => (held() ? revoked.check() : 'degraded') },
   };
 };
 
