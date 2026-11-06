@@ -1,6 +1,6 @@
 {
   "name": "@agentage/extension",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "The agentage extension kit: create(ctx) per part (pages, ui, api, mcp, worker, cli), the store, /health, discovery, the envelope, and the build tool with up and token",
   "type": "module",
   "license": "MIT",
@@ -44,7 +44,8 @@
     "build": "tsc -b",
     "schemas": "node dist/schemas/write-schemas.js schemas",
     "verify": "npm run verify --prefix ../..",
-    "prepublishOnly": "npm run verify"
+    "prepublishOnly": "npm run verify",
+    "check:fixtures": "vitest run --root ../.. --reporter=tree packages/extension/src/tool/check.fixtures.test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.4.0",
@@ -52,6 +53,7 @@
     "helmet": "^8.1.0",
     "jose": "^6.2.15",
     "pg": "^8.23.1",
+    "semver": "^7.8.6",
     "zod": "^4.2.0"
   },
   "peerDependencies": {

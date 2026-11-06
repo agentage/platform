@@ -24,6 +24,6 @@ describe('tool entry', () => {
   it('loads no server dependency', () => {
     const graph = [...reachable(join(SRC, 'tool', 'index.ts'))];
     const external = graph.filter((spec) => !spec.startsWith('/'));
-    expect(external.filter((spec) => !spec.startsWith('node:')).sort()).toEqual(['zod']);
+    expect(external.filter((spec) => !spec.startsWith('node:')).sort()).toEqual(['semver', 'zod']);
   });
 });

@@ -18,28 +18,38 @@ const WidgetsSchema = z.array(WidgetSchema).min(1);
 
 const noStore: Store = {
   query: async () => {
-    throw new Error('the store is not open while the build lists tools');
+    throw new Error('the store is not open while the tool reads a part');
   },
 };
 
-const silent = createLog({ extension: 'build', part: 'mcp' }, () => undefined);
+const silent = createLog({ extension: 'build', part: 'check' }, () => undefined);
 
-// The tools the mcp part registers and their scopes, read by running its create(ctx) on a recorder.
-export const toolsOf = async (dir: string, pkg: ExtensionPackage) => {
-  const registry = createToolRegistry();
-  const base = createContext({
+// The ctx part code gets when the tool runs its create(ctx) to read what it registers or routes.
+export const recordingContext = (pkg: ExtensionPackage, part: 'api' | 'mcp') =>
+  createContext({
     pkg,
-    part: 'mcp',
+    part,
     origin: 'http://127.0.0.1',
     commit: '0'.repeat(40),
     log: silent,
     store: noStore,
   });
-  await (
-    await loadCreate<McpContext>(dir, pkg, 'mcp')
-  )({ ...base, tool: registry.tool });
+
+// The tools an mcp part's create(ctx) registers, run on a recorder.
+export const registeredTools = async (
+  create: (ctx: McpContext) => unknown,
+  pkg: ExtensionPackage
+) => {
+  const registry = createToolRegistry();
+  await create({ ...recordingContext(pkg, 'mcp'), tool: registry.tool });
+  return registry.tools;
+};
+
+// The tools the mcp part registers and their scopes, for the record.
+export const toolsOf = async (dir: string, pkg: ExtensionPackage) => {
+  const tools = await registeredTools(await loadCreate<McpContext>(dir, pkg, 'mcp'), pkg);
   const { id } = pkg.agentage;
-  return registry.tools.map((tool) => ({
+  return tools.map((tool) => ({
     name: prefixed(id, tool.name),
     scope: scopeOf(id, tool.spec.scope),
   }));

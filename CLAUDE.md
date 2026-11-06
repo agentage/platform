@@ -26,7 +26,9 @@ security, backend); this file only adds what the tree does not say.
 - `store/` the pg pool, migrations and seeds, the migrate entry `dist/store/migrate.js`, the
   in-process test store (PGlite, an optional peer)
 - `pages/`, `ui/` the static page helper and the ui file server; `command/` the cli part runner
-- `tool/` build, the per-part stage and recipe, the record extras, `up/` (compose, gateway,
+- `tool/` build, `check.ts` and `rules/` (the six conformance rules; `fixtures/` holds one
+  base package and one overlay per rule, `npm run check:fixtures`), the per-part stage and recipe,
+  the record extras, `up/` (compose, gateway,
   dev issuer, wait, down, token); exported as `@agentage/extension/tool`; it must not import the
   server stack (`tool-imports.test.ts` guards it, the cli loads it)
 - `index.test.ts` pins both public surfaces (sealing)

@@ -37,14 +37,19 @@ const fakes = () => {
   return { run, docker, commands, options, order, builds, pushes };
 };
 
-const probeDir = (manifest: object = { ...API_MANIFEST, scripts: { build: 'tsc' } }) =>
+const probeDir = (
+  manifest: object = { ...API_MANIFEST, scripts: { build: 'tsc' } },
+  files: Record<string, string> = {}
+) =>
   tempPackage({
+    ...files,
     'package.json': json({
       ...manifest,
       repository: 'git+https://github.com/agentage/extension-probe.git',
     }),
     'package-lock.json': json({ lockfileVersion: 3 }),
     'dist/api/index.js': 'export const create = () => null;',
+    'openapi.json': json({ openapi: '3.1.0', info: { version: '0.1.0' }, paths: {} }),
   });
 
 describe('build', () => {
@@ -107,6 +112,16 @@ describe('build', () => {
     await expect(build({ dir: full, env: ENV }, f)).rejects.toThrow(
       'dist/pages/index.js not found: the package build must write the pages part there'
     );
+  });
+
+  it('a sealing break stops it with the check message before any docker call', async () => {
+    const sealed = `${'// line\n'.repeat(6)}const prefix = process.env['ECHO_PREFIX'];\n`;
+    const dir = await probeDir(undefined, { 'src/api/index.ts': sealed });
+    const f = fakes();
+    await expect(build({ dir, env: ENV }, { run: f.run, docker: f.docker })).rejects.toThrow(
+      /^check failed: sealing: src\/api\/index.ts:7 reads process.env$/
+    );
+    expect(f.order).toEqual(['npm']);
   });
 
   it('names images ghcr.io/agentage/{id}-{part}:{version}', () => {

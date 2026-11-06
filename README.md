@@ -81,9 +81,10 @@ node packages/extension/dist/tool/cli.js down [--keep-data]
 node packages/extension/dist/tool/cli.js token --scope probe:read
 ```
 
-`build` validates the manifest, runs the package's `npm run build`, runs the check rules
-(`tool/check.ts`: today `entries`, every image part built and the cli handlers equal to the
-commands; M4 adds the rest of conformance there), then builds one image per part
+`build` validates the manifest, runs the package's `npm run build`, runs the six check rules
+(`tool/check.ts`, `tool/rules/`: manifest, entries, surface, stack, store, sealing; any problem
+stops it before an image; `npm run check:fixtures` shows one fixture refused per rule), then
+builds one image per part
 (pages, ui, api, mcp, worker) from the kit recipe (multi-stage `node:26-alpine`, `npm ci
 --omit=dev`, `USER node`, `COMMIT_SHA`/`BUILD_TIME`, a `HEALTHCHECK` on `127.0.0.1`), tagged
 `ghcr.io/agentage/{id}-{part}:{version}` with the OCI revision and created labels. Each image
@@ -102,8 +103,8 @@ while another copy holds 4280 or 4281 (naming it), and on a kept volume the stor
 store volume). `token` mints a dev token (`aga_` + EdDSA JWT, `{id}:{verb}` scopes, 1 hour) that the
 parts of `up` check like a deployment's; the issuer also takes `ttlSeconds`, `aud` and
 `POST /revoke { jti }`. Every docker, git and npm call has a timeout (`tool/timeouts.ts`); none retries, and
-a re-run is safe. The cli runs the same code as `agentage extension build|up|down|token` through
-`@agentage/extension/tool`, plus `runCommand` and `checkCli` for installed commands.
+a re-run is safe. The cli runs the same code as `agentage extension check|build|up|down|token`
+through `@agentage/extension/tool`, plus `runCommand` and `checkCli` for installed commands.
 
 ## Run a part image
 
