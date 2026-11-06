@@ -17,8 +17,8 @@ jobs:
   verify:
     name: Verify
     runs-on: ubuntu-latest
-    # Every outbound call has its own bound; this one catches a hung runner or registry.
-    timeout-minutes: 30
+    # The gate stays under 10 minutes (about 3 on 2026-11-07); slower is a regression.
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -102,7 +102,7 @@ jobs:
   widget-screenshots:
     name: Widget screenshots
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     container:
       image: mcr.microsoft.com/playwright:v1.64.1-noble
       options: --user 1001
