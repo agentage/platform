@@ -7,7 +7,7 @@ import { type ExtensionPackage } from '../manifest/manifest.schema.js';
 export const SPEC_MANIFEST = {
   name: '@agentage/extension-probe',
   version: '0.1.0',
-  engines: { agentage: '^0.1' },
+  engines: { agentage: '^0.4' },
   agentage: {
     id: 'probe',
     parts: {
@@ -28,7 +28,7 @@ export const SPEC_MANIFEST = {
 export const API_MANIFEST: ExtensionPackage = {
   name: '@agentage/extension-probe',
   version: '0.1.0',
-  engines: { agentage: '^0.1.0' },
+  engines: { agentage: '^0.4.0' },
   agentage: { id: 'probe', parts: { api: true } },
 };
 

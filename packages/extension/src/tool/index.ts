@@ -9,7 +9,8 @@ export {
   type BuildResult,
   type BuiltImage,
 } from './build.js';
-export { buildLines } from './format.js';
+export { check, type CheckProblem, type CheckReport } from './check.js';
+export { buildLines, checkLines } from './format.js';
 export { KIT_VERSION } from './kit-version.js';
 export { down, type DownOptions, type DownResult } from './up/down.js';
 export { token, type TokenOptions } from './up/token.js';

@@ -9,7 +9,7 @@ const SERVICES = ['pages', 'ui', 'api', 'mcp', 'worker', 'gateway', 'issuer', 's
 export const PROBE = {
   ...SPEC_MANIFEST,
   version: '0.2.0',
-  engines: { agentage: '^0.2' },
+  engines: { agentage: '^0.4' },
   scripts: { build: 'tsc' },
   agentage: {
     ...SPEC_MANIFEST.agentage,
@@ -43,11 +43,30 @@ const PROBE_FILES = {
   'seeds/001-hello.sql': 'insert into ticks values (1);',
 };
 
+const SCHEMA = { $schema: 'https://json-schema.org/draft/2020-12/schema', type: 'object' };
+const ECHO = {
+  name: 'probe__echo',
+  description: 'Echo',
+  inputSchema: { ...SCHEMA, properties: {} },
+  outputSchema: { ...SCHEMA, properties: {}, additionalProperties: false },
+};
+
+// The committed contracts the surface rule compares with what the fixture parts serve.
+const contracts = (version: string) => ({
+  'openapi.json': json({ openapi: '3.1.0', info: { title: 'probe', version }, paths: {} }),
+  'probe.mcpc.json': json({ serverInfo: { name: 'agentage-probe', version }, tools: [ECHO] }),
+});
+
 export const probeDir = async (
-  manifest: object = PROBE,
+  manifest: { version: string; [key: string]: unknown } = PROBE,
   cli = "export const create = ({ out }) => ({ ping: () => out.log('pong') });"
 ) => {
-  const files = { 'package.json': json(manifest), ...PROBE_FILES, 'dist/cli/index.js': cli };
+  const files = {
+    'package.json': json(manifest),
+    ...PROBE_FILES,
+    ...contracts(manifest.version),
+    'dist/cli/index.js': cli,
+  };
   const dir = await tempPackage(files);
   await linkModules(dir);
   return dir;

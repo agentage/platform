@@ -1,0 +1,10 @@
+import { Router } from 'express';
+
+// Plain JavaScript in a .ts file: the fixture build copies it to dist/api/index.js.
+export const make = () => {
+  const router = Router();
+  router.get('/echo', (req, res) => {
+    res.json({ success: true, data: { msg: String(req.query['msg']) } });
+  });
+  return router;
+};

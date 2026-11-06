@@ -130,7 +130,7 @@ export const build = async (
   const pkg = await readManifest(dir);
   const info = await resolveBuildInfo(dir, options.env ?? process.env, deps.run);
   await compile(dir, pkg, deps.run);
-  await assertConforms({ dir, pkg });
+  await assertConforms(dir, { run: deps.run });
   const images = await buildParts({ dir, pkg, info }, options, deps);
   const result: BuildResult = { id: pkg.agentage.id, version: pkg.version, ...info, images };
   if (!options.push) return result;
