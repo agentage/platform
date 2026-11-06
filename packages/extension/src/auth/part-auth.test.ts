@@ -60,6 +60,13 @@ describe('the start rule', () => {
         /AGENTAGE_AUDIENCE/
       );
   });
+
+  it('under an https origin the issuer is https too', async () => {
+    const origin = { AGENTAGE_ORIGIN: 'https://probe.next.agentage.io' };
+    await expect(auth(origin)).rejects.toThrow(
+      `the issuer ${issuer.url} is not https under the origin https://probe.next.agentage.io`
+    );
+  });
 });
 
 describe('the token check of a part', () => {
@@ -83,6 +90,38 @@ describe('the token check of a part', () => {
     const { log, lines } = recordedLog();
     await partAuth(authEnv(issuer, dir), 'probe', log, []);
     expect(lines.filter((line) => line['msg'] === 'key set not read')).toHaveLength(1);
+  });
+
+  it('auth is degraded while no key set is held, though the revoked list was read', async () => {
+    const real = globalThis.fetch;
+    const reads = vi.spyOn(globalThis, 'fetch');
+    reads.mockImplementation((input, init) =>
+      String(input).endsWith('/jwks.json')
+        ? Promise.reject(new TypeError('fetch failed'))
+        : real(input, init)
+    );
+    const { tokenCheck, checks } = await auth();
+    expect(await checks.auth()).toBe('degraded');
+    reads.mockImplementation(real);
+    const bearer = await issuer.bearer({ scope: 'probe:read' });
+    expect(await statusOf(tokenCheck(bearer, 'read'))).toBe(200);
+    expect(await checks.auth()).toBe('ok');
+  });
+
+  it('a key set missed at start is read again by the 30 s poll, with no request', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval'] });
+    const real = globalThis.fetch;
+    const reads = vi.spyOn(globalThis, 'fetch');
+    reads.mockImplementation((input, init) =>
+      String(input).endsWith('/jwks.json')
+        ? Promise.reject(new TypeError('fetch failed'))
+        : real(input, init)
+    );
+    const { checks } = await auth();
+    expect(await checks.auth()).toBe('degraded');
+    reads.mockImplementation(real);
+    vi.advanceTimersByTime(REVOKED_POLL_MS);
+    await expect.poll(() => checks.auth()).toBe('ok');
   });
 
   it('until the revoked list is read, a token with a jti is 503 and auth is degraded', async () => {

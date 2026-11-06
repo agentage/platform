@@ -52,7 +52,8 @@ export const remoteKeys = (issuer: string) => {
     timeoutDuration: 3000,
     cacheMaxAge: Infinity,
   });
-  return { keys: keysOrOutage(set), read: () => retryOnce(set.reload) };
+  const held = () => set.jwks() !== undefined;
+  return { keys: keysOrOutage(set), read: () => retryOnce(set.reload), held };
 };
 
 const claimsOf = async (authorization: string, deps: TokenCheckDeps) => {

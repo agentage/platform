@@ -71,6 +71,7 @@ const fixedServices = (input: ComposeInput, anyImage: string) => ({
     command: ['node', ISSUER_ENTRY],
     ports: [`127.0.0.1:${ISSUER_PORT}:${PART_PORT}`],
     healthcheck: { start_period: '15s', start_interval: '1s' }, // the image's test, each second
+    init: true, // node as PID 1 ignores SIGTERM: without it every stop waits 10 s
   },
 });
 

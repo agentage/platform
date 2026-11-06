@@ -50,7 +50,7 @@ describe('runPart', () => {
       BUILD_TIME: '2026-11-03T20:00:00Z',
       AGENTAGE_RECORD_FILE: `${dir}/record.json`,
       AGENTAGE_ORIGIN: 'https://probe.next.agentage.io',
-      AGENTAGE_ISSUER: 'http://127.0.0.1:9',
+      AGENTAGE_ISSUER: 'https://127.0.0.1:9',
       AGENTAGE_AUDIENCE: '*.agentage.io',
     };
     server = await runPart({
