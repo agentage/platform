@@ -1,5 +1,5 @@
 import { readdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import semver from 'semver';
 import { checkCli } from '../command/check-cli.js';
@@ -66,7 +66,7 @@ const exportProblem = async (dir: string, pkg: ExtensionPackage, part: Part) => 
   const mod = (await import(pathToFileURL(join(dir, entryOf(pkg, part))).href)) as object;
   const others = Object.keys(mod).filter((name) => name !== 'create');
   if (typeof (mod as { create?: unknown }).create !== 'function')
-    return `part ${part} does not export create`;
+    return `part ${part} does not export create${'create' in mod ? ' as a function' : ''}`;
   if (others.length > 0) return `part ${part} exports ${others.join(', ')} beside create`;
   const cli = part === 'cli' ? await checkCli(dir) : null;
   return cli && `cli part: ${cli}`;
@@ -122,8 +122,9 @@ export const RULES: readonly CheckRule[] = [manifest, entries, surface, stack, s
 const runRule = (rule: CheckRule, input: CheckInput) =>
   rule.run(input).catch((err) => [{ problem: messageOf(err).replace(`${input.dir}/`, '') }]);
 
-export const check = async (dir: string, options: CheckOptions = {}): Promise<CheckReport> => {
+export const check = async (at: string, options: CheckOptions = {}): Promise<CheckReport> => {
   const { rules = RULES, run = runCommand } = options;
+  const dir = resolve(at);
   const read = readJsonIfExists(join(dir, 'package.json')).catch(() => ({}));
   const pkg = ((await read) ?? {}) as ExtensionPackage;
   const problems: CheckProblem[] = [];

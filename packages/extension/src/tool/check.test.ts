@@ -1,3 +1,4 @@
+import { relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { json, SPEC_MANIFEST, tempPackage } from '../test-support/packages.js';
 import { assertConforms, check, RULES, type CheckOptions } from './check.js';
@@ -49,7 +50,7 @@ describe('entries', () => {
     expect((await check(dir, only('entries'))).problems.map((p) => p.problem)).toEqual([
       'part api exports helper beside create',
       'dist/mcp/index.js not found: the package build must write the mcp part there',
-      'part worker does not export create',
+      'part worker does not export create as a function',
       'part cli does not export create',
     ]);
   });
@@ -90,6 +91,24 @@ describe('manifest', () => {
     expect(report.problems.map((p) => [p.rule, p.problem.split(':')[0]])).toEqual([
       ['manifest', 'package.json is not valid JSON'],
     ]);
+  });
+});
+
+describe('problem paths', () => {
+  it('name files relative to the package for a ./dir and a dir/ too', async () => {
+    const bad = await tempPackage({ 'package.json': '{ "name": ' });
+    const stray = { 'package.json': json(SPEC_MANIFEST), 'migrations/stray.txt': '' };
+    const store = await tempPackage(stray);
+    const forms = (dir: string) => [`./${relative(process.cwd(), dir)}`, `${dir}/`];
+    for (const dir of forms(bad)) {
+      const [found] = (await check(dir)).problems;
+      expect(found?.problem).toMatch(/^package\.json is not valid JSON/);
+    }
+    for (const dir of forms(store)) {
+      expect((await check(dir, only('store'))).problems).toEqual([
+        { rule: 'store', problem: 'migrations: not NNN-name.sql: stray.txt' },
+      ]);
+    }
   });
 });
 
