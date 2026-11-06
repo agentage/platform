@@ -8,7 +8,7 @@ export interface ToolSpec<I extends ObjectSchema, O extends ObjectSchema> {
   description: string;
   input: I;
   output: O;
-  // What tools/call needs once tokens are on: {id}:{scope}, or public; read when left out.
+  // What tools/call needs: {id}:{scope}, or public; read when left out.
   scope?: Access;
 }
 

@@ -91,7 +91,7 @@ describe('composeFile', () => {
     expect(services['ui']?.['environment']).toMatchObject({
       AGENTAGE_DEV_ISSUER: 'http://localhost:4281',
     });
-    expect(services['ui']).not.toHaveProperty('depends_on');
+    expect(services['ui']?.['depends_on']).toEqual({});
     for (const part of ['pages', 'worker'])
       expect(services[part]?.['depends_on'], part).toEqual({ store: HEALTHY });
     for (const part of ['api', 'mcp'])
@@ -109,6 +109,7 @@ describe('composeFile', () => {
       image: TAGS['pages'],
       command: ['node', 'node_modules/@agentage/extension/dist/tool/up/dev-issuer.js'],
       ports: ['127.0.0.1:4281:3000'],
+      healthcheck: { start_period: '15s', start_interval: '1s' },
     });
   });
 

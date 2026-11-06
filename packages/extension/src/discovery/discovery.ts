@@ -29,7 +29,7 @@ const partsOf = (pkg: ExtensionPackage, images: PartImages, migrations?: number)
   return parts as ExtensionRecord['parts'];
 };
 
-// From the manifest, the build, the images by digest and what the code serves; OpenAPI comes later.
+// From the manifest, the build, the images by digest and what the code serves.
 export const recordOf = (
   pkg: ExtensionPackage,
   build: BuildInfo,
