@@ -33,7 +33,7 @@ const testPackage = (
 ): ExtensionPackage => ({
   name: `@agentage/extension-${ctx.extension.id}`,
   version: ctx.extension.version,
-  engines: { agentage: '^0.2.0' },
+  engines: { agentage: '^0.3.0' },
   agentage: { id: ctx.extension.id, parts },
 });
 

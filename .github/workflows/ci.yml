@@ -92,7 +92,7 @@ jobs:
           scripts/image-smoke.sh "$GITHUB_SHA"
           curl -sf http://localhost:4280/.well-known/agentage-extension.json > /tmp/discovery.json
           node --input-type=module -e "import { DiscoveryDocumentSchema } from '@agentage/extension'; import { readFileSync } from 'node:fs'; DiscoveryDocumentSchema.parse(JSON.parse(readFileSync('/tmp/discovery.json', 'utf8'))); console.log('PASS discovery valid')"
-          npx playwright install --with-deps chromium
+          npx playwright install chromium
           npm run test:e2e
 
       - name: Container logs on failure

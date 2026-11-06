@@ -105,9 +105,8 @@ const revokedList = ({ revoked }: Issuer) => {
 const ORIGINS = ['localhost', '127.0.0.1'].map((host) => `http://${host}:${GATEWAY_PORT}`);
 const allowed = ({ settings }: Issuer, req: IncomingMessage) => {
   const host = (req.headers.host ?? '').replace(/:[0-9]+$/, '');
-  const origin = req.headers.origin;
   const hosts = ['localhost', '127.0.0.1', new URL(settings.issuer).hostname];
-  return hosts.includes(host) && (origin === undefined || ORIGINS.includes(origin));
+  return hosts.includes(host) && [undefined, ...ORIGINS].includes(req.headers.origin);
 };
 
 const route = (issuer: Issuer, req: IncomingMessage, res: ServerResponse) => {

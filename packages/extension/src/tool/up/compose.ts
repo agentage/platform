@@ -24,12 +24,11 @@ const STORE_PASSWORD = 'agentage-local';
 
 const storeUrl = (id: string): string => `postgres://${id}:${STORE_PASSWORD}@store:5432/${id}`;
 
-const TOKENS = { AGENTAGE_ISSUER: UP_ISSUER, AGENTAGE_AUDIENCE: DEV_AUDIENCE };
-
 // Only the ui under `up` names the dev issuer: its CSP then lets the harness ask it for a token.
 const partEnv = (pkg: ExtensionPackage, part: ImagePartKind | 'migrate') => ({
   AGENTAGE_ORIGIN: `http://localhost:${GATEWAY_PORT}`,
-  ...TOKENS,
+  AGENTAGE_ISSUER: UP_ISSUER,
+  AGENTAGE_AUDIENCE: DEV_AUDIENCE,
   AGENTAGE_RECORD_FILE: RECORD_TARGET,
   ...(hasPostgres(pkg) && part !== 'ui' ? { AGENTAGE_STORE_URL: storeUrl(pkg.agentage.id) } : {}),
   ...(part === 'ui' ? { AGENTAGE_DEV_ISSUER: DEV_ISSUER } : {}),
@@ -41,10 +40,7 @@ const storeService = (id: string) => ({
   image: STORE_IMAGE,
   environment: { POSTGRES_USER: id, POSTGRES_PASSWORD: STORE_PASSWORD, POSTGRES_DB: id },
   volumes: ['store:/var/lib/postgresql'],
-  healthcheck: {
-    test: ['CMD-SHELL', `pg_isready -U ${id} -d ${id}`],
-    ...QUICK_CHECK,
-  },
+  healthcheck: { test: ['CMD-SHELL', `pg_isready -U ${id} -d ${id}`], ...QUICK_CHECK },
 });
 
 const HEALTHY = { condition: 'service_healthy' };
@@ -55,15 +51,12 @@ const dependsOn = (pkg: ExtensionPackage, part: ImagePartKind) => ({
   ...(part === 'api' || part === 'mcp' ? { issuer: HEALTHY } : {}),
 });
 
-const partService = (input: ComposeInput, part: ImagePartKind) => {
-  const depends_on = dependsOn(input.pkg, part);
-  return {
-    image: input.tags[part],
-    environment: partEnv(input.pkg, part),
-    volumes: [`${input.recordFile}:${RECORD_TARGET}:ro`],
-    ...(Object.keys(depends_on).length > 0 ? { depends_on } : {}),
-  };
-};
+const partService = (input: ComposeInput, part: ImagePartKind) => ({
+  image: input.tags[part],
+  environment: partEnv(input.pkg, part),
+  volumes: [`${input.recordFile}:${RECORD_TARGET}:ro`],
+  depends_on: dependsOn(input.pkg, part),
+});
 
 const fixedServices = (input: ComposeInput, anyImage: string) => ({
   gateway: {
@@ -71,15 +64,13 @@ const fixedServices = (input: ComposeInput, anyImage: string) => ({
     command: TRAEFIK_COMMAND,
     ports: [`127.0.0.1:${GATEWAY_PORT}:80`],
     volumes: [`${input.gatewayFile}:/etc/traefik/dynamic.yml:ro`],
-    healthcheck: {
-      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8082/ping'],
-      ...QUICK_CHECK,
-    },
+    healthcheck: { test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8082/ping'], ...QUICK_CHECK },
   },
   issuer: {
     image: anyImage,
     command: ['node', ISSUER_ENTRY],
     ports: [`127.0.0.1:${ISSUER_PORT}:${PART_PORT}`],
+    healthcheck: { start_period: '15s', start_interval: '1s' }, // the image's test, each second
   },
 });
 

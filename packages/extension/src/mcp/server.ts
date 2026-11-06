@@ -12,8 +12,7 @@ export interface ServerIdentity {
 
 const text = (value: string) => [{ type: 'text' as const, text: value }];
 
-// A failed tool is isError with the REST error shape; anything unexpected is a generic INTERNAL.
-// Outside a request (no agcid in scope) the error still carries a valid one, minted here.
+// A failed tool: isError, the REST error shape, an agcid (minted outside a request); else INTERNAL.
 const errorResult = (err: unknown, log: Log) => {
   const failure: Failure = isFailure(err) ? err : fail('INTERNAL', 'Internal error');
   if (failure.status >= 500) log.error(err);
