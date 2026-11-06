@@ -35,7 +35,6 @@ export const recordingContext = (pkg: ExtensionPackage, part: 'api' | 'mcp') =>
     store: noStore,
   });
 
-// The tools an mcp part's create(ctx) registers, run on a recorder.
 export const registeredTools = async (
   create: (ctx: McpContext) => unknown,
   pkg: ExtensionPackage
@@ -45,7 +44,6 @@ export const registeredTools = async (
   return registry.tools;
 };
 
-// The tools the mcp part registers and their scopes, for the record.
 export const toolsOf = async (dir: string, pkg: ExtensionPackage) => {
   const tools = await registeredTools(await loadCreate<McpContext>(dir, pkg, 'mcp'), pkg);
   const { id } = pkg.agentage;

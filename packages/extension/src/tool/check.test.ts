@@ -3,6 +3,7 @@ import { json, SPEC_MANIFEST, tempPackage } from '../test-support/packages.js';
 import { assertConforms, check, RULES, type CheckOptions } from './check.js';
 import { type Run } from './exec.js';
 import { checkLines } from './format.js';
+import { KIT_VERSION } from './kit-version.js';
 
 const CREATE = 'export const create = () => null;';
 const BUILT = {
@@ -65,57 +66,83 @@ describe('entries', () => {
 describe('manifest', () => {
   it('names each schema issue and an image recipe; an invalid manifest stops every later rule', async () => {
     const bad = { ...SPEC_MANIFEST, agentage: { ...SPEC_MANIFEST.agentage, id: 'Probe!' } };
-    const report = await check(await tempPackage({ 'package.json': json(bad), Dockerfile: '' }));
+    const recipes = { Dockerfile: '', 'docker-compose.yaml': '', Containerfile: '' };
+    const report = await check(await tempPackage({ 'package.json': json(bad), ...recipes }));
+    const recipe = 'is not allowed: the kit writes every image recipe';
     expect(report.problems).toEqual([
-      {
-        rule: 'manifest',
-        problem: 'agentage.id: lowercase id, never a name the platform owns',
-      },
-      {
-        rule: 'manifest',
-        file: 'Dockerfile',
-        problem: 'is not allowed: the kit writes every image recipe',
-      },
+      { rule: 'manifest', problem: 'agentage.id: lowercase id, never a name the platform owns' },
+      { rule: 'manifest', file: 'Containerfile', problem: recipe },
+      { rule: 'manifest', file: 'Dockerfile', problem: recipe },
+      { rule: 'manifest', file: 'docker-compose.yaml', problem: recipe },
+    ]);
+  });
+
+  it('a package.json that is not JSON is a manifest problem, not a crash', async () => {
+    const report = await check(await tempPackage({ 'package.json': '{ "name": ' }));
+    expect(report.conforms).toBe(false);
+    expect(report.problems.map((p) => [p.rule, p.problem.split(':')[0]])).toEqual([
+      ['manifest', expect.stringContaining('package.json is not valid JSON')],
     ]);
   });
 });
 
 describe('stack', () => {
-  const stackOf = async (dependencies: Record<string, string>) => {
-    const pkg = { ...SPEC_MANIFEST, engines: { agentage: '^0.4' }, dependencies };
+  const stackOf = async (dependencies: Record<string, string>, agentage = '^0.4') => {
+    const pkg = { ...SPEC_MANIFEST, engines: { agentage }, dependencies };
     const dir = await tempPackage({ 'package.json': json(pkg) });
     return (await check(dir, only('stack'))).problems.map((p) => p.problem);
   };
 
-  it('needs express 5, zod 4, the MCP SDK 2 and a kit inside engines.agentage', async () => {
+  it('needs express 5, zod 4, the MCP SDK 2 and a kit range inside engines.agentage', async () => {
     const good = { express: '^5.1.0', zod: '^4.2.0', '@agentage/extension': '^0.4.1' };
     expect(await stackOf(good)).toEqual([]);
-    const old = { express: '>=4', zod: '^3.23.0', '@modelcontextprotocol/server': '^1.20.0' };
+    const old = { express: '>=4', zod: '^3.23.0', '@modelcontextprotocol/server': '>=1' };
     expect(await stackOf({ ...old, '@agentage/extension': '^0.5.0' })).toEqual([
       'express >=4, needs ^5',
       'zod ^3.23.0, needs ^4',
-      '@modelcontextprotocol/server ^1.20.0, needs ^2',
+      '@modelcontextprotocol/server >=1, needs ^2',
       '@agentage/extension ^0.5.0, needs ^0.4',
     ]);
   });
 
-  it('does not judge a spec that is no semver range, such as a local tarball', async () => {
+  it('refuses a spec that is no version range, and the MCP SDK 1 package by name', async () => {
+    const specs = {
+      express: 'file:vendor/express-4.tgz',
+      zod: 'npm:zod@3',
+      '@agentage/extension': 'latest',
+    };
     expect(
-      await stackOf({ '@agentage/extension': 'file:.kit/agentage-extension-0.4.0.tgz' })
-    ).toEqual([]);
+      await stackOf({
+        ...specs,
+        '@modelcontextprotocol/server': '',
+        '@modelcontextprotocol/sdk': '^1.20.0',
+      })
+    ).toEqual([
+      'express file:vendor/express-4.tgz needs a version range',
+      'zod npm:zod@3 needs a version range',
+      '@modelcontextprotocol/server "" needs a version range',
+      '@agentage/extension latest needs a version range',
+      '@modelcontextprotocol/sdk is MCP SDK 1: use @modelcontextprotocol/server ^2',
+    ]);
+  });
+
+  it('needs the running kit inside engines.agentage; a file: kit tarball is not judged', async () => {
+    expect(await stackOf({}, '^0.3')).toEqual([
+      `kit ${KIT_VERSION} is outside engines.agentage ^0.3`,
+    ]);
+    const tarball = { '@agentage/extension': 'file:.kit/agentage-extension-0.4.0.tgz' };
+    expect(await stackOf(tarball)).toEqual([]);
   });
 });
 
-describe('store', () => {
-  it('is skipped without a store or without docker, but build never skips it', async () => {
-    const api = { ...SPEC_MANIFEST, agentage: { id: 'probe', parts: { api: true } } };
-    const none = await check(await tempPackage({ 'package.json': json(api) }), only('store'));
-    expect(none.skipped).toEqual({ store: 'no store' });
-    const dir = await tempPackage({ ...BUILT, 'migrations/001-a.sql': 'select 1;' });
-    const report = await check(dir, { ...only('store'), run: noDocker });
-    expect(report).toMatchObject({ conforms: true, skipped: { store: 'no docker' } });
-    await expect(assertConforms(dir, { ...only('store'), run: noDocker })).rejects.toThrow(
-      'check failed: store: docker does not answer: build needs it'
+describe('assertConforms', () => {
+  it('refuses with one line per problem, and needs docker for the store', async () => {
+    const old = { ...SPEC_MANIFEST, engines: { agentage: '^0.3' } };
+    const files = { 'package.json': json(old), 'migrations/001-a.sql': 'select 1;' };
+    const dir = await tempPackage(files);
+    const rules = only('store', 'stack');
+    await expect(assertConforms(dir, { ...rules, run: noDocker })).rejects.toThrow(
+      `check failed: stack: kit ${KIT_VERSION} is outside engines.agentage ^0.3\ncheck failed: store: docker does not answer: build needs it`
     );
   });
 });

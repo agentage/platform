@@ -15,7 +15,7 @@ const REFUSED: Record<string, string> = {
   surface: 'surface: openapi.json differs from the generated contract (GET /api/v1/echo)',
   stack: 'stack: express ^4.19.0, needs ^5',
   store:
-    'store: migrations/002-broken.sql:1 fails on postgres:18-alpine: ERROR:  relation "missing" does not exist',
+    'store: migrations/002-broken.sql:1 fails on postgres:18-alpine: ERROR: relation "missing" does not exist',
   sealing: 'sealing: src/api/index.ts:7 reads process.env',
 };
 

@@ -60,9 +60,39 @@ describe('surface, the api part', () => {
     };
     const extra = API.replace('return router;', 'router.use(Router());\n  return router;');
     expect(await surfaceOf({ 'dist/api/index.js': extra, 'openapi.json': json(stale) })).toEqual([
-      'openapi.json differs from the generated contract (POST /api/v1/items, router middleware, info.version, GET /api/v1/gone)',
+      'openapi.json differs from the generated contract (info.version 0.1.0, POST /api/v1/items, router sub-router, info.version 0.0.9, GET /api/v1/gone)',
       'openapi.json GET /api/v1/items/{id} declares neither a scope nor security: []',
     ]);
+  });
+
+  it('reads only the HTTP methods of a path; router.all, an array path, a middleware pass', async () => {
+    const pathLevel = {
+      parameters: [{ name: 'id', in: 'path' }],
+      summary: 's',
+      servers: [],
+      $ref: '#/x',
+    };
+    const doc = {
+      ...OPENAPI,
+      paths: {
+        '/api/v1/items/{id}': { ...read, ...pathLevel, description: 'd' },
+        '/api/v1/items': { post: { security: [] } },
+        '/api/v1/a': read,
+        '/api/v1/b': read,
+      },
+    };
+    const code = `import express, { Router } from 'express';
+export const create = () => {
+  const router = Router();
+  router.use(express.json());
+  router.get('/items/:id', (_req, res) => res.json({}));
+  router.post('/items', (_req, res) => res.json({}));
+  router.get(['/a', '/b'], (_req, res) => res.json({}));
+  router.all('/any', (_req, res) => res.json({}));
+  return router;
+};
+`;
+    expect(await surfaceOf({ 'dist/api/index.js': code, 'openapi.json': json(doc) })).toEqual([]);
   });
 
   it('needs the committed contract; leaves a part that does not load to entries', async () => {

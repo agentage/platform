@@ -1,3 +1,4 @@
+import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import semver from 'semver';
@@ -12,7 +13,8 @@ import { problemLines } from './format.js';
 import { sealing } from './rules/sealing.js';
 import { store } from './rules/store.js';
 import { surface } from './rules/surface.js';
-import { assertBuilt, exists } from './stage.js';
+import { KIT_VERSION } from './kit-version.js';
+import { assertBuilt } from './stage.js';
 
 export interface CheckOptions {
   run?: Run;
@@ -50,15 +52,14 @@ export interface CheckReport {
   skipped: Record<string, string>;
 }
 
-const RECIPES = ['Dockerfile', 'compose.yml', 'compose.yaml', 'docker-compose.yml'];
+const RECIPE = /^(?:Dockerfile|Containerfile|(?:docker-)?compose\.ya?ml)$/;
 
-// pkg is package.json as read: this rule is the one that validates it.
 const manifest: CheckRule = {
   name: 'manifest',
-  run: async ({ dir, pkg }) => {
-    const issues = PackageSchema.safeParse(pkg).error?.issues ?? [];
-    const found = await Promise.all(RECIPES.map((file) => exists(join(dir, file))));
-    const recipes = RECIPES.filter((_, i) => found[i]);
+  run: async ({ dir }) => {
+    const value = await readJsonIfExists(join(dir, 'package.json'));
+    const issues = PackageSchema.safeParse(value).error?.issues ?? [];
+    const recipes = (await readdir(dir)).filter((file) => RECIPE.test(file)).sort();
     const recipe = 'is not allowed: the kit writes every image recipe';
     return [
       ...issues.map((issue) => ({ problem: formatIssues([issue]) })),
@@ -101,18 +102,30 @@ const entries: CheckRule = {
 };
 
 const MAJORS = { express: '^5', zod: '^4', '@modelcontextprotocol/server': '^2' };
+const KIT = '@agentage/extension';
 
-// Declared ranges only; a spec that is no semver range (a local tarball) is not judged.
+const specProblem = (name: string, spec: string, needed: string): string[] => {
+  if (!spec.trim() || !semver.validRange(spec))
+    return [`${name} ${spec || '""'} needs a version range`];
+  return semver.subset(spec, needed) ? [] : [`${name} ${spec}, needs ${needed}`];
+};
+
 const stack: CheckRule = {
   name: 'stack',
   run: async ({ pkg }) => {
     const deps = (pkg as { dependencies?: Record<string, string> }).dependencies ?? {};
-    const needs = { ...MAJORS, '@agentage/extension': pkg.engines.agentage };
-    return Object.entries(needs).flatMap(([name, needed]) => {
+    const range = pkg.engines.agentage;
+    const found = Object.entries({ ...MAJORS, [KIT]: range }).flatMap(([name, needed]) => {
       const spec = deps[name];
-      if (!spec || !semver.validRange(spec) || semver.subset(spec, needed)) return [];
-      return [{ problem: `${name} ${spec}, needs ${needed}` }];
+      // This repo's CI installs the packed kit into a probe clone as a file: tarball.
+      if (spec === undefined || (name === KIT && spec.startsWith('file:'))) return [];
+      return specProblem(name, spec, needed);
     });
+    if ('@modelcontextprotocol/sdk' in deps)
+      found.push('@modelcontextprotocol/sdk is MCP SDK 1: use @modelcontextprotocol/server ^2');
+    if (!semver.satisfies(KIT_VERSION, range))
+      found.push(`kit ${KIT_VERSION} is outside engines.agentage ${range}`);
+    return found.map((problem) => ({ problem }));
   },
 };
 
@@ -122,10 +135,10 @@ export const RULES: readonly CheckRule[] = [manifest, entries, surface, stack, s
 const runRule = (rule: CheckRule, input: CheckInput) =>
   rule.run(input).catch((err: unknown) => [{ problem: messageOf(err) }]);
 
-// Every rule in order; an invalid manifest stops the rest, which all read it.
 export const check = async (dir: string, options: CheckOptions = {}): Promise<CheckReport> => {
   const { rules = RULES, run = runCommand } = options;
-  const pkg = ((await readJsonIfExists(join(dir, 'package.json'))) ?? {}) as ExtensionPackage;
+  const read = readJsonIfExists(join(dir, 'package.json')).catch(() => ({}));
+  const pkg = ((await read) ?? {}) as ExtensionPackage;
   const problems: CheckProblem[] = [];
   const skipped: Record<string, string> = {};
   for (const rule of rules) {
@@ -142,5 +155,6 @@ export const check = async (dir: string, options: CheckOptions = {}): Promise<Ch
 // What build runs after the compile and before any image: any problem stops everything.
 export const assertConforms = async (dir: string, options: CheckOptions = {}): Promise<void> => {
   const report = await check(dir, { ...options, requireDocker: true });
-  if (!report.conforms) throw new Error(`check failed: ${problemLines(report).join('; ')}`);
+  const lines = problemLines(report).map((line) => `check failed: ${line}`);
+  if (!report.conforms) throw new Error(lines.join('\n'));
 };

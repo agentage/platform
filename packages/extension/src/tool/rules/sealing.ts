@@ -1,44 +1,63 @@
-import { readdir, readFile } from 'node:fs/promises';
+import { lstat, readdir, readFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { readJsonIfExists } from '../../manifest/read-manifest.js';
 import { type CheckRule, type Finding } from '../check.js';
 
 const CODE = /\.[cm]?[jt]sx?$/;
 const TEST = /\.(test|spec)\.[cm]?[jt]sx?$/;
+// Strings first, so a // inside one is no comment; a comment keeps its newlines for the line count.
+const TOKENS =
+  /'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"|`(?:\\.|[^`\\])*`|\/\*[\s\S]*?\*\/|\/\/[^\n]*/g;
+const QUOTED = /'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"/g;
 
-// extension-model section 9: the host owns ports, env, args and every other extension's address.
-const SEALED: [RegExp, string][] = [
-  [/\.\s*listen\s*\(/, 'calls listen()'],
-  [/\bprocess\s*(?:\.|\[\s*['"`])\s*(env|argv)\b/, 'reads process.$1'],
-  [/(?:from|import|require)\s*\(?\s*['"`](?:node:)?process['"`]/, 'imports process'],
-  [/(?:https?:)?\/\/[\w.-]*agentage\.io\b/, 'names an absolute agentage URL'],
+type Pattern = [RegExp, (match: RegExpExecArray) => string];
+
+// extension-model section 9: ctx gives a part all it may read, so part code never names process.
+const ON_CODE: Pattern[] = [
+  [
+    /(?:\bglobalThis\s*\??\.\s*|(?<![.\w$:'"`/-]))process\b(?:\s*(?:\?\.|\.|\[\s*['"`])\s*(env|argv)\b)?/g,
+    (m) => (m[1] ? `reads process.${m[1]}` : 'names process'),
+  ],
+  [/\bglobalThis\s*(?:\?\.)?\s*\[\s*['"`]process['"`]/g, () => 'names process'],
+  [/\blisten\s*(?:\?\.\s*)?\(|\[\s*['"`]listen['"`]\s*\]/g, () => 'calls listen()'],
+];
+const ON_STRINGS: Pattern[] = [
+  [/(?:from|import|require)\s*\(?\s*['"`](?:node:)?process['"`]/g, () => 'imports process'],
+  [/(?:https?:)?\/\/[^'"`\s]*agentage\.io/gi, () => 'names an absolute agentage URL'],
 ];
 
-const lineFindings = (file: string, text: string): Finding[] =>
-  text.split('\n').flatMap((code, i) =>
-    SEALED.flatMap(([pattern, problem]) => {
-      const match = pattern.exec(code);
-      return match ? [{ file, line: i + 1, problem: problem.replace('$1', match[1] ?? '') }] : [];
+const matches = (file: string, text: string, patterns: Pattern[]): Finding[] =>
+  patterns.flatMap(([pattern, problem]) =>
+    [...text.matchAll(pattern)].map((m) => {
+      const line = text.slice(0, m.index).split('\n').length;
+      return { file, line, problem: problem(m) };
     })
   );
 
-// Every non-test source under src/; a symlink is refused, since it could point anywhere.
+// Prose strings (with a space) are blanked; a name such as 'env' stays, as dynamic access spells it.
+const fileFindings = (file: string, text: string): Finding[] => {
+  const kept = text.replace(TOKENS, (t) => (t.startsWith('/') ? t.replace(/[^\n]/g, '') : t));
+  const code = kept.replace(QUOTED, (s) => (/\s/.test(s) ? "''" : s));
+  return [...matches(file, code, ON_CODE), ...matches(file, kept, ON_STRINGS)];
+};
+
+const LINKED = 'is a symlink: part code is plain files';
+
+// Every non-test source under src/; any symlink met is refused, since it could point anywhere.
 const sourceFindings = async (dir: string): Promise<Finding[]> => {
-  const found = await readdir(join(dir, 'src'), { recursive: true, withFileTypes: true }).catch(
-    () => []
-  );
-  const scanned = found
-    .filter((entry) => CODE.test(entry.name) && !TEST.test(entry.name))
-    .map(async (entry) => {
-      const file = relative(dir, join(entry.parentPath, entry.name));
-      if (entry.isSymbolicLink())
-        return [{ file, problem: 'is a symlink: part code is plain files' }];
-      return entry.isFile() ? lineFindings(file, await readFile(join(dir, file), 'utf8')) : [];
-    });
+  const src = join(dir, 'src');
+  const top = await lstat(src).catch(() => null);
+  if (top?.isSymbolicLink()) return [{ file: 'src', problem: LINKED }];
+  const found = top ? await readdir(src, { recursive: true, withFileTypes: true }) : [];
+  const scanned = found.map(async (entry) => {
+    const file = relative(dir, join(entry.parentPath, entry.name));
+    if (entry.isSymbolicLink()) return [{ file, problem: LINKED }];
+    if (!entry.isFile() || !CODE.test(entry.name) || TEST.test(entry.name)) return [];
+    return fileFindings(file, await readFile(join(dir, file), 'utf8'));
+  });
   return (await Promise.all(scanned)).flat();
 };
 
-// An installed dependency whose package.json carries an agentage manifest is an extension.
 const extensionDeps = async (dir: string, pkg: object): Promise<Finding[]> => {
   const { dependencies, optionalDependencies, peerDependencies } = pkg as Record<string, object>;
   const names = Object.keys({ ...dependencies, ...optionalDependencies, ...peerDependencies });

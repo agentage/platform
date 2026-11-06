@@ -10,35 +10,37 @@ import { type CheckInput, type CheckRule, type Finding } from '../check.js';
 import { recordingContext, registeredTools } from '../record-extras.js';
 
 type Json = Record<string, unknown>;
-type Layer = { name: string; route?: { path: string; stack: { method: string }[] } };
+type Route = { path: unknown; stack: { method?: string }[] };
+type Layer = { name: string; route?: Route; handle?: { stack?: unknown } };
 
 const differing = (generated: Json, committed: Json): string[] =>
   [...new Set([...Object.keys(generated), ...Object.keys(committed)])].filter(
     (key) => JSON.stringify(canonical(generated[key])) !== JSON.stringify(canonical(committed[key]))
   );
 
-const keyed = (keys: string[], version: unknown): Json => ({
-  ...Object.fromEntries(keys.map((key) => [key, true])),
-  'info.version': version,
-});
-
-// Express routes as OpenAPI keys; a middleware or sub-router hides routes, so it never matches one.
-const servedRoutes = (router: unknown): string[] =>
-  ((router as { stack?: Layer[] } | null)?.stack ?? []).flatMap(({ name, route }) => {
-    if (!route) return [`${name} middleware`];
-    const path = `/api/v1${route.path.replace(/:(\w+)/g, '{$1}')}`;
-    return route.stack.map(({ method }) => `${method.toUpperCase()} ${path}`);
+const routeKeys = ({ path, stack }: Route): string[] =>
+  [path].flat().flatMap((one) => {
+    const at = `/api/v1${String(one).replace(/:(\w+)/g, '{$1}')}`;
+    // router.all names no method, so it has no operation to compare.
+    return stack.flatMap(({ method }) => (method ? [`${method.toUpperCase()} ${at}`] : []));
   });
+
+// Express routes as OpenAPI keys; a sub-router hides its routes, so it never matches one.
+const servedRoutes = (router: unknown): string[] =>
+  ((router as { stack?: Layer[] } | null)?.stack ?? []).flatMap(({ name, route, handle }) => {
+    if (route) return routeKeys(route);
+    return handle?.stack ? [`${name} sub-router`] : [];
+  });
+
+const METHODS = new Set(['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace']);
 
 const operations = (doc: Json): [string, Json][] =>
   Object.entries((doc['paths'] ?? {}) as Record<string, Json>).flatMap(([path, ops]) =>
-    Object.entries(ops).map(([method, op]): [string, Json] => [
-      `${method.toUpperCase()} ${path}`,
-      op as Json,
-    ])
+    Object.entries(ops)
+      .filter(([method]) => METHODS.has(method))
+      .map(([method, op]): [string, Json] => [`${method.toUpperCase()} ${path}`, op as Json])
   );
 
-// security: [] is public; otherwise a requirement names at least one scope.
 const declaresAccess = (security: unknown): boolean =>
   Array.isArray(security) &&
   (security.length === 0 ||
@@ -46,14 +48,11 @@ const declaresAccess = (security: unknown): boolean =>
 
 const apiProblems = (doc: Json, routes: string[], version: string): string[] => {
   const ops = operations(doc);
+  const served = new Set([`info.version ${version}`, ...routes]);
   const info = (doc['info'] as Json | undefined)?.['version'];
-  const diff = differing(
-    keyed(routes, version),
-    keyed(
-      ops.map(([key]) => key),
-      info
-    )
-  );
+  const documented = new Set([`info.version ${String(info)}`, ...ops.map(([key]) => key)]);
+  const diff = [...served].filter((k) => !documented.has(k));
+  diff.push(...[...documented].filter((k) => !served.has(k)));
   const open = ops.filter(([, op]) => !declaresAccess(op['security'] ?? doc['security']));
   return [
     ...(diff.length > 0 ? [`differs from the generated contract (${diff.join(', ')})`] : []),
@@ -73,19 +72,15 @@ const apiSurface = async ({ dir, pkg }: CheckInput): Promise<Finding[]> => {
 
 type Listed = { '~standard': { jsonSchema: Record<'input' | 'output', (o: object) => Json> } };
 
-// What the SDK lists for a tool: both schemas as JSON Schema 2020-12.
-const listed = (id: string, { name, spec }: ToolEntry): Json => {
-  const schema = (zod: object, io: 'input' | 'output') =>
-    (zod as Listed)['~standard'].jsonSchema[io]({ target: 'draft-2020-12' });
-  const { description, input, output } = spec;
-  const inputSchema = schema(input, 'input');
-  return {
-    name: prefixed(id, name),
-    description,
-    inputSchema,
-    outputSchema: schema(output, 'output'),
-  };
-};
+const schemaOf = (zod: object, io: 'input' | 'output') =>
+  (zod as Listed)['~standard'].jsonSchema[io]({ target: 'draft-2020-12' });
+
+const listed = (id: string, { name, spec }: ToolEntry): Json => ({
+  name: prefixed(id, name),
+  description: spec.description,
+  inputSchema: schemaOf(spec.input, 'input'),
+  outputSchema: schemaOf(spec.output, 'output'),
+});
 
 const byName = ({ serverInfo, tools }: McpSnapshot): Json => ({
   serverInfo,
