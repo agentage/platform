@@ -49,7 +49,7 @@ describe('entries', () => {
     expect((await check(dir, only('entries'))).problems.map((p) => p.problem)).toEqual([
       'part api exports helper beside create',
       'dist/mcp/index.js not found: the package build must write the mcp part there',
-      'part worker create is not a function',
+      'part worker does not export create',
       'part cli does not export create',
     ]);
   });

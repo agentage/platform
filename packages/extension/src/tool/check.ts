@@ -23,17 +23,9 @@ export interface CheckOptions {
   rules?: readonly CheckRule[];
 }
 
-export interface CheckInput extends CheckOptions {
-  dir: string;
-  pkg: ExtensionPackage;
-  run: Run;
-}
+export type CheckInput = CheckOptions & { dir: string; pkg: ExtensionPackage; run: Run };
 
-export interface Finding {
-  file?: string;
-  line?: number;
-  problem: string;
-}
+export type Finding = { file?: string; line?: number; problem: string };
 
 export type CheckProblem = Finding & { rule: string };
 
@@ -57,9 +49,7 @@ const RECIPE = /^(?:dockerfile|containerfile)(?:\..+)?$|^(?:docker-)?compose(?:\
 const manifest: CheckRule = {
   name: 'manifest',
   run: async ({ dir }) => {
-    const value = await readJsonIfExists(join(dir, 'package.json')).catch((err: unknown) => {
-      throw new Error(messageOf(err).replace(`${dir}/`, ''));
-    });
+    const value = await readJsonIfExists(join(dir, 'package.json'));
     const issues = PackageSchema.safeParse(value).error?.issues ?? [];
     const recipes = (await readdir(dir)).filter((file) => RECIPE.test(file)).sort();
     const recipe = 'is not allowed: the kit writes every image recipe';
@@ -72,28 +62,19 @@ const manifest: CheckRule = {
 
 type Part = ImagePartKind | 'cli';
 
-const problemsOf = (work: Promise<unknown>): Promise<string[]> =>
-  work.then(
-    (found) => (Array.isArray(found) ? found : []),
-    (err: unknown) => [messageOf(err)]
-  );
-
-const exportProblems = async (dir: string, pkg: ExtensionPackage, part: Part) => {
+const exportProblem = async (dir: string, pkg: ExtensionPackage, part: Part) => {
   const mod = (await import(pathToFileURL(join(dir, entryOf(pkg, part))).href)) as object;
-  const names = Object.keys(mod);
-  if (!names.includes('create')) return [`part ${part} does not export create`];
-  if (typeof (mod as { create: unknown }).create !== 'function')
-    return [`part ${part} create is not a function`];
-  const others = names.filter((name) => name !== 'create');
-  return others.length > 0 ? [`part ${part} exports ${others.join(', ')} beside create`] : [];
+  const others = Object.keys(mod).filter((name) => name !== 'create');
+  if (typeof (mod as { create?: unknown }).create !== 'function')
+    return `part ${part} does not export create`;
+  if (others.length > 0) return `part ${part} exports ${others.join(', ')} beside create`;
+  const cli = part === 'cli' ? await checkCli(dir) : null;
+  return cli && `cli part: ${cli}`;
 };
 
-const partProblems = async ({ dir, pkg }: CheckInput, part: Part): Promise<string[]> => {
-  const built = part === 'cli' ? [] : await problemsOf(assertBuilt(dir, pkg, part));
-  if (built.length > 0 || part === 'ui') return built;
-  const own = await problemsOf(exportProblems(dir, pkg, part));
-  const cli = own.length === 0 && part === 'cli' ? await checkCli(dir) : null;
-  return cli ? [`cli part: ${cli}`] : own;
+const partProblem = async ({ dir, pkg }: CheckInput, part: Part): Promise<string | null> => {
+  if (part !== 'cli') await assertBuilt(dir, pkg, part);
+  return part === 'ui' ? null : exportProblem(dir, pkg, part);
 };
 
 // Every part built where its image looks, exporting create and nothing else; cli handlers = commands.
@@ -101,8 +82,8 @@ const entries: CheckRule = {
   name: 'entries',
   run: async (input) => {
     const parts = Object.keys(normalizeParts(input.pkg.agentage.parts).code) as Part[];
-    const found = await Promise.all(parts.map((part) => partProblems(input, part)));
-    return found.flat().map((problem) => ({ problem }));
+    const found = parts.map((part) => partProblem(input, part).catch(messageOf));
+    return (await Promise.all(found)).flatMap((problem) => (problem ? [{ problem }] : []));
   },
 };
 
@@ -137,8 +118,9 @@ const stack: CheckRule = {
 // The closed list of extension-kit section 7, in its order; build runs it before any image.
 export const RULES: readonly CheckRule[] = [manifest, entries, surface, stack, store, sealing];
 
+// A thrown message names its file relative to the package, as every problem line does.
 const runRule = (rule: CheckRule, input: CheckInput) =>
-  rule.run(input).catch((err: unknown) => [{ problem: messageOf(err) }]);
+  rule.run(input).catch((err) => [{ problem: messageOf(err).replace(`${input.dir}/`, '') }]);
 
 export const check = async (dir: string, options: CheckOptions = {}): Promise<CheckReport> => {
   const { rules = RULES, run = runCommand } = options;

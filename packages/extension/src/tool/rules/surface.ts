@@ -12,6 +12,7 @@ import { recordingContext, registeredTools } from '../record-extras.js';
 type Json = Record<string, unknown>;
 type Route = { path: unknown; stack: { method?: string }[] };
 type Layer = { name: string; route?: Route; handle?: { stack?: unknown } };
+type Router = { stack?: Layer[]; router?: Router };
 
 const differing = (generated: Json, committed: Json): string[] =>
   [...new Set([...Object.keys(generated), ...Object.keys(committed)])].filter(
@@ -25,16 +26,14 @@ const routeKeys = ({ path, stack }: Route): string[] =>
     return stack.flatMap(({ method }) => (method ? [`${method.toUpperCase()} ${at}`] : []));
   });
 
-const stackOf = (router: unknown) => (router as { stack?: Layer[] } | null)?.stack;
-
 // Express routes (of a Router or an express() app) as OpenAPI keys; a sub-router hides its routes, so it never matches one.
-const servedRoutes = (router: unknown): string[] =>
-  (stackOf(router) ?? stackOf((router as { router?: unknown } | null)?.router) ?? []).flatMap(
-    ({ name, route, handle }) => {
-      if (route) return routeKeys(route);
-      return handle?.stack ? [`${name} sub-router`] : [];
-    }
-  );
+const servedRoutes = (app: unknown): string[] => {
+  const { stack, router } = (app ?? {}) as Router;
+  return (stack ?? router?.stack ?? []).flatMap(({ name, route, handle }) => {
+    if (route) return routeKeys(route);
+    return handle?.stack ? [`${name} sub-router`] : [];
+  });
+};
 
 const METHODS = new Set(['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace']);
 
@@ -55,8 +54,7 @@ const apiProblems = (doc: Json, routes: string[], version: string): string[] => 
   const served = new Set([`info.version ${version}`, ...routes]);
   const info = (doc['info'] as Json | undefined)?.['version'];
   const documented = new Set([`info.version ${String(info)}`, ...ops.map(([key]) => key)]);
-  const diff = [...served].filter((k) => !documented.has(k));
-  diff.push(...[...documented].filter((k) => !served.has(k)));
+  const diff = [...served, ...documented].filter((k) => !served.has(k) || !documented.has(k));
   const open = ops.filter(([, op]) => !declaresAccess(op['security'] ?? doc['security']));
   return [
     ...(diff.length > 0 ? [`differs from the generated contract (${diff.join(', ')})`] : []),
