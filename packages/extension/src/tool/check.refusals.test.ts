@@ -37,4 +37,15 @@ describe('the first refusals a caller meets', () => {
       { rule: 'entries', problem: 'part api fails at import: boom' },
     ]);
   });
+
+  it('a built package without its cli entry says so in one relative line', async () => {
+    const cli = { ...SPEC_MANIFEST, agentage: { ...SPEC_MANIFEST.agentage, parts: { cli: true } } };
+    const files = { 'package.json': json(cli), 'dist/keep.txt': '' };
+    expect((await check(await tempPackage(files), entries)).problems).toEqual([
+      {
+        rule: 'entries',
+        problem: 'dist/cli/index.js not found: the package build must write the cli part there',
+      },
+    ]);
+  });
 });

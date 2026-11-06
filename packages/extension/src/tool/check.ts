@@ -1,5 +1,5 @@
 import { readdir } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { join, normalize, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import semver from 'semver';
 import { checkCli } from '../command/check-cli.js';
@@ -80,6 +80,8 @@ const exportProblem = async (dir: string, pkg: ExtensionPackage, part: Part) => 
 
 const partProblem = async ({ dir, pkg }: CheckInput, part: Part): Promise<string | null> => {
   if (part !== 'cli') await assertBuilt(dir, pkg, part);
+  else if (!(await exists(join(dir, entryOf(pkg, part)))))
+    return `${normalize(entryOf(pkg, part))} not found: the package build must write the cli part there`;
   return part === 'ui' ? null : exportProblem(dir, pkg, part);
 };
 
