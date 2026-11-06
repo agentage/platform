@@ -167,8 +167,8 @@ describe('the token check (C4)', () => {
     await expect(check(unknown, 'read')).rejects.toMatchObject(unauthorized('Invalid token'));
     expect(jwks()).toHaveLength(2);
     await issuer.close();
+    vi.setSystemTime(Date.now() + 11 * 60_000);
     expect(await check(bearer, 'read')).toMatchObject({ sub: 'usr_dev' });
-    vi.setSystemTime(Date.now() + 31_000);
     await expect(check(unknown, 'read')).rejects.toMatchObject(UNAVAILABLE);
   });
 
