@@ -20,6 +20,8 @@ const runArgs = (dir: string, files: string[]) => [
 ];
 
 const failure = (stderr = ''): Finding => {
+  const daemon = /^docker: (.*)$/m.exec(stderr)?.[1];
+  if (daemon) return { problem: `${STORE_IMAGE} does not run: ${daemon}` };
   const [, file, line, why] =
     /^psql:\/tmp\/m\/([^:]+):(\d+): (?:ERROR:\s+)?(.*)$/m.exec(stderr) ?? [];
   const problem = `fails on ${STORE_IMAGE}: ${why ? `ERROR: ${why}` : stderr.trim().split('\n').pop()}`;

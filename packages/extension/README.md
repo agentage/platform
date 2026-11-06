@@ -9,5 +9,21 @@ correlation id, the response envelope, the store pool, the scheduler and argumen
 npm install @agentage/extension express zod
 ```
 
+`agentage extension check [dir] --json` prints the conformance report (exit 1 when `conforms` is
+false); `file` and `line` are there only when a problem has them:
+
+```json
+{
+  "id": "probe",
+  "version": "0.4.0",
+  "conforms": false,
+  "rules": ["manifest", "entries", "surface", "stack", "store", "sealing"],
+  "problems": [
+    { "rule": "sealing", "file": "src/api/index.ts", "line": 7, "problem": "reads process.env" }
+  ],
+  "skipped": {}
+}
+```
+
 See the [platform README](https://github.com/agentage/platform#readme) for every part kind, the
 manifest, the tool and how a part image runs.
