@@ -40,14 +40,15 @@ const settingsOf = (env: Env) => {
   return { issuer, audience, origin };
 };
 
-// Keys and revoked list read once before the part serves; an issuer down at start is no stop.
+// Read before serving, then every 30 s (keys only while none held); no stop on a dead issuer.
 export const partAuth = async (env: Env, id: string, log: Log, scopes: string[]) => {
   const { issuer, audience, origin } = settingsOf(env);
   const { keys, read, held } = remoteKeys(issuer);
   const revoked = createRevokedList(issuer, log);
   const unread = (err: unknown) => log.warn('key set not read', { reason: messageOf(err) });
-  await Promise.all([read().catch(unread), revoked.refresh()]);
-  setInterval(() => void revoked.refresh(), REVOKED_POLL_MS).unref();
+  const poll = () => Promise.all([held() || read().catch(unread), revoked.refresh()]);
+  await poll();
+  setInterval(() => void poll(), REVOKED_POLL_MS).unref();
   return {
     tokenCheck: createTokenCheck({ issuer, audience, id, origin, keys, revoked }),
     resource: {

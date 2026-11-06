@@ -108,6 +108,22 @@ describe('the token check of a part', () => {
     expect(await checks.auth()).toBe('ok');
   });
 
+  it('a key set missed at start is read again by the 30 s poll, with no request', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval'] });
+    const real = globalThis.fetch;
+    const reads = vi.spyOn(globalThis, 'fetch');
+    reads.mockImplementation((input, init) =>
+      String(input).endsWith('/jwks.json')
+        ? Promise.reject(new TypeError('fetch failed'))
+        : real(input, init)
+    );
+    const { checks } = await auth();
+    expect(await checks.auth()).toBe('degraded');
+    reads.mockImplementation(real);
+    vi.advanceTimersByTime(REVOKED_POLL_MS);
+    await expect.poll(() => checks.auth()).toBe('ok');
+  });
+
   it('until the revoked list is read, a token with a jti is 503 and auth is degraded', async () => {
     const real = globalThis.fetch;
     vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) =>
