@@ -177,3 +177,12 @@ describe('tool registry', () => {
     expect(tools.map((entry) => entry.name)).toEqual(['echo_v2-x']);
   });
 });
+
+describe('mcp cookies', () => {
+  it('serves a request that carries a Cookie and answers with no Set-Cookie', async () => {
+    const s = await app('open');
+    const res = await post(s.url, LIST, { ...HEADERS, cookie: 'session=s3cr3t' });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('set-cookie')).toBeNull();
+  });
+});

@@ -52,7 +52,7 @@ export const PUBLIC_CORS: CorsOptions = {
 };
 
 // api-standards section 5: parts take bearer tokens only, so no handler or log ever sees a cookie.
-export const dropCookie: RequestHandler = (req, _res, next) => {
+const dropCookie: RequestHandler = (req, _res, next) => {
   delete req.headers.cookie;
   next();
 };
