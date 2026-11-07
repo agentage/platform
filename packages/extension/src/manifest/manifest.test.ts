@@ -26,7 +26,7 @@ const C1_MANIFEST = {
       {
         name: 'ping',
         summary: 'answer pong',
-        args: [{ name: 'msg', type: 'string', optional: true }],
+        args: [{ name: 'msg', type: 'string', required: false }],
       },
     ],
     settings: { 'mcp.listing': { type: 'string', enum: ['open', 'token'], default: 'open' } },
@@ -94,6 +94,19 @@ describe('manifest schema', () => {
     expect(issuesOf(withAgentage({ contributes: {} }))).toEqual([
       expect.stringContaining('"contributes"'),
     ]);
+  });
+
+  it('takes required on a command arg, or neither key, never optional', () => {
+    const [ping] = SPEC_MANIFEST.agentage.commands;
+    const arg = (keys: object) => ({
+      ...SPEC_MANIFEST,
+      agentage: {
+        ...SPEC_MANIFEST.agentage,
+        commands: [{ ...ping, args: [{ name: 'msg', type: 'string', ...keys }] }],
+      },
+    });
+    expect(issuesOf(arg({ optional: true }))).toEqual([expect.stringContaining('"optional"')]);
+    expect([issuesOf(arg({})), issuesOf(arg({ required: true }))]).toEqual([[], []]);
   });
 });
 

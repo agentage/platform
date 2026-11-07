@@ -25,7 +25,7 @@ const manifest = (names: string[]) => ({
     parts: { api: true, cli: true },
     commands: names.map((name) =>
       name === 'ping'
-        ? command(name, [{ name: 'msg', type: 'string', optional: true }])
+        ? command(name, [{ name: 'msg', type: 'string', required: false }])
         : command(name)
     ),
   },
