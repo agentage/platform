@@ -166,6 +166,7 @@ jobs:
         run: |
           npm ci
           npm run build
+          mkdir -p "$RUNNER_TEMP/pack"
           npm pack --workspaces --pack-destination "$RUNNER_TEMP/pack"
 
       - name: Install probe with the candidate kit, build, Chromium
