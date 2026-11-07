@@ -188,3 +188,33 @@ describe('api app: envelope and headers', () => {
     );
   });
 });
+
+describe('api app: no cookies', () => {
+  const COOKIE = { cookie: 'session=s3cr3t' };
+
+  it('drops the Cookie header before a route handler and sets none', async () => {
+    const router = Router();
+    router.get('/seen', (req, res) => void res.json({ cookie: req.headers.cookie ?? null }));
+    const { get } = await start({ router });
+    const res = await get('/api/v1/seen', { headers: COOKIE });
+    expect(await res.json()).toEqual({ cookie: null });
+    expect(res.headers.get('set-cookie')).toBeNull();
+  });
+
+  it('logs no cookie on a failing request', async () => {
+    const { ctx, get } = await start();
+    await get('/api/v1/boom', { headers: COOKIE });
+    expect(ctx.logs.length).toBeGreaterThan(0);
+    expect(JSON.stringify(ctx.logs)).not.toContain('s3cr3t');
+  });
+
+  it('answers a CORS preflight without a credentials header', async () => {
+    const { get } = await start();
+    const res = await get('/api/v1/echo', {
+      method: 'OPTIONS',
+      headers: { origin: 'https://x.example', 'access-control-request-method': 'GET' },
+    });
+    expect(res.headers.get('access-control-allow-origin')).toBe('*');
+    expect(res.headers.get('access-control-allow-credentials')).toBeNull();
+  });
+});
