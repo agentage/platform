@@ -128,6 +128,30 @@ describe('token()', () => {
     expect(await token()).toBe('aga_2');
   });
 
+  it('re-mints 59 s before expiresAt and keeps the token 61 s before it', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const auth = fakeAuth();
+    const token = identity(auth).token();
+    const mintedAt = Date.now();
+    expect(await token()).toBe('aga_1');
+    vi.setSystemTime(mintedAt + DAY_MS - 61_000);
+    expect(await token()).toBe('aga_1');
+    vi.setSystemTime(mintedAt + DAY_MS - 59_000);
+    expect(await token()).toBe('aga_2');
+  });
+
+  it('keeps one token per day when the client clock runs ahead of auth', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const behind = (): [number, unknown] => {
+      const expiresAt = new Date(Date.now() - DAY_MS).toISOString();
+      return [201, { success: true, data: { id: 'tok_1', token: 'aga_1', expiresAt } }];
+    };
+    const auth = fakeAuth({ 'POST /account/pat': behind });
+    const token = identity(auth).token();
+    expect([await token(), await token()]).toEqual(['aga_1', 'aga_1']);
+    expect(auth.at().filter((a) => a === 'POST /account/pat')).toHaveLength(1);
+  });
+
   it('is undefined without a session and mints nothing', async () => {
     const auth = fakeAuth();
     auth.signOutNow();
@@ -145,6 +169,27 @@ describe('signOut()', () => {
     const order = auth.at().filter((a) => a.startsWith('DELETE') || a.includes('sign-out'));
     expect(order).toEqual(['DELETE /account/pat/tok_1', 'POST /api/auth/sign-out']);
     expect(await id.token()()).toBeUndefined();
+  });
+
+  it('ends the session when the revoke fails, then rethrows', async () => {
+    const error = { code: 'INTERNAL', message: 'down' };
+    const auth = fakeAuth({ 'DELETE /account/pat/tok_1': () => [500, { success: false, error }] });
+    const id = identity(auth);
+    await id.token()();
+    await expect(id.signOut()).rejects.toMatchObject({ code: 'INTERNAL', status: 500 });
+    expect(auth.at()).toContain('POST /api/auth/sign-out');
+  });
+
+  it('revokes a PAT whose mint is in flight at sign-out', async () => {
+    const auth = fakeAuth();
+    const id = identity(auth);
+    const token = id.token();
+    const pending = token();
+    await id.signOut();
+    expect(await pending).toBe('aga_1');
+    const order = auth.at().filter((a) => a.startsWith('DELETE') || a.includes('sign-out'));
+    expect(order).toEqual(['DELETE /account/pat/tok_1', 'POST /api/auth/sign-out']);
+    expect(await token()).toBeUndefined();
   });
 
   it('ends the session without a DELETE when no PAT was minted', async () => {
