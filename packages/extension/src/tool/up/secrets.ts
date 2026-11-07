@@ -39,8 +39,8 @@ export const writeUpSecrets = async (dir: string, pkg: ExtensionPackage, env: En
     value: valueOf(name, env, file),
   }));
   await mkdir(join(dir, LOCAL_DIR, 'secrets'), { recursive: true, mode: 0o700 });
-  // chmod after the write: an existing file from an older up gets 0600 too; down removes them.
+  // 0644 in a 0700 folder: the part's node user reads the bind mount; chmod fixes an older file.
   for (const { path, value } of files)
-    await writeFile(path, value, { mode: 0o600 }).then(() => chmod(path, 0o600));
+    await writeFile(path, value, { mode: 0o644 }).then(() => chmod(path, 0o644));
   return Object.fromEntries(files.map(({ name, path }) => [name, path]));
 };
