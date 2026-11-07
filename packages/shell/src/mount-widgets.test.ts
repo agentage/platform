@@ -104,6 +104,12 @@ describe('mountWidgets', () => {
     expect(importModule).toHaveBeenCalledWith('https://probe.test/ui/0.2.0/probe.js');
   });
 
+  it('a re-mount replaces what the container held, never duplicates', async () => {
+    await mount(widget('probe', 'echo'));
+    await mount(widget('probe', 'echo'));
+    expect(container.children).toHaveLength(1);
+  });
+
   it('a top-level widget mounts straight into the container', async () => {
     await mount(widget('probe', 'echo'));
     expect(container.firstElementChild?.tagName.toLowerCase()).toBe('probe-echo');

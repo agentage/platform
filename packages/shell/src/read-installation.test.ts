@@ -21,7 +21,7 @@ describe('readInstallation', () => {
     ).resolves.toEqual(installation);
     expect(fetch).toHaveBeenCalledWith(
       'https://agentage.io/api/v1/installations/fixture.next.agentage.io',
-      { headers: { Accept: 'application/json' } }
+      { headers: { Accept: 'application/json' }, credentials: 'omit' }
     );
   });
 
@@ -29,6 +29,15 @@ describe('readInstallation', () => {
     vi.stubGlobal('fetch', answer({ success: false }, 404));
     await expect(readInstallation('https://agentage.io', 'x')).rejects.toThrow('HTTP 404');
   });
+
+  it.each(['https://probe.test/base', 'http://probe.test', 'ftp://probe.test'])(
+    'rejects a deployment url %s that is not an origin',
+    async (url) => {
+      const bad = { ...installation, deployments: [{ id: 'probe', url }] };
+      vi.stubGlobal('fetch', answer({ success: true, data: bad }));
+      await expect(readInstallation('https://agentage.io', 'x')).rejects.toThrow();
+    }
+  );
 
   it('rejects a document outside the schema', async () => {
     const bad = { ...installation, layout: { kind: 'grid', children: [] } };

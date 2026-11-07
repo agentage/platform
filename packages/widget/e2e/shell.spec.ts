@@ -13,11 +13,13 @@ const page = `<!doctype html><html lang="en"><head><meta charset="utf-8" /><titl
 <script type="module" src="./shell.js"></script></head><body><main id="shell"></main></body></html>`;
 let calls: McpCall[] = [];
 let widgets: unknown[] = [];
+let version = '';
 let close: () => void = () => undefined;
 
 test.beforeAll(async () => {
   const result = await bundle({ dir: fixture });
   widgets = result.widgets;
+  version = result.version;
   const entryPoints = [fileURLToPath(new URL('./shell-page.ts', import.meta.url))];
   const outfile = join(result.outDir, 'shell.js');
   await build({
@@ -55,7 +57,7 @@ test('the shell mounts probe echo from a static installation, with its host and 
   await tab.route('**/.well-known/agentage-extension.json', (route) =>
     route.fulfill({ json: { id: 'probe', widgets } })
   );
-  await tab.goto('/ui/0.2.0/shell.html');
+  await tab.goto(`/ui/${version}/shell.html`);
   await expect(tab.locator('body')).toHaveAttribute('data-mounted', 'true');
   await expect(tab.getByRole('alert')).toHaveText('probe missing: probe serves no widget missing');
   await tab.getByRole('button', { name: 'ping' }).click();

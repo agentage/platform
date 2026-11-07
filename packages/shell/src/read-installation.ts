@@ -3,7 +3,7 @@ import { EnvelopeSchema, type Installation } from './installation.schema.js';
 export const trimSlash = (url: string): string => url.replace(/\/+$/, '');
 
 export const getJson = async (url: string): Promise<unknown> => {
-  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  const res = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'omit' });
   if (!res.ok) throw new Error(`GET ${url}: HTTP ${res.status}`);
   return res.json();
 };

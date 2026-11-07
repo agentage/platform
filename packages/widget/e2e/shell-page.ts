@@ -1,7 +1,7 @@
 import { mountWidgets, readInstallation } from '@agentage/shell';
 import { createBridge } from '@agentage/widget';
 
-// A shell page as C6 types it: the installation from root, one bridge per deployment url.
+// A shell page as C6 types it: the installation from root, one bridge for the first deployment.
 const doc = await readInstallation(location.origin, 'harness');
 const [deployment] = doc.deployments;
 const container = document.getElementById('shell') ?? document.body;

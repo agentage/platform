@@ -82,6 +82,7 @@ const showError = ({ node, slot }: Slot, error: unknown): Element => {
 // Never rejects: a widget that fails becomes its own error element.
 export const mountWidgets = async (layout: Layout, options: MountOptions): Promise<Element[]> => {
   const slots: Slot[] = [];
+  options.container.replaceChildren();
   place(layout, options.container, slots);
   const read = discoveryReader();
   return Promise.all(

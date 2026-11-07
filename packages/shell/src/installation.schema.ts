@@ -28,7 +28,17 @@ export const LayoutSchema: z.ZodMiniType<Layout> = z.union([
   }),
 ]);
 
-const DeploymentSchema = z.object({ id: Kebab, url: z.url() });
+// The kit's OriginSchema: https or loopback http, no path, so discovery and modules share it.
+const Origin = z
+  .string()
+  .check(
+    z.maxLength(270),
+    z.regex(
+      /^(https:\/\/[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+|http:\/\/(127\.0\.0\.1|localhost))(:[0-9]{1,5})?$/
+    )
+  );
+
+const DeploymentSchema = z.object({ id: Kebab, url: Origin });
 
 export const InstallationSchema = z.object({
   target: z.string().check(z.minLength(1), z.maxLength(253)),
