@@ -173,7 +173,8 @@ jobs:
           cd probe
           npm ci
           npm install ./agentage-extension-*.tgz ./agentage-widget-*.tgz
-          npm ls @agentage/extension @agentage/widget
+          grep -E "\"@agentage/(extension|widget)\": \"file:" package.json
+          grep -cE "\"resolved\": \"file:agentage-(extension|widget)-" package-lock.json
           npm run build
 
       - name: agentage extension up
