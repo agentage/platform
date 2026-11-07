@@ -109,6 +109,7 @@ describe('registerWidgets', () => {
     expect(seen()).toMatchObject({ extension: 'eta', version: '2.0.0', theme: 'light', props: {} });
     await flush(() => el.setAttribute('data-theme', 'dark'));
     expect(seen().theme).toBe('dark');
+    expect(Object.keys(el.host ?? {}).sort()).toEqual(['api', 'context', 'tool']);
   });
 
   it('refuses an id or a name that is not kebab-case', () => {

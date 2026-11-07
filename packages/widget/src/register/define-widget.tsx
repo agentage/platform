@@ -33,8 +33,7 @@ const viewOf = (host: Host, element: Element, spec: WidgetSpec): Host => {
   const theme = currentTheme(element);
   const own = { extension: extension || spec.id, version: version || spec.version, theme };
   const context = { ...host.context, ...own, props: props ?? {} };
-  // The prototype keeps a class-based host's methods and their this.
-  return Object.assign(Object.create(host) as Host, { context });
+  return { tool: host.tool.bind(host), api: host.api.bind(host), context };
 };
 
 const render = (root: Root, { component: Component }: WidgetSpec, host: Host): void =>
