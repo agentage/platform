@@ -1,6 +1,6 @@
 # platform
 
-Everything an agentage extension author imports or runs, and no product code. Two packages:
+Everything an agentage extension author imports or runs, and no product code. The packages:
 
 - [`@agentage/extension`](packages/extension): the extension kit (a part exports only
   `create(ctx)`; the kit owns servers, `/health`, discovery, the correlation id, the envelope, the
@@ -8,6 +8,8 @@ Everything an agentage extension author imports or runs, and no product code. Tw
 - [`@agentage/widget`](packages/widget): the ui part. React widgets as custom elements in a
   shadow root, the host bridge (`useHost`), design-system `Button` and `Card`, and the bundler
   with its harness page.
+- [`@agentage/shell`](packages/shell): the shell kit. `readInstallation` reads what a target
+  runs, `mountWidgets` places each extension's widgets by a nested layout.
 
 ## Install
 
