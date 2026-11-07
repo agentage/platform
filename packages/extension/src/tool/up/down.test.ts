@@ -1,4 +1,4 @@
-import { mkdir, realpath, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, realpath, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { json, SPEC_MANIFEST, tempPackage } from '../../test-support/packages.js';
@@ -104,6 +104,17 @@ describe('down', () => {
     await down({ dir, onLine: (l) => void lines.push(l) }, fakeRun(0, '').run);
     const project = projectName('probe', await realpath(dir));
     expect(lines).toEqual([`removed  ${'nothing was running'.padEnd(45)}${project}`]);
+  });
+
+  it('removes the secret files up wrote, even with --keep-data, and keeps secrets.json', async () => {
+    const dir = await tempPackage({
+      'package.json': json(SPEC_MANIFEST),
+      '.agentage/secrets.json': json({ 'github-read': 'x' }),
+      '.agentage/secrets/github-read': 'x',
+    });
+    await down({ dir, keepData: true }, fakeRun().run);
+    expect(await readdir(join(dir, '.agentage'))).toEqual(['secrets.json']);
+    await down({ dir }, fakeRun(0, '').run);
   });
 
   it('throws with the compose error when down fails', async () => {

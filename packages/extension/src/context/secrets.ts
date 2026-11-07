@@ -1,10 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-// An extension declares its names: `declare module '@agentage/extension' { interface Secrets { githubRead: string } }`.
-export interface Secrets {
-  readonly [name: string]: string;
-}
+// Empty on purpose: `declare module '@agentage/extension' { interface Secrets { githubRead: string } }` adds names.
+export interface Secrets {}
 
 export const SECRETS_DIR = '/run/secrets';
 
@@ -23,7 +21,7 @@ export const readSecrets = async (names: readonly string[], dir: string, part: s
   const pairs = await Promise.all(read);
   const missing = pairs.find(([, value]) => value === '');
   if (missing) throw new Error(`${part} refused to start: secret ${missing[0]} has no value`);
-  const secrets: Secrets = Object.fromEntries(
+  const secrets: Record<string, string> = Object.fromEntries(
     pairs.map(([name, value]) => [camelName(name), value])
   );
   return Object.freeze(secrets);

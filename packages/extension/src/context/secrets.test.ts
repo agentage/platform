@@ -2,6 +2,7 @@ import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { tempPackage } from '../test-support/packages.js';
+import { type PartContext } from './context.js';
 import { camelName, readSecrets } from './secrets.js';
 
 describe('secrets', () => {
@@ -30,5 +31,12 @@ describe('secrets', () => {
     await expect(readSecrets(['github-read'], dir, 'api')).rejects.toThrow(
       'api refused to start: secret github-read has no value'
     );
+  });
+
+  it('names no secret until an extension declares it with declare module', () => {
+    const read = (ctx: PartContext) =>
+      // @ts-expect-error a name nobody declared is a compile error, not undefined at runtime
+      ctx.secrets.githubRaed;
+    expect(read).toBeTypeOf('function');
   });
 });

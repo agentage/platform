@@ -1,4 +1,4 @@
-import { readFile, stat, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { validateManifest } from '../../manifest/read-manifest.js';
@@ -17,7 +17,7 @@ describe('up secrets', () => {
     expect(secretEnvName('github-read')).toBe('AGENTAGE_SECRET_GITHUB_READ');
   });
 
-  it('writes each value to a 0644 file in a 0700 folder, the env over secrets.json', async () => {
+  it('writes each value to a 0600 file in a 0700 folder, the env over secrets.json', async () => {
     const files = { '.agentage/secrets.json': json({ 'github-read': 'file', 'smtp-pass': 'pw' }) };
     const dir = await tempPackage(files);
     const out = await writeUpSecrets(dir, PKG, { AGENTAGE_SECRET_GITHUB_READ: 'env' });
@@ -29,7 +29,10 @@ describe('up secrets', () => {
     expect(await readFile(`${folder}/github-read`, 'utf8')).toBe('env');
     expect(await readFile(`${folder}/smtp-pass`, 'utf8')).toBe('pw');
     expect((await stat(folder)).mode & 0o777).toBe(0o700);
-    expect((await stat(`${folder}/smtp-pass`)).mode & 0o777).toBe(0o644);
+    expect((await stat(`${folder}/smtp-pass`)).mode & 0o777).toBe(0o600);
+    await chmod(`${folder}/smtp-pass`, 0o644);
+    await writeUpSecrets(dir, PKG, { AGENTAGE_SECRET_GITHUB_READ: 'env' });
+    expect((await stat(`${folder}/smtp-pass`)).mode & 0o777).toBe(0o600);
   });
 
   it('refuses a missing value by name and a broken secrets.json without quoting it', async () => {
@@ -41,6 +44,11 @@ describe('up secrets', () => {
     const broken = writeUpSecrets(dir, PKG, {});
     await expect(broken).rejects.toThrow(
       /^up stopped: \.agentage\/secrets\.json is not valid JSON$/
+    );
+    await rm(join(dir, '.agentage/secrets.json'));
+    await mkdir(join(dir, '.agentage/secrets.json'));
+    await expect(writeUpSecrets(dir, PKG, {})).rejects.toThrow(
+      /^up stopped: \.agentage\/secrets\.json cannot be read$/
     );
     expect(await writeUpSecrets(dir, validateManifest(API_MANIFEST), {})).toBeUndefined();
   });
