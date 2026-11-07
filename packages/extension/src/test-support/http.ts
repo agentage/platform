@@ -15,7 +15,10 @@ export interface Served {
 export const serveApp = async (app: Express): Promise<Served> => {
   const server = await listen(app, 0, '127.0.0.1');
   const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  return { url, close: () => new Promise((resolve) => server.close(() => resolve())) };
+  // An idle keep-alive socket left by an aborted fetch would hold close() for 4 s.
+  const close = () =>
+    new Promise<void>((resolve) => (server.close(() => resolve()), server.closeAllConnections()));
+  return { url, close };
 };
 
 export interface RecordedLog {
