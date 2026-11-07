@@ -132,6 +132,7 @@ jobs:
   probe-local-gate:
     name: Probe local gate on this kit
     needs: verify
+    if: github.event.pull_request.head.repo.fork != true
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -160,28 +161,20 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 22
+          cache: 'npm'
+          cache-dependency-path: platform/package-lock.json
 
-      - name: Build and pack the candidate kit and widget
-        working-directory: platform
+      # The tarballs sit in the probe folder and the lock points at them, so the server images build from the candidate.
+      - name: Pack the candidate kit and widget, install them in probe
         run: |
+          npm ci --prefix platform
+          npm run build --prefix platform
+          npm pack --workspaces --prefix platform --pack-destination "$PWD/probe"
+          cd probe
           npm ci
+          npm install ./agentage-extension-*.tgz ./agentage-widget-*.tgz
+          npm ls @agentage/extension @agentage/widget
           npm run build
-          mkdir -p "$RUNNER_TEMP/pack"
-          npm pack --workspaces --pack-destination "$RUNNER_TEMP/pack"
-
-      - name: Install probe with the candidate kit, build, Chromium
-        working-directory: probe
-        run: |
-          npm ci
-          npm install --no-save --no-audit --no-fund "$RUNNER_TEMP"/pack/agentage-extension-*.tgz "$RUNNER_TEMP"/pack/agentage-widget-*.tgz
-          npm run build
-          npx playwright install chromium
-
-      - name: Install agentage/e2e
-        if: github.actor != 'dependabot[bot]'
-        run: |
-          npm ci --prefix e2e-suite --no-audit --no-fund
-          npx --prefix e2e-suite playwright install chromium
 
       - name: agentage extension up
         working-directory: probe
@@ -192,7 +185,18 @@ jobs:
         working-directory: e2e-suite
         env:
           PROBE_DIR: ${{ github.workspace }}/probe
-        run: npm run e2e -- probe gate local
+        run: |
+          npm ci
+          npx playwright install chromium
+          npm run e2e -- probe gate local
+
+      # A gate that skipped itself is not green.
+      - name: Assert the gate was not vacuous
+        if: github.actor != 'dependabot[bot]'
+        working-directory: e2e-suite
+        env:
+          MIN_EXECUTED: '30'
+        run: node scripts/assert-executed.mjs
 
       - name: agentage extension down
         if: always()
