@@ -23,6 +23,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Tag commit must be on master
+        run: |
+          git fetch origin master
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/master || { echo "::error::$GITHUB_SHA is not on master"; exit 1; }
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -31,7 +38,7 @@ jobs:
           cache: 'npm'
 
       - name: Install
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Verify
         run: npm run verify
