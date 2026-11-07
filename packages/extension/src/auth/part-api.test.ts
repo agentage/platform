@@ -27,7 +27,7 @@ afterEach(async () => {
 const start = () => startPart(dir, 'api', authEnv(issuer, dir));
 
 describe('an api part checks tokens (C5, C6)', () => {
-  it('401 without a token, 403 naming the scope, 200 with the caller; public stays open', async () => {
+  it('401 without a token, 403 naming the scope, 200 no-store with the caller; public stays open', async () => {
     const url = await start();
     const none = await fetch(`${url}/api/v1/echo`, { headers: { agcid: 'trace-401-m3' } });
     expect([none.status, none.headers.get('www-authenticate')]).toEqual([401, RESOURCE]);
@@ -41,14 +41,16 @@ describe('an api part checks tokens (C5, C6)', () => {
     expect(await refused.json()).toMatchObject({ error: { message: 'Needs probe:read' } });
     const read = await issuer.bearer({ scope: 'probe:read', sub: 'usr_1' });
     const echo = await fetch(`${url}/api/v1/echo`, { headers: { authorization: read } });
+    expect(echo.headers.get('cache-control')).toBe('no-store');
     expect(await echo.json()).toEqual({
       success: true,
       data: { sub: 'usr_1', scopes: ['probe:read'] },
     });
-    expect(await (await fetch(`${url}/api/v1/ticks`)).json()).toEqual({
-      success: true,
-      data: null,
-    });
+    const ticks = await fetch(`${url}/api/v1/ticks`);
+    expect([ticks.headers.get('cache-control'), await ticks.json()]).toEqual([
+      null,
+      { success: true, data: null },
+    ]);
   });
 
   it('a read token gets 403 on a write route under every spelling Express routes', async () => {

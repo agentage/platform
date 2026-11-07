@@ -101,10 +101,12 @@ const openapiHandler =
 // Before the body is read: each request checked for the access its OpenAPI operation declares.
 const routeGuard =
   (options: ApiAppOptions): RequestHandler =>
-  async (req, _res, next) => {
+  async (req, res, next) => {
     if (!options.tokenCheck) return next();
     const access = routeAccess(options.openapi, req.method, `/api/v1${req.path}`);
-    setCaller(req, await options.tokenCheck(req.get('authorization'), access));
+    const caller = await options.tokenCheck(req.get('authorization'), access);
+    if (caller) res.setHeader('Cache-Control', 'no-store');
+    setCaller(req, caller);
     next();
   };
 
