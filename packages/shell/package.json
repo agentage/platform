@@ -1,0 +1,54 @@
+{
+  "name": "@agentage/shell",
+  "version": "0.1.0",
+  "description": "The agentage shell kit: readInstallation reads what a target runs, mountWidgets places each extension's widgets by a nested layout",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/agentage/platform.git",
+    "directory": "packages/shell"
+  },
+  "homepage": "https://agentage.io",
+  "bugs": {
+    "url": "https://github.com/agentage/platform/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "!dist/**/*.test.*"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "verify": "npm run verify --prefix ../..",
+    "prepublishOnly": "npm run verify"
+  },
+  "dependencies": {
+    "zod": "^4.2.0"
+  },
+  "peerDependencies": {
+    "@agentage/widget": "^0.2.0"
+  },
+  "devDependencies": {
+    "@agentage/widget": "^0.2.0"
+  },
+  "keywords": [
+    "agentage",
+    "extension",
+    "shell",
+    "widget"
+  ]
+}
