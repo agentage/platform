@@ -129,12 +129,12 @@ in [`packages/extension/schemas`](packages/extension/schemas), generated from th
 `src/ui/index.ts` exports `widgets = { echo: Echo }`, each a React component
 ([example](packages/widget/README.md)). The kit gives:
 
-| Import                      | Gives                                                                                                                                                                                                                                                        |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `@agentage/widget`          | `useHost()`: `tool(name, args)` resolves the tool's `structuredContent` (rejects with its `error.code`), `api(path, init)` resolves the `/api/v1` envelope's `data`, `context` (extension, version, path, theme); types `Host`, `HostContext`, `ToolOutputs` |
-| `@agentage/widget/ds`       | design-system `Button` and `Card` (`title` plus children) styled inside the shadow root; light and dark follow `prefers-color-scheme`                                                                                                                        |
-| `@agentage/widget/register` | `registerWidgets(id, widgets, { version })`: defines `{id}-{kebab name}` once, open shadow root, adopted sheet, React root that shows an error box when the widget throws                                                                                    |
-| `@agentage/widget/bundle`   | `bundle({ dir })`, also the bin `agentage-widget bundle [--dir <ext>]` (exit 0 ok, 1 failure, 2 usage)                                                                                                                                                       |
+| Import                      | Gives                                                                                                                                                                                                                                                                                                                    |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `@agentage/widget`          | `useHost()`: `tool(name, args)` resolves the tool's `structuredContent` (rejects with its `error.code`), `api(path, init)` resolves the `/api/v1` envelope's `data`, `context` (extension, version, path, theme, props); `createBridge({ baseUrl, token })` for a shell host; types `Host`, `HostContext`, `ToolOutputs` |
+| `@agentage/widget/ds`       | design-system `Button` and `Card` (`title` plus children) styled inside the shadow root; the host element's `data-theme=light\|dark` decides, else `prefers-color-scheme`                                                                                                                                                |
+| `@agentage/widget/register` | `registerWidgets(id, widgets, { version })`: defines `{id}-{kebab name}` once, open shadow root, adopted sheet, React root that shows an error box when the widget throws                                                                                                                                                |
+| `@agentage/widget/bundle`   | `bundle({ dir })`, also the bin `agentage-widget bundle [--dir <ext>]` (exit 0 ok, 1 failure, 2 usage)                                                                                                                                                                                                                   |
 
 The bundler reads `agentage.id` and `version` from the extension's `package.json` and writes
 `dist/ui/`: `{id}.js` (one minified self-contained ESM module: React, components, CSS; it calls
@@ -146,7 +146,7 @@ The harness page mounts every widget from `widgets.json` (or `?widget=<name>`) a
 `Mcp-Method`, `Mcp-Name` headers, a JSON or `text/event-stream` answer) and `api` to
 `/api/v1{path}`, each call bounded at 30 s (`TIMEOUT`); a refusal before the tool runs (a 401,
 403 or 503) rejects with the envelope's code. Its token: `?token=` wins; on `localhost` or
-`127.0.0.1` it asks the dev issuer at `http://localhost:4281/token` for `{id}:read` (5 s); else it
+`127.0.0.1` it asks the dev issuer at `http://localhost:4281/token` for `?scope=` (default `{id}:read`, 5 s); else it
 calls anonymously. The token stays in the bridge. The page has no inline script, so it runs under
 the ui part's CSP.
 
