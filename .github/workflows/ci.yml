@@ -128,3 +128,78 @@ jobs:
             packages/widget/playwright-report
             packages/widget/test-results
           retention-days: 7
+
+  probe-local-gate:
+    name: Probe local gate on this kit
+    needs: verify
+    if: github.event.pull_request.head.repo.fork != true
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          path: platform
+
+      - name: Checkout agentage/extension-probe
+        uses: actions/checkout@v7
+        with:
+          repository: agentage/extension-probe
+          path: probe
+
+      # agentage/e2e is private; the org PAT_TOKEN reads it. Dependabot runs get no secrets.
+      - name: Checkout agentage/e2e
+        if: github.actor != 'dependabot[bot]'
+        uses: actions/checkout@v7
+        with:
+          repository: agentage/e2e
+          path: e2e-suite
+          token: ${{ secrets.PAT_TOKEN }}
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: platform/package-lock.json
+
+      # The tarballs sit in the probe folder and the lock points at them, so the server images build from the candidate.
+      - name: Pack the candidate kit and widget, install them in probe
+        run: |
+          npm ci --prefix platform
+          npm run build --prefix platform
+          npm pack --workspaces --prefix platform --pack-destination "$PWD/probe"
+          cd probe
+          npm ci
+          npm install ./agentage-extension-*.tgz ./agentage-widget-*.tgz
+          grep -E "\"@agentage/(extension|widget)\": \"file:" package.json
+          grep -cE "\"resolved\": \"file:agentage-(extension|widget)-" package-lock.json
+          npm run build
+
+      - name: agentage extension up
+        working-directory: probe
+        run: node_modules/.bin/agentage extension up
+
+      - name: e2e gate on local (agentage/e2e, probe gate local)
+        if: github.actor != 'dependabot[bot]'
+        working-directory: e2e-suite
+        env:
+          PROBE_DIR: ${{ github.workspace }}/probe
+        run: |
+          npm ci
+          npx playwright install chromium
+          npm run e2e -- probe gate local
+
+      # A gate that skipped itself is not green.
+      - name: Assert the gate was not vacuous
+        if: github.actor != 'dependabot[bot]'
+        working-directory: e2e-suite
+        env:
+          MIN_EXECUTED: '30'
+        run: node scripts/assert-executed.mjs
+
+      - name: agentage extension down
+        if: always()
+        working-directory: probe
+        run: node_modules/.bin/agentage extension down || true
