@@ -34,10 +34,16 @@ describe('readConfig', () => {
       token: 'aga_1',
     });
     expect(readConfig(document, '')).toEqual({ id: 'probe', version: '0.2.0' });
+    expect(readConfig(document, '?scope=probe:read probe:write&theme=light')).toMatchObject({
+      scope: 'probe:read probe:write',
+      theme: 'light',
+    });
   });
 
   it('refuses a bad widget name and a page without the meta', () => {
     expect(() => readConfig(document, '?widget=<b>')).toThrow(/a widget name is lowercase kebab/);
+    expect(() => readConfig(document, '?theme=blue')).toThrow();
+    expect(() => readConfig(document, '?scope="x"')).toThrow();
     document.head.replaceChildren();
     expect(issuePaths(thrown(() => readConfig(document, '')))).toEqual(['id', 'version']);
   });
@@ -63,6 +69,8 @@ describe('mount', () => {
     const made = mountWidgets(document.body, [echo, stats]);
     expect(made.map((el) => el.localName)).toEqual(['probe-echo', 'probe-stats']);
     expect(document.body.children).toHaveLength(2);
+    const [themed] = mountWidgets(document.body, [echo], 'light');
+    expect(themed?.getAttribute('data-theme')).toBe('light');
   });
 
   it('shows a problem as an alert', () => {

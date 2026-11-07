@@ -12,8 +12,10 @@ import { callTool } from './tool.js';
 import { WIDGET_VERSION } from './version.js';
 
 export interface BridgeOptions {
-  id: string;
-  version: string;
+  id?: string;
+  version?: string;
+  baseUrl?: string;
+  props?: Record<string, unknown>;
   clientName?: string;
   token?: TokenSource;
   fetch?: FetchLike;
@@ -22,18 +24,23 @@ export interface BridgeOptions {
 const foreign = (id: string) =>
   hostError('FOREIGN_TOOL', `a ${id} widget calls only ${id}__ tools`);
 
+// A bridge without an id (one shell host for a whole deployment) leaves the guard to its baseUrl.
+const own = (id: string | undefined, name: string) => !id || name.startsWith(`${id}__`);
+
 const anonymous: TokenSource = () => Promise.resolve(undefined);
 
-const contextOf = (id: string, version: string): HostContext => ({
-  extension: id,
-  version,
+const contextOf = (options: BridgeOptions): HostContext => ({
+  extension: options.id ?? '',
+  version: options.version ?? '',
   path: globalThis.location?.pathname ?? '/',
   theme: currentTheme(),
+  props: options.props ?? {},
 });
 
-// Same-origin bridge: POST /mcp and /api/v1; the token, when any, stays in here.
+// POST {baseUrl}/mcp and {baseUrl}/api/v1, same origin by default; the token stays in here.
 export const createBridge = (options: BridgeOptions): Host => {
-  const fetchFn: FetchLike = options.fetch ?? ((input, init) => fetch(input, init));
+  const base = (options.baseUrl ?? '').replace(/\/+$/, '');
+  const fetchFn: FetchLike = (input, init) => (options.fetch ?? fetch)(`${base}${input}`, init);
   const token = options.token ?? anonymous;
   let lastId = 0;
   const clientInfo = { name: options.clientName ?? 'agentage-widget', version: WIDGET_VERSION };
@@ -41,10 +48,10 @@ export const createBridge = (options: BridgeOptions): Host => {
   return {
     // The cast is the typed view an extension declares through ToolOutputs.
     tool: <N extends string>(name: N, args: Record<string, unknown> = {}) =>
-      (name.startsWith(`${options.id}__`)
+      (own(options.id, name)
         ? callTool(tool, name, args)
-        : Promise.reject(foreign(options.id))) as Promise<ToolOutput<N>>,
+        : Promise.reject(foreign(options.id ?? ''))) as Promise<ToolOutput<N>>,
     api: (path, init) => callApi(fetchFn, token, path, init),
-    context: contextOf(options.id, options.version),
+    context: contextOf(options),
   };
 };

@@ -29,6 +29,12 @@ describe('resolveToken', () => {
     expect(timeout.mock.calls).toEqual([[5_000], [5_000]]);
   });
 
+  it('asks the dev issuer for ?scope= when given', async () => {
+    const { calls, input: args } = input('localhost', [jsonResponse({ token: 'aga_w' })]);
+    await expect(resolveToken({ ...args, scope: 'probe:write' })).resolves.toBe('aga_w');
+    expect(calls[0]?.init.body).toBe('{"scope":"probe:write"}');
+  });
+
   it('stays anonymous on a deployed host, without a warning', async () => {
     const { calls, warn, input: args } = input('probe.next.agentage.io', []);
     await expect(resolveToken(args)).resolves.toBeUndefined();

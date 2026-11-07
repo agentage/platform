@@ -25,8 +25,14 @@ export const pickWidgets = (list: WidgetList, only?: string): WidgetList => {
   return picked;
 };
 
-export const mountWidgets = (target: Element, list: WidgetList): HTMLElement[] =>
-  list.map((widget) => target.appendChild(target.ownerDocument.createElement(widget.element)));
+const create = (doc: Document, element: string, theme?: string): HTMLElement => {
+  const el = doc.createElement(element);
+  if (theme) el.setAttribute('data-theme', theme);
+  return el;
+};
+
+export const mountWidgets = (target: Element, list: WidgetList, theme?: string): HTMLElement[] =>
+  list.map((widget) => target.appendChild(create(target.ownerDocument, widget.element, theme)));
 
 export const showProblem = (target: Element, message: string): void => {
   const box = target.ownerDocument.createElement('p');

@@ -38,6 +38,7 @@ describe('createBridge', () => {
       version: '0.2.0',
       path: '/ui/0.2.0/harness.html',
       theme: 'light',
+      props: {},
     });
     await expect(host.api('/one')).resolves.toBe(1);
     expect(new Headers(calls[0]?.init.headers).has('authorization')).toBe(false);
@@ -51,6 +52,22 @@ describe('createBridge', () => {
     expect(JSON.stringify(host)).not.toContain('aga_secret');
     await host.tool('probe__echo');
     expect(new Headers(calls[0]?.init.headers).get('authorization')).toBe('Bearer aga_secret');
+  });
+
+  it('calls {baseUrl}/mcp and {baseUrl}/api/v1 and carries props; no id, no guard', async () => {
+    const { fetch, calls } = fakeFetch(toolAnswer({}), jsonResponse({ success: true, data: 2 }));
+    const host = createBridge({
+      baseUrl: 'https://probe.next.agentage.io/',
+      fetch,
+      props: { n: 1 },
+    });
+    await host.tool('memory__search');
+    await expect(host.api('/two')).resolves.toBe(2);
+    expect(calls.map((call) => call.url)).toEqual([
+      'https://probe.next.agentage.io/mcp',
+      'https://probe.next.agentage.io/api/v1/two',
+    ]);
+    expect(host.context).toMatchObject({ extension: '', version: '', props: { n: 1 } });
   });
 
   it('is dark with no media query and / with no location', () => {

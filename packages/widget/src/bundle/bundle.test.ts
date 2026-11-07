@@ -64,7 +64,13 @@ describe('bundle on the fixture extension', () => {
 
   it('runs as one widget runtime: the echo calls its tool and shows the answer', async () => {
     const tool = vi.fn(() => Promise.resolve({ msg: 'pong hi' }));
-    const context = { extension: 'probe', version: '0.2.0', path: '/', theme: 'dark' } as const;
+    const context = {
+      extension: 'probe',
+      version: '0.2.0',
+      path: '/',
+      theme: 'dark',
+      props: {},
+    } as const;
     const window = await pageWith({
       tool: tool as Host['tool'],
       api: () => Promise.resolve(null),

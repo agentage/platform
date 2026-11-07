@@ -35,24 +35,41 @@ test.beforeEach(() => {
   calls.length = 0;
 });
 
-for (const colorScheme of ['light', 'dark'] as const) {
-  test(`echo widget answers pong hi, axe WCAG A/AA clean (${colorScheme})`, async ({ page }) => {
+const opposite = { light: 'dark', dark: 'light' } as const;
+
+// The host attribute decides against the opposite system preference, so the attribute is proven.
+for (const theme of ['light', 'dark'] as const) {
+  test(`echo widget answers pong hi, axe WCAG A/AA clean (${theme})`, async ({ page }) => {
     const problems: string[] = [];
     page.on('pageerror', (error) => problems.push(error.message));
     page.on('console', (msg) => {
       if (msg.type() === 'error' && !msg.location().url.startsWith(DEV_ISSUER))
         problems.push(msg.text());
     });
-    await page.emulateMedia({ colorScheme });
-    await page.goto('/ui/0.2.0/harness.html');
+    await page.emulateMedia({ colorScheme: opposite[theme] });
+    await page.goto(`/ui/0.2.0/harness.html?theme=${theme}`);
+    await expect(page.locator('probe-echo')).toHaveAttribute('data-theme', theme);
     await page.getByRole('button', { name: 'ping' }).click();
     await expect(page.locator('probe-echo')).toContainText('pong hi');
     const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
     expect(violations.map((violation) => violation.id)).toEqual([]);
-    await expect(page).toHaveScreenshot(`echo-${colorScheme}.png`);
+    await expect(page).toHaveScreenshot(`echo-${theme}.png`);
     expect(problems).toEqual([]);
   });
 }
+
+test('a theme toggle on the host reaches the widget at run time', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.goto('/ui/0.2.0/harness.html?theme=dark');
+  const echo = page.locator('probe-echo');
+  const scheme = () => echo.evaluate((el) => getComputedStyle(el).colorScheme);
+  await expect(echo.getByRole('button', { name: 'ping' })).toBeVisible();
+  expect(await scheme()).toBe('dark');
+  await echo.evaluate((el) => el.setAttribute('data-theme', 'light'));
+  expect(await scheme()).toBe('light');
+  await echo.evaluate((el) => el.removeAttribute('data-theme'));
+  expect(await scheme()).toBe('dark');
+});
 
 test('the harness speaks 2026-07-28 tools/call and keeps the token in the bridge', async ({
   page,

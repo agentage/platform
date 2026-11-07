@@ -11,6 +11,7 @@ export interface TokenInput {
   id: string;
   hostname: string;
   token?: string;
+  scope?: string;
   fetch: FetchLike;
   warn: (message: string) => void;
 }
@@ -19,7 +20,7 @@ const fromIssuer = async (input: TokenInput): Promise<string> => {
   const res = await input.fetch(DEV_ISSUER, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ scope: `${input.id}:read` }),
+    body: JSON.stringify({ scope: input.scope ?? `${input.id}:read` }),
     signal: AbortSignal.timeout(ISSUER_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`dev issuer answered ${res.status}`);
@@ -28,7 +29,7 @@ const fromIssuer = async (input: TokenInput): Promise<string> => {
   return answer.data.token;
 };
 
-// ?token= wins; on a local page the dev issuer of `up` mints one; elsewhere calls stay anonymous.
+// ?token= wins; on a local page the dev issuer of `up` mints ?scope= (default {id}:read).
 export const resolveToken = async (input: TokenInput): Promise<string | undefined> => {
   if (input.token) return input.token;
   if (!LOCAL_HOSTS.has(input.hostname)) return undefined;

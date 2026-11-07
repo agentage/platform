@@ -3,6 +3,7 @@ export interface HostContext {
   version: string;
   path: string;
   theme: 'light' | 'dark';
+  props: Record<string, unknown>;
 }
 
 // Augmented per extension: declare module '@agentage/widget' { interface ToolOutputs { ... } }

@@ -9,6 +9,18 @@
 @source not '../**/*.test.*';
 @source not '../test-support';
 
+/* dark: utilities follow the host's data-theme first, the system second. */
+@custom-variant dark {
+  :host([data-theme='dark']) & {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    :host(:not([data-theme='light'])) & {
+      @slot;
+    }
+  }
+}
+
 @layer base {
   *,
   ::before,
@@ -29,10 +41,4 @@
   font-family: var(--font-sans);
   line-height: var(--leading-normal);
   -webkit-font-smoothing: antialiased;
-}
-
-@media (prefers-color-scheme: light) {
-  :host {
-    color-scheme: light;
-  }
 }
