@@ -77,7 +77,9 @@ const webRequest = (req: Request, body: Buffer): globalThis.Request => {
 
 const send = async (response: globalThis.Response, res: Response, auth: boolean) => {
   res.status(response.status);
-  response.headers.forEach((value, key) => void res.setHeader(key, value));
+  response.headers.forEach(
+    (value, key) => void (key !== 'set-cookie' && res.setHeader(key, value))
+  );
   // After the SDK headers: its SSE answer sets no-cache, which a token-checked answer overrides.
   if (auth) res.setHeader('Cache-Control', 'no-store');
   if (!response.body) return void res.end();

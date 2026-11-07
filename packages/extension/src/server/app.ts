@@ -51,6 +51,12 @@ export const PUBLIC_CORS: CorsOptions = {
   exposedHeaders: ['agcid', 'ETag', 'Retry-After', 'RateLimit', 'WWW-Authenticate'],
 };
 
+// api-standards section 5: parts take bearer tokens only, so no handler or log ever sees a cookie.
+const dropCookie: RequestHandler = (req, _res, next) => {
+  delete req.headers.cookie;
+  next();
+};
+
 export const BODY_LIMIT = '1mb';
 
 const requestOrigin = (req: Request): string => `${req.protocol}://${req.get('host') ?? ''}`;
@@ -77,7 +83,7 @@ export const createPartApp = (options: PartAppOptions): Express => {
   const app = express();
   // The gateway calls parts over a private network; its X-Forwarded-Proto then sets req.protocol.
   app.set('trust proxy', 'loopback, linklocal, uniquelocal');
-  app.use(agcidMiddleware, helmet(options.helmet));
+  app.use(dropCookie, agcidMiddleware, helmet(options.helmet));
   app.get('/health', healthHandler(options));
   if (options.part !== 'worker') {
     app.use('/.well-known', cors(PUBLIC_CORS));

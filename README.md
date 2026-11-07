@@ -118,6 +118,7 @@ through `@agentage/extension/tool`, plus `runCommand` and `checkCli` for install
 | `AGENTAGE_STORE_URL` / `_FILE`                            | the postgres connection (or a file holding it); else libpq `PG*` variables                          |
 | `AGENTAGE_ISSUER`, `AGENTAGE_AUDIENCE`, `AGENTAGE_ORIGIN` | required for api and mcp: without them, or with a host off the audience, the part does not start    |
 | `AGENTAGE_DEV_ISSUER`                                     | set by `up` for the ui part only: its CSP then lets the harness reach the dev issuer                |
+| `Cookie` request header                                   | dropped before any handler; a part sets no cookie and its CORS carries no credentials               |
 
 Schemas for the manifest, the build record, the discovery document, `/health` and the envelope are
 in [`packages/extension/schemas`](packages/extension/schemas), generated from the kit's Zod schemas
