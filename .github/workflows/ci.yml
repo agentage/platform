@@ -60,6 +60,14 @@ jobs:
           if grep -Eq '\.test\.|test-support|/e2e/' /tmp/pack/widget-files.txt; then echo 'test files in the widget tarball'; exit 1; fi
           node packages/widget/dist/bundle/cli.js --help
 
+      - name: Pack smoke - identity (dist in, tests out)
+        run: |
+          set -euo pipefail
+          npm pack -w @agentage/identity --pack-destination /tmp/pack
+          tar -tzf /tmp/pack/agentage-identity-*.tgz > /tmp/pack/identity-files.txt
+          grep -qx 'package/dist/index.js' /tmp/pack/identity-files.txt
+          if grep -Eq '\.test\.' /tmp/pack/identity-files.txt; then echo 'test files in the identity tarball'; exit 1; fi
+
       - name: Image smoke - extension-probe on this kit, every part through up
         run: |
           set -euo pipefail
