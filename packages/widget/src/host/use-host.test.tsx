@@ -28,7 +28,7 @@ describe('useHost', () => {
     const host: Host = {
       tool: (() => Promise.resolve({})) as Host['tool'],
       api: () => Promise.resolve(null),
-      context: { extension: 'probe', version: '0.2.0', path: '/', theme: 'dark' },
+      context: { extension: 'probe', version: '0.2.0', path: '/', theme: 'dark', props: {} },
     };
     const seen = vi.fn();
     const root = createRoot(document.createElement('div'));

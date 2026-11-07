@@ -4,6 +4,8 @@ import { ExtensionIdSchema, WidgetNameSchema } from '../register/names.js';
 const QuerySchema = z.object({
   widget: z.optional(WidgetNameSchema),
   token: z.optional(z.string().check(z.minLength(1), z.maxLength(4096))),
+  scope: z.optional(z.string().check(z.regex(/^[a-z][a-z0-9:_ -]{0,255}$/))),
+  theme: z.optional(z.enum(['light', 'dark'])),
 });
 
 const PageSchema = z.object({
@@ -16,6 +18,8 @@ export interface HarnessConfig {
   version: string;
   widget?: string;
   token?: string;
+  scope?: string;
+  theme?: 'light' | 'dark';
 }
 
 const meta = (doc: Document, name: string): string | undefined =>
@@ -33,6 +37,8 @@ export const readConfig = (doc: Document, search: string): HarnessConfig => {
   const query = QuerySchema.parse({
     widget: queryValue(params, 'widget'),
     token: queryValue(params, 'token'),
+    scope: queryValue(params, 'scope'),
+    theme: queryValue(params, 'theme'),
   });
   return { ...page, ...query };
 };

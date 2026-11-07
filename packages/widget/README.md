@@ -44,5 +44,12 @@ declare module '@agentage/widget' {
 npx agentage-widget bundle            # dist/ui/{id}.js, widgets.json, harness.html, harness.js
 ```
 
+A host element's `data-theme="light"` or `"dark"` decides the theme, set by a shell at any time;
+without it the system `prefers-color-scheme` decides. `useHost().context` carries `theme` and
+`props` (`{}` by default). A shell builds the host for a deployment with
+`createBridge({ baseUrl, token })` and sets `el.host` before it appends the element. The harness
+page takes `?theme=light|dark`, `?widget=`, `?token=` and `?scope=` (the dev token's scope,
+default `{id}:read`).
+
 See the [platform README](https://github.com/agentage/platform#readme) for the bridge protocol
 and the harness page.

@@ -18,12 +18,13 @@ const start = async (target: Element): Promise<void> => {
   dropTokenFromUrl();
   const warn = (message: string) => console.warn(message);
   const input = { id: config.id, hostname: location.hostname, fetch: fetchFn, warn };
-  const token = resolveToken({ ...input, token: config.token });
+  const token = resolveToken({ ...input, token: config.token, scope: config.scope });
   const bridge = { id: config.id, version: config.version, clientName: 'agentage-harness' };
   globalThis.__agentageHost = () => createBridge({ ...bridge, token: () => token });
   await import(new URL(`./${config.id}.js`, document.baseURI).href);
   const list = await loadWidgets(fetchFn, new URL('./widgets.json', document.baseURI).href);
-  mountWidgets(target, pickWidgets(list, config.widget));
+  if (config.theme) document.documentElement.dataset.theme = config.theme;
+  mountWidgets(target, pickWidgets(list, config.widget), config.theme);
 };
 
 const target = document.getElementById('widgets') ?? document.body;

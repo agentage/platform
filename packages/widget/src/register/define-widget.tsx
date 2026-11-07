@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { adoptWidgetStyles } from '../ds/sheet.js';
 import { HostProvider } from '../host/use-host.js';
 import { type Host } from '../host/host.types.js';
+import { currentTheme } from '../host/theme.js';
 import { resolveHost } from './resolve-host.js';
 import { WidgetError } from './widget-error.js';
 
@@ -13,10 +14,9 @@ export interface WidgetSpec {
   component: ComponentType;
 }
 
-const mount = (shadow: ShadowRoot, spec: WidgetSpec, host: Host): Root => {
+const mount = (shadow: ShadowRoot, element: string): Root => {
   const container = shadow.ownerDocument.createElement('div');
   shadow.append(container);
-  const { component: Component, element } = spec;
   // The widget's own root is its error boundary: a throw replaces only this box.
   const root: Root = createRoot(container, {
     onUncaughtError: (error) => {
@@ -24,24 +24,49 @@ const mount = (shadow: ShadowRoot, spec: WidgetSpec, host: Host): Root => {
       queueMicrotask(() => root.render(<WidgetError element={element} error={error} />));
     },
   });
+  return root;
+};
+
+// The widget sees its element's theme, its own id and version, and props {} when none is given.
+const viewOf = (host: Host, element: Element, spec: WidgetSpec): Host => {
+  const { extension, version, props } = host.context;
+  const theme = currentTheme(element);
+  const own = { extension: extension || spec.id, version: version || spec.version, theme };
+  const context = { ...host.context, ...own, props: props ?? {} };
+  // The prototype keeps a class-based host's methods and their this.
+  return Object.assign(Object.create(host) as Host, { context });
+};
+
+const render = (root: Root, { component: Component }: WidgetSpec, host: Host): void =>
   root.render(
     <HostProvider host={host}>
       <Component />
     </HostProvider>
   );
-  return root;
-};
 
 export const defineWidget = (spec: WidgetSpec): CustomElementConstructor =>
   class AgentageWidget extends HTMLElement {
+    static observedAttributes = ['data-theme'];
     host?: Host;
     #root?: Root;
+    #host?: Host;
 
     connectedCallback(): void {
       if (this.#root) return;
       const shadow = this.shadowRoot ?? this.attachShadow({ mode: 'open' });
       adoptWidgetStyles(shadow);
-      this.#root = mount(shadow, spec, resolveHost(this, spec.id, spec.version));
+      this.#host = resolveHost(this, spec.id, spec.version);
+      this.#root = mount(shadow, spec.element);
+      this.#render();
+    }
+
+    // A theme toggle on the element re-renders the widget with the new context.theme.
+    attributeChangedCallback(): void {
+      this.#render();
+    }
+
+    #render(): void {
+      if (this.#root && this.#host) render(this.#root, spec, viewOf(this.#host, this, spec));
     }
 
     disconnectedCallback(): void {

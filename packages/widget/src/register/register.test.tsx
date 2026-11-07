@@ -10,7 +10,7 @@ import { type HostedElement } from './resolve-host.js';
 const fakeHost = (extension: string): Host => ({
   tool: (() => Promise.resolve({})) as Host['tool'],
   api: () => Promise.resolve(null),
-  context: { extension, version: '9.9.9', path: '/', theme: 'dark' },
+  context: { extension, version: '9.9.9', path: '/', theme: 'dark', props: {} },
 });
 
 const Hello = () => <p>hello from {useHost().context.extension}</p>;
@@ -95,6 +95,20 @@ describe('registerWidgets', () => {
     expect(el.shadowRoot?.childNodes).toHaveLength(0);
     await flush(() => document.body.append(el));
     expect(el.shadowRoot?.textContent).toBe('hello from eps');
+  });
+
+  it('gives the element theme, the spec id and version, and {} props to the widget', async () => {
+    const Context = () => <p>{JSON.stringify(useHost().context)}</p>;
+    registerWidgets('eta', { ctx: Context }, { version: '2.0.0' });
+    const bare = { extension: '', version: '', path: '/', theme: 'dark' } as Host['context'];
+    const el = await mount('eta-ctx', (e) => {
+      e.host = { ...fakeHost(''), context: bare };
+      e.setAttribute('data-theme', 'light');
+    });
+    const seen = () => JSON.parse(el.shadowRoot?.textContent ?? '{}') as Host['context'];
+    expect(seen()).toMatchObject({ extension: 'eta', version: '2.0.0', theme: 'light', props: {} });
+    await flush(() => el.setAttribute('data-theme', 'dark'));
+    expect(seen().theme).toBe('dark');
   });
 
   it('refuses an id or a name that is not kebab-case', () => {

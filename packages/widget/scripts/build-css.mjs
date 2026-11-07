@@ -19,7 +19,7 @@ const isRootRule = (node) => node.type === 'rule' && node.selectors.includes(':r
 const LIGHT = /^html\[data-theme=['"]?light['"]?\]$/;
 const SYSTEM = /^html\[data-theme=['"]?system['"]?\]$/;
 
-// Shadow trees: @property out to the document, :root also as :host, the system light theme on :host.
+// Shadow trees: @property out, :root also as :host, light on :host([data-theme=light]) or the system.
 const toShadow = (root) => {
   const properties = [];
   root.walkAtRules('property', (rule) => {
@@ -27,8 +27,8 @@ const toShadow = (root) => {
     rule.remove();
   });
   root.walkRules((rule) => {
-    if (LIGHT.test(rule.selector)) return void rule.remove();
-    if (SYSTEM.test(rule.selector)) rule.selector = ':host';
+    if (LIGHT.test(rule.selector)) rule.selector = ":host([data-theme='light'])";
+    else if (SYSTEM.test(rule.selector)) rule.selector = ":host(:not([data-theme='dark']))";
     else if (isRootRule(rule) && !rule.selectors.includes(':host'))
       rule.selectors = [...rule.selectors, ':host'];
   });

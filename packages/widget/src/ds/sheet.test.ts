@@ -57,11 +57,15 @@ describe('the compiled css', () => {
     expect(widgetCss).not.toMatch(/html\[data-theme/);
   });
 
-  it('is dark by default and light under prefers-color-scheme on :host', () => {
+  it('is dark by default, light by the host data-theme first and the system second', () => {
+    const light = '{color-scheme:light;--color-background:oklch(100% 0 0)';
     expect(widgetCss).toMatch(/:root,:host\{[^}]*--color-background:oklch\(8\.5% \.013 277\)/);
-    expect(widgetCss).toMatch(
-      /@media \(prefers-color-scheme:light\)\{:host\{color-scheme:light;--color-background:oklch\(100% 0 0\)/
+    expect(widgetCss).toContain(`:host([data-theme='light'])${light}`);
+    expect(widgetCss).toContain(
+      `@media (prefers-color-scheme:light){:host(:not([data-theme='dark']))${light}`
     );
+    expect(widgetCss).toContain(':host([data-theme=dark]) .dark\\:border-input{');
+    expect(widgetCss).toContain(':host(:not([data-theme=light])) .dark\\:border-input{');
   });
 
   it('carries the utilities Button and Card use', () => {
