@@ -1,6 +1,6 @@
 {
   "name": "@agentage/extension",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "The agentage extension kit: create(ctx) per part (pages, ui, api, mcp, worker, cli), the store, /health, discovery, the envelope, and the build tool with up and token",
   "type": "module",
   "license": "MIT",
