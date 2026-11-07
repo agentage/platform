@@ -3,7 +3,7 @@ import { type Express } from 'express';
 import { type PartContext } from '../context/context.js';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
 import { loadCreate, type ImportModule } from '../manifest/entry.js';
-import { hasPostgres } from '../manifest/parts.js';
+import { hasStore } from '../manifest/parts.js';
 import { type ImagePartKind } from '../manifest/primitives.schema.js';
 import { createMcpApp } from '../mcp/mcp-app.js';
 import { createToolRegistry } from '../mcp/tools.js';
@@ -64,7 +64,7 @@ const ui = async (input: RunnerInput): Promise<Running> => ({
 const worker = async (input: RunnerInput): Promise<Running> => {
   const ctx = input.ctx();
   const log = runLog(ctx.log);
-  const runs = hasPostgres(input.pkg) ? storeRuns(ctx.store) : memoryRuns();
+  const runs = hasStore(input.pkg, 'postgres') ? storeRuns(ctx.store) : memoryRuns();
   const scheduler = createScheduler({ runs, log });
   await callCreate(input, 'worker', { ...ctx, log, schedule: scheduler.schedule });
   const checks = { ...input.base.checks, ...scheduler.checks() };

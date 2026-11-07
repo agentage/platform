@@ -3,7 +3,8 @@ import cloud from '../test-support/fixtures/neg-package-commands-no-cli.json' wi
 import memory from '../test-support/fixtures/package-memory.json' with { type: 'json' };
 import { API_MANIFEST, json, SPEC_MANIFEST, tempPackage } from '../test-support/packages.js';
 import { PackageSchema } from './manifest.schema.js';
-import { entryOf, hasPostgres, imageParts, normalizeParts } from './parts.js';
+import { entryOf, hasStore, imageParts, migratesStore, normalizeParts } from './parts.js';
+import { SERVED_KINDS, STORE_KINDS } from './primitives.schema.js';
 import { readManifest, validateManifest } from './read-manifest.js';
 
 // C1 of the M2 sheet, as an author writes it.
@@ -128,10 +129,25 @@ describe('parts', () => {
     const custom = validateManifest(withAgentage({ parts: { api: { entry: './out/a.js' } } }));
     expect(entryOf(custom, 'api')).toBe('./out/a.js');
     const git = validateManifest(memory);
-    expect([hasPostgres(spec), hasPostgres(git), hasPostgres(custom)]).toEqual([
+    const pg = [spec, git, custom].map((pkg) => hasStore(pkg, 'postgres'));
+    expect(pg).toEqual([true, false, false]);
+    expect([hasStore(git, 'git'), migratesStore(spec), migratesStore(git)]).toEqual([
+      true,
       true,
       false,
-      false,
+    ]);
+  });
+
+  it('knows three store kinds, postgres alone with migrations, and serves two', () => {
+    expect(STORE_KINDS).toEqual({
+      postgres: { migrations: true },
+      signoz: { migrations: false },
+      git: { migrations: false },
+    });
+    expect(SERVED_KINDS).toEqual(['postgres', 'signoz']);
+    const sqlite = PackageSchema.safeParse(withAgentage({ parts: { api: true, store: 'sqlite' } }));
+    expect(sqlite.error?.issues.map((issue) => issue.message)).toEqual([
+      'one of postgres, signoz, git',
     ]);
   });
 });

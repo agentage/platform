@@ -9,7 +9,7 @@ import { createLog } from '../log/log.js';
 import { loadCreate } from '../manifest/entry.js';
 import { readJsonIfExists } from '../manifest/read-manifest.js';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
-import { hasPostgres, normalizeParts } from '../manifest/parts.js';
+import { migratesStore, normalizeParts } from '../manifest/parts.js';
 import { createToolRegistry, prefixed, type McpContext } from '../mcp/tools.js';
 import { sqlFiles } from '../store/migrations.js';
 import { type Store } from '../store/store.types.js';
@@ -68,6 +68,6 @@ export const recordExtras = async (dir: string, pkg: ExtensionPackage): Promise<
   }
   if (code.ui) extras.widgets = await widgetsOf(dir);
   if (code.api && (await readOpenapi(dir))) extras.openapi = OPENAPI_PATH;
-  if (hasPostgres(pkg)) extras.migrations = (await sqlFiles(join(dir, 'migrations'))).length;
+  if (migratesStore(pkg)) extras.migrations = (await sqlFiles(join(dir, 'migrations'))).length;
   return extras;
 };

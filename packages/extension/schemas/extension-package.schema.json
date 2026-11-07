@@ -152,8 +152,8 @@
                   "type": "string",
                   "enum": [
                     "postgres",
-                    "git",
-                    "signoz"
+                    "signoz",
+                    "git"
                   ]
                 },
                 {
@@ -163,8 +163,8 @@
                       "type": "string",
                       "enum": [
                         "postgres",
-                        "git",
-                        "signoz"
+                        "signoz",
+                        "git"
                       ]
                     }
                   },

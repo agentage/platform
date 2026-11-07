@@ -129,6 +129,24 @@ describe('store', () => {
     expect(docker.calls.map((c) => c.args[0])).toEqual(['version', 'version']);
   });
 
+  it('refuses a kind the estate does not serve and skips one without migrations, before docker', async () => {
+    const withStore = (kind: string) => ({
+      ...SPEC_MANIFEST,
+      agentage: { ...SPEC_MANIFEST.agentage, parts: { api: true, store: kind } },
+    });
+    const docker = fakeDocker();
+    const at = async (kind: string) =>
+      check(await tempPackage({ 'package.json': json(withStore(kind)), ...MIGRATIONS }), {
+        run: docker.run,
+        rules: [store],
+      });
+    expect((await at('git')).problems).toEqual([
+      { rule: 'store', problem: 'kind git is not served yet; served: postgres, signoz' },
+    ]);
+    expect((await at('signoz')).skipped).toEqual({ store: 'kind signoz has no migrations' });
+    expect(docker.calls).toEqual([]);
+  });
+
   it.skipIf(!HAS_DOCKER)(
     'applies a 0600 migration in a 0700 folder on the real image (needs docker)',
     async () => {

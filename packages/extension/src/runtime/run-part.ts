@@ -8,7 +8,7 @@ import { readOpenapi } from '../discovery/openapi.js';
 import { createLog, type Log } from '../log/log.js';
 import { type ImportModule } from '../manifest/entry.js';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
-import { hasPostgres, imageParts } from '../manifest/parts.js';
+import { hasStore, imageParts } from '../manifest/parts.js';
 import { type ImagePartKind } from '../manifest/primitives.schema.js';
 import { readManifest } from '../manifest/read-manifest.js';
 import { type PartAppBase } from '../server/app.js';
@@ -50,7 +50,7 @@ export const partOf = (pkg: ExtensionPackage, part: string): ImagePartKind => {
 
 // ui serves files and gets no ctx; every other part gets the store when the manifest has postgres.
 const storeFor = ({ pkg, part, env, log }: Start) =>
-  part !== 'ui' && hasPostgres(pkg) ? createStore(env, log) : undefined;
+  part !== 'ui' && hasStore(pkg, 'postgres') ? createStore(env, log) : undefined;
 
 const contextFor = (start: Start, part: ServerPartKind, store: Store | undefined) =>
   createContext({

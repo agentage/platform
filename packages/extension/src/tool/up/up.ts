@@ -1,7 +1,7 @@
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { type ExtensionPackage } from '../../manifest/manifest.schema.js';
-import { hasPostgres, imageParts, normalizeParts } from '../../manifest/parts.js';
+import { hasStore, imageParts, normalizeParts } from '../../manifest/parts.js';
 import { readManifest } from '../../manifest/read-manifest.js';
 import { type Env } from '../../runtime/build-info.js';
 import { build } from '../build.js';
@@ -116,9 +116,9 @@ export const up = async (
   await buildStep(s, options.env ?? process.env);
   // Again after the build: another up may have started meanwhile, and the store comes next.
   await assertPortsFree(s.deps.run, s.target.project);
-  if (hasPostgres(s.pkg)) await storeStep(s);
+  if (hasStore(s.pkg, 'postgres')) await storeStep(s);
   await partsStep(s);
-  const parts = imageParts(s.pkg).length + (hasPostgres(s.pkg) ? 1 : 0) + cliParts(s.pkg);
+  const parts = imageParts(s.pkg).length + (hasStore(s.pkg, 'postgres') ? 1 : 0) + cliParts(s.pkg);
   const seconds = Math.round((Date.now() - started) / 1000);
   s.line('ready', `${plural(parts, 'part')} healthy`, `${seconds} s`);
   return { parts, seconds, project: s.target.project };

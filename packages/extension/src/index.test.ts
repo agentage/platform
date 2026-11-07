@@ -16,6 +16,8 @@ describe('public surface', () => {
       'OkEnvelopeSchema',
       'PROTOCOL_VERSIONS',
       'PackageSchema',
+      'SERVED_KINDS',
+      'STORE_KINDS',
       'canonical',
       'createTestContext',
       'fail',

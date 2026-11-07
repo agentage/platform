@@ -1,5 +1,10 @@
 import { type CodePart, type ExtensionPackage, type Parts } from './manifest.schema.js';
-import { IMAGE_PART_KINDS, type ImagePartKind, type StoreKind } from './primitives.schema.js';
+import {
+  IMAGE_PART_KINDS,
+  STORE_KINDS,
+  type ImagePartKind,
+  type StoreKind,
+} from './primitives.schema.js';
 
 export interface NormalizedParts {
   code: Partial<Record<ImagePartKind | 'cli', { entry?: string }>>;
@@ -33,5 +38,13 @@ export const imageParts = (pkg: ExtensionPackage): ImagePartKind[] => {
 export const entryOf = (pkg: ExtensionPackage, part: ImagePartKind | 'cli'): string =>
   normalizeParts(pkg.agentage.parts).code[part]?.entry ?? `./dist/${part}/index.js`;
 
-export const hasPostgres = (pkg: ExtensionPackage): boolean =>
-  normalizeParts(pkg.agentage.parts).store === 'postgres';
+export const storeOf = (pkg: ExtensionPackage): StoreKind | undefined =>
+  normalizeParts(pkg.agentage.parts).store;
+
+export const hasStore = (pkg: ExtensionPackage, kind: StoreKind): boolean => storeOf(pkg) === kind;
+
+// The migrate rule: the api image carries migrations/ and a migrate job only for such a kind.
+export const migratesStore = (pkg: ExtensionPackage): boolean => {
+  const kind = storeOf(pkg);
+  return kind !== undefined && STORE_KINDS[kind].migrations;
+};

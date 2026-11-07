@@ -1,0 +1,20 @@
+{
+  "name": "fixture-base",
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "agentage": "^0.5"
+  },
+  "agentage": {
+    "id": "base",
+    "parts": {
+      "api": true,
+      "store": "git"
+    }
+  },
+  "dependencies": {
+    "@agentage/extension": "^0.5.0",
+    "express": "^5.1.0",
+    "zod": "^4.2.0"
+  }
+}
