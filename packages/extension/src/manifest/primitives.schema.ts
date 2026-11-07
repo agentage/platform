@@ -58,7 +58,16 @@ export const PackagePathSchema = z
   .max(256)
   .regex(/^\.\/[A-Za-z0-9._/-]+$/);
 
-export const StoreKindSchema = z.enum(['postgres', 'git', 'signoz']);
+export const STORE_KINDS = {
+  postgres: { migrations: true },
+  signoz: { migrations: false },
+  git: { migrations: false },
+} as const;
+
+// STORE_KINDS[kind].migrations: the api image carries a migrate job. SERVED_KINDS moves with the estate.
+export const SERVED_KINDS: readonly StoreKind[] = ['postgres', 'signoz'];
+
+export const StoreKindSchema = z.enum(Object.keys(STORE_KINDS) as [StoreKind, ...StoreKind[]]);
 
 export const FULL_SHA = /^[0-9a-f]{40}$/;
 
@@ -73,4 +82,4 @@ export const IMAGE_PART_KINDS = ['pages', 'ui', 'api', 'mcp', 'worker'] as const
 
 export type ImagePartKind = (typeof IMAGE_PART_KINDS)[number];
 
-export type StoreKind = z.infer<typeof StoreKindSchema>;
+export type StoreKind = keyof typeof STORE_KINDS;

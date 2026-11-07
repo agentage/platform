@@ -1,5 +1,5 @@
 import { type ExtensionPackage } from '../../manifest/manifest.schema.js';
-import { hasPostgres, imageParts } from '../../manifest/parts.js';
+import { hasStore, imageParts } from '../../manifest/parts.js';
 import { type ImagePartKind } from '../../manifest/primitives.schema.js';
 import { DEV_AUDIENCE, DEV_ISSUER, UP_ISSUER } from './dev-issuer-app.js';
 import { GATEWAY_PORT, ISSUER_PORT, PART_PORT, TRAEFIK_COMMAND, TRAEFIK_IMAGE } from './gateway.js';
@@ -17,6 +17,8 @@ export interface ComposeInput {
   gatewayFile: string;
   // The package's seeds/: local runs only, so they reach the migrate job as a mount.
   seedsDir?: string;
+  // Declared secret name to the local file holding its value; absent when none is declared.
+  secretFiles?: Record<string, string>;
 }
 
 // A local-only credential: the store has no published port, only the parts' network reaches it.
@@ -30,7 +32,9 @@ const partEnv = (pkg: ExtensionPackage, part: ImagePartKind | 'migrate') => ({
   AGENTAGE_ISSUER: UP_ISSUER,
   AGENTAGE_AUDIENCE: DEV_AUDIENCE,
   AGENTAGE_RECORD_FILE: RECORD_TARGET,
-  ...(hasPostgres(pkg) && part !== 'ui' ? { AGENTAGE_STORE_URL: storeUrl(pkg.agentage.id) } : {}),
+  ...(hasStore(pkg, 'postgres') && part !== 'ui'
+    ? { AGENTAGE_STORE_URL: storeUrl(pkg.agentage.id) }
+    : {}),
   ...(part === 'ui' ? { AGENTAGE_DEV_ISSUER: DEV_ISSUER } : {}),
 });
 
@@ -47,7 +51,7 @@ const HEALTHY = { condition: 'service_healthy' };
 
 // api and mcp read the issuer's keys and revoked list before they serve.
 const dependsOn = (pkg: ExtensionPackage, part: ImagePartKind) => ({
-  ...(hasPostgres(pkg) && part !== 'ui' ? { store: HEALTHY } : {}),
+  ...(hasStore(pkg, 'postgres') && part !== 'ui' ? { store: HEALTHY } : {}),
   ...(part === 'api' || part === 'mcp' ? { issuer: HEALTHY } : {}),
 });
 
@@ -55,8 +59,12 @@ const partService = (input: ComposeInput, part: ImagePartKind) => ({
   image: input.tags[part],
   environment: partEnv(input.pkg, part),
   volumes: [`${input.recordFile}:${RECORD_TARGET}:ro`],
+  ...(part !== 'ui' && input.secretFiles ? { secrets: Object.keys(input.secretFiles) } : {}),
   depends_on: dependsOn(input.pkg, part),
 });
+
+const secretsOf = (files: Record<string, string>) =>
+  Object.fromEntries(Object.entries(files).map(([name, file]) => [name, { file }]));
 
 const fixedServices = (input: ComposeInput, anyImage: string) => ({
   gateway: {
@@ -91,10 +99,11 @@ export const composeFile = (input: ComposeInput) => {
   const services: Record<string, unknown> = {};
   for (const part of parts) services[part] = partService(input, part);
   Object.assign(services, fixedServices(input, input.tags[parts[0] ?? 'api'] ?? ''));
-  if (hasPostgres(input.pkg)) {
+  if (hasStore(input.pkg, 'postgres')) {
     services['store'] = storeService(input.pkg.agentage.id);
     if (input.tags['api']) services['migrate'] = migrateService(input);
   }
-  const volumes = hasPostgres(input.pkg) ? { store: {} } : {};
-  return { name: input.project, services, volumes };
+  const volumes = hasStore(input.pkg, 'postgres') ? { store: {} } : {};
+  const secrets = input.secretFiles ? { secrets: secretsOf(input.secretFiles) } : {};
+  return { name: input.project, services, volumes, ...secrets };
 };

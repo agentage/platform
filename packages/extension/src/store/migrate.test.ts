@@ -62,7 +62,7 @@ describe('the migrate entry', () => {
     expect(stdout).toEqual([]);
     expect(JSON.parse(stderr.join(''))).toMatchObject({
       level: 'error',
-      extension: 'probe',
+      'extension.id': 'probe',
       msg: expect.stringMatching(/^migration 001-ticks\.sql failed: syntax error/),
     });
   });
@@ -75,8 +75,8 @@ describe('the migrate entry', () => {
     expect(pool.opened).toEqual([]);
     expect(JSON.parse(stderr.join(''))).toMatchObject({
       level: 'error',
-      extension: 'unknown',
-      part: 'migrate',
+      'extension.id': 'unknown',
+      'extension.part': 'migrate',
       msg: expect.stringMatching(/^invalid agentage manifest in package\.json: version: /),
     });
   });

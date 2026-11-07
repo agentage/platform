@@ -12,15 +12,15 @@ const capture = () => {
 };
 
 describe('log', () => {
-  it('writes JSON lines tagged with extension and part', () => {
+  it('writes JSON lines tagged with extension.id and extension.part', () => {
     const { log, lines } = capture();
     log.info('listening', { port: 3000 });
     log.warn('careful');
     expect(lines[0]).toMatchObject({
       level: 'info',
       msg: 'listening',
-      extension: 'probe',
-      part: 'api',
+      'extension.id': 'probe',
+      'extension.part': 'api',
       port: 3000,
     });
     expect(lines[1]).toMatchObject({ level: 'warn', msg: 'careful' });
@@ -39,11 +39,14 @@ describe('log', () => {
 
   it('a field never overwrites time, level, msg or the tags', () => {
     const { log, lines } = capture();
-    const fields = { time: 'x', level: 'debug', msg: 'x', extension: 'x', part: 'x', n: 1 };
-    log.warn('kept', fields);
-    expect(lines[0]).toMatchObject({ level: 'warn', msg: 'kept', extension: 'probe', part: 'api' });
+    const tags = { 'extension.id': 'x', 'extension.part': 'x' };
+    log.warn('kept', { time: 'x', level: 'debug', msg: 'x', ...tags, n: 1 });
+    const kept = { 'extension.id': 'probe', 'extension.part': 'api' };
+    expect(lines[0]).toMatchObject({ level: 'warn', msg: 'kept', ...kept });
     expect(lines[0]?.['time']).toMatch(/^\d{4}-\d\d-\d\dT/);
-    expect(Object.keys(lines[0] ?? {})).toEqual(['time', 'level', 'msg', 'extension', 'part', 'n']);
+    expect(Object.keys(lines[0] ?? {})).toEqual([
+      ...['time', 'level', 'msg', 'extension.id', 'extension.part', 'n'],
+    ]);
   });
 
   it('tags a line written inside a request with its agcid', () => {

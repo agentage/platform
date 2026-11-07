@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { hasPostgres } from '../../manifest/parts.js';
+import { migratesStore, storeOf } from '../../manifest/parts.js';
+import { SERVED_KINDS } from '../../manifest/primitives.schema.js';
 import { sqlFiles } from '../../store/migrations.js';
 import { type CheckRule, type Finding } from '../check.js';
 import { type Run } from '../exec.js';
@@ -52,7 +53,11 @@ const dockerAnswers = (run: Run): Promise<boolean> =>
 export const store: CheckRule = {
   name: 'store',
   run: async ({ dir, pkg, run, requireDocker }) => {
-    if (!hasPostgres(pkg)) return { skipped: 'no store' };
+    const kind = storeOf(pkg);
+    if (!kind) return { skipped: 'no store' };
+    if (!SERVED_KINDS.includes(kind))
+      return [{ problem: `kind ${kind} is not served yet; served: ${SERVED_KINDS.join(', ')}` }];
+    if (!migratesStore(pkg)) return { skipped: `kind ${kind} has no migrations` };
     const files = await sqlFiles(join(dir, 'migrations'));
     const meta = await metaCommands(dir, files);
     if (files.length === 0 || meta.length > 0) return meta;

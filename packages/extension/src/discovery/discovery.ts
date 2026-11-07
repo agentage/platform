@@ -36,7 +36,7 @@ export const recordOf = (
   images: PartImages,
   extras: RecordExtras = {}
 ): ExtensionRecord => {
-  const { id, commands } = pkg.agentage;
+  const { id, commands, secrets } = pkg.agentage;
   const { commit, buildTime } = build;
   const parts = partsOf(pkg, images, extras.migrations);
   const record: ExtensionRecord = { id, version: pkg.version, commit, buildTime, parts };
@@ -44,6 +44,7 @@ export const recordOf = (
   if (extras.tools) record.tools = extras.tools;
   if (commands) record.commands = commands.map((command) => command.name);
   if (extras.widgets) record.widgets = extras.widgets;
+  if (secrets?.length) record.secrets = secrets;
   return record;
 };
 
@@ -61,5 +62,6 @@ export const loadRecord = async (file: string): Promise<ExtensionRecord | null> 
 
 export const discoveryDocument = (record: ExtensionRecord, host: string) => {
   const { id, version, commit, buildTime, ...rest } = record;
+  delete rest.secrets;
   return { id, version, commit, buildTime, host, ...rest };
 };

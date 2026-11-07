@@ -28,7 +28,8 @@ const errorFields = (error: unknown): LogFields => {
 // Spread twice: the key order stays, and a field never overwrites time, level, msg, tags or agcid.
 const line = (level: LogLevel, message: string, tags: LogTags, fields: LogFields): string => {
   const agcid = currentAgcid();
-  const own = { time: new Date().toISOString(), level, msg: message, ...tags };
+  const ids = { 'extension.id': tags.extension, 'extension.part': tags.part };
+  const own = { time: new Date().toISOString(), level, msg: message, ...ids };
   const fixed = agcid ? { ...own, agcid } : own;
   return `${JSON.stringify({ ...fixed, ...fields, ...fixed })}\n`;
 };

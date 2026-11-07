@@ -102,8 +102,8 @@
               "type": "string",
               "enum": [
                 "postgres",
-                "git",
-                "signoz"
+                "signoz",
+                "git"
               ]
             },
             "migrations": {
@@ -180,6 +180,15 @@
       "items": {
         "type": "string",
         "maxLength": 32,
+        "pattern": "^[a-z][a-z0-9-]*$"
+      }
+    },
+    "secrets": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 48,
         "pattern": "^[a-z][a-z0-9-]*$"
       }
     }

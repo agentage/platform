@@ -1,3 +1,4 @@
+import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { readManifest } from '../../manifest/read-manifest.js';
 import { quietly, runCommand, type Run } from '../exec.js';
@@ -62,6 +63,7 @@ export const down = async (
   const result = await quietly(run)('docker', args);
   const log = result.stderr ?? '';
   if (result.code !== 0) throw new Error(`docker compose down failed: ${log.trim()}`);
+  await rm(join(dir, LOCAL_DIR, 'secrets'), { recursive: true, force: true });
   const removed = removedOf(log);
   options.onLine?.(stepLine('removed', summary(removed, options.keepData), target.project));
   return { project: target.project, ...removed };

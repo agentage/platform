@@ -17,7 +17,9 @@ const CodePartSchema = z.union([
   z.strictObject({ entry: PackagePathSchema.optional() }),
 ]);
 
-const StorePartSchema = z.union([StoreKindSchema, z.strictObject({ kind: StoreKindSchema })]);
+const StorePartSchema = z.union([StoreKindSchema, z.strictObject({ kind: StoreKindSchema })], {
+  error: `one of ${StoreKindSchema.options.join(', ')}`,
+});
 
 const ROUTED = ['pages', 'ui', 'api', 'mcp'] as const;
 

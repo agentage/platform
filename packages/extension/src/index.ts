@@ -12,6 +12,7 @@ export {
   type ServerPartKind,
   type SettingValue,
 } from './context/context.js';
+export { type Secrets } from './context/secrets.js';
 export {
   createTestContext,
   type LogEntry,
@@ -48,6 +49,7 @@ export {
   type ExtensionPackage,
 } from './manifest/manifest.schema.js';
 export { imageParts } from './manifest/parts.js';
+export { SERVED_KINDS, STORE_KINDS, type StoreKind } from './manifest/primitives.schema.js';
 export { readManifest, validateManifest } from './manifest/read-manifest.js';
 export {
   canonical,

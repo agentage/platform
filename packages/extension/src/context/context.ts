@@ -2,6 +2,7 @@ import { callerOf, type Caller } from '../auth/token-check.js';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
 import { createLog, type Log } from '../log/log.js';
 import { type Store } from '../store/store.types.js';
+import { type Secrets } from './secrets.js';
 
 export type ServerPartKind = 'pages' | 'api' | 'mcp' | 'worker';
 
@@ -15,7 +16,7 @@ export interface ExtensionInfo {
   commit: string;
 }
 
-// The kit's subset of the host ctx; secrets and spans arrive in later versions.
+// The kit's subset of the host ctx; spans arrive in a later version.
 export interface PartContext {
   readonly extension: Readonly<ExtensionInfo>;
   // api only: who called, as the token check found it; null on a public route and in other parts.
@@ -23,6 +24,7 @@ export interface PartContext {
   readonly log: Log;
   readonly settings: Readonly<Record<string, SettingValue>>;
   readonly store: Store;
+  readonly secrets: Secrets;
 }
 
 // ctx.store is always there; without a store part in the manifest it says so on first use.
@@ -45,6 +47,7 @@ export interface ContextInput {
   log?: Log;
   settings?: Record<string, SettingValue>;
   store?: Store;
+  secrets?: Secrets;
 }
 
 export const createContext = (input: ContextInput): PartContext => {
@@ -59,5 +62,6 @@ export const createContext = (input: ContextInput): PartContext => {
   const log = input.log ?? createLog({ extension: pkg.agentage.id, part });
   const settings = Object.freeze({ ...settingDefaults(pkg), ...input.settings });
   const auth = Object.freeze({ caller: callerOf });
-  return Object.freeze({ extension, auth, log, settings, store: store ?? NO_STORE });
+  const secrets = input.secrets ?? {};
+  return Object.freeze({ extension, auth, log, settings, store: store ?? NO_STORE, secrets });
 };

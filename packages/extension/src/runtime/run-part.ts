@@ -1,5 +1,6 @@
 import { type Server } from 'node:http';
 import { createContext, type PartContext, type ServerPartKind } from '../context/context.js';
+import { readSecrets, SECRETS_DIR, type Secrets } from '../context/secrets.js';
 import { settingsFromEnv } from '../context/settings.js';
 import { DEFAULT_RECORD_FILE, loadRecord } from '../discovery/discovery.js';
 import { type ExtensionRecord } from '../discovery/discovery.schema.js';
@@ -8,7 +9,7 @@ import { readOpenapi } from '../discovery/openapi.js';
 import { createLog, type Log } from '../log/log.js';
 import { type ImportModule } from '../manifest/entry.js';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
-import { hasPostgres, imageParts } from '../manifest/parts.js';
+import { hasStore, imageParts } from '../manifest/parts.js';
 import { type ImagePartKind } from '../manifest/primitives.schema.js';
 import { readManifest } from '../manifest/read-manifest.js';
 import { type PartAppBase } from '../server/app.js';
@@ -23,6 +24,7 @@ export interface RunPartOptions {
   part: string;
   env: Env;
   importModule?: ImportModule;
+  secretsDir?: string;
   serve?: Pick<ServeOptions, 'signals' | 'exit'>;
 }
 
@@ -33,6 +35,7 @@ interface Start {
   part: ImagePartKind;
   env: Env;
   log: Log;
+  secrets: Secrets;
 }
 
 const recordFor = async (env: Env, log: Log) => {
@@ -50,7 +53,7 @@ export const partOf = (pkg: ExtensionPackage, part: string): ImagePartKind => {
 
 // ui serves files and gets no ctx; every other part gets the store when the manifest has postgres.
 const storeFor = ({ pkg, part, env, log }: Start) =>
-  part !== 'ui' && hasPostgres(pkg) ? createStore(env, log) : undefined;
+  part !== 'ui' && hasStore(pkg, 'postgres') ? createStore(env, log) : undefined;
 
 const contextFor = (start: Start, part: ServerPartKind, store: Store | undefined) =>
   createContext({
@@ -61,6 +64,7 @@ const contextFor = (start: Start, part: ServerPartKind, store: Store | undefined
     log: start.log,
     settings: settingsFromEnv(start.pkg, start.env, start.log),
     store,
+    secrets: start.secrets,
   });
 
 // Built on first use, so the ui runner, which never asks, has no ctx at all.
@@ -112,7 +116,9 @@ export const runPart = async (options: RunPartOptions): Promise<Server> => {
   const pkg = await readManifest(options.dir);
   const part = partOf(pkg, options.part);
   const log = createLog({ extension: pkg.agentage.id, part });
-  const start = { pkg, part, env: options.env, log };
+  const names = part === 'ui' ? [] : (pkg.agentage.secrets ?? []);
+  const secrets = await readSecrets(names, options.secretsDir ?? SECRETS_DIR, part);
+  const start = { pkg, part, env: options.env, log, secrets };
   const { app, stop } = await RUNNERS[part](await inputFor(options, start));
   if (stop)
     for (const signal of options.serve?.signals ?? ['SIGTERM', 'SIGINT'])

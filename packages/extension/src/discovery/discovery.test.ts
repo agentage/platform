@@ -32,6 +32,19 @@ describe('build record', () => {
     expect(ExtensionRecordSchema.safeParse(record).success).toBe(true);
   });
 
+  it('carries the declared secret names for the estate, absent when none, never in discovery', () => {
+    const agentage = { ...API_MANIFEST.agentage, secrets: ['github-read'] };
+    const record = validateRecord(
+      recordOf({ ...API_MANIFEST, agentage }, BUILD, { api: API_IMAGE })
+    );
+    expect(record.secrets).toEqual(['github-read']);
+    const none = { ...API_MANIFEST, agentage: { ...agentage, secrets: [] } };
+    expect(recordOf(none, BUILD, { api: API_IMAGE })).not.toHaveProperty('secrets');
+    const doc = discoveryDocument(record, 'https://probe.next.agentage.io');
+    expect(doc).not.toHaveProperty('secrets');
+    expect(DiscoveryDocumentSchema.safeParse(doc).success).toBe(true);
+  });
+
   it('refuses images by tag, a short commit and an image of another extension', () => {
     const tag = recordOf(API_MANIFEST, BUILD, { api: 'ghcr.io/agentage/probe-api:0.1.0' });
     expect(() => validateRecord(tag)).toThrow(/parts\.api\.image/);

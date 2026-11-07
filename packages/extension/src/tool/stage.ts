@@ -2,7 +2,7 @@ import { access, cp, mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, normalize, sep } from 'node:path';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
-import { entryOf, hasPostgres } from '../manifest/parts.js';
+import { entryOf, migratesStore } from '../manifest/parts.js';
 import { type ImagePartKind } from '../manifest/primitives.schema.js';
 import { OPENAPI_FILE } from '../discovery/openapi.js';
 import { serverPartRecipe } from './recipe.js';
@@ -53,7 +53,7 @@ const copyDeps = async (dir: string, root: string, pkg: ExtensionPackage): Promi
 
 // The api image runs the migrate job, so it alone carries the migrations; seeds never ship.
 const migrates = (pkg: ExtensionPackage, part: ImagePartKind): boolean =>
-  part === 'api' && hasPostgres(pkg);
+  part === 'api' && migratesStore(pkg);
 
 // What a part image carries: its own dist/{part}, the shared dist/lib, and for api the migrations.
 export const appPaths = async (dir: string, pkg: ExtensionPackage, part: ImagePartKind) => {

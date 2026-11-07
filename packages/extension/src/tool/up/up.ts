@@ -1,7 +1,7 @@
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { type ExtensionPackage } from '../../manifest/manifest.schema.js';
-import { hasPostgres, imageParts, normalizeParts } from '../../manifest/parts.js';
+import { hasStore, imageParts, normalizeParts } from '../../manifest/parts.js';
 import { readManifest } from '../../manifest/read-manifest.js';
 import { type Env } from '../../runtime/build-info.js';
 import { build } from '../build.js';
@@ -14,6 +14,7 @@ import { GATEWAY_PORT, gatewayConfig, ISSUER_PORT, PART_PATHS, partPath } from '
 import { plural, stepLine } from './lines.js';
 import { assertDiscoverable, LOCAL_DIR, writeLocalRecord } from './local-record.js';
 import { assertPortsFree } from './ports.js';
+import { writeUpSecrets } from './secrets.js';
 import { projectName, workingCopy } from './project.js';
 import { storePhrase, summaryOf } from './store-line.js';
 import { waitHealthy, type WaitDeps } from './wait.js';
@@ -38,6 +39,7 @@ interface Session {
   target: ComposeTarget & { file: string };
   line: (label: string, what: string, detail?: string) => void;
   deps: UpDeps;
+  secretFiles: Record<string, string> | undefined;
 }
 
 const GATEWAY = `http://localhost:${GATEWAY_PORT}`;
@@ -50,10 +52,11 @@ const renderFiles = async (s: Session, recordFile: string, tags: Record<string, 
   const seeds = join(s.dir, 'seeds');
   const seedsDir = (await exists(seeds)) ? seeds : undefined;
   await jsonFile(gatewayFile, gatewayConfig(imageParts(s.pkg), s.pkg.version));
-  const project = s.target.project;
+  const { pkg, secretFiles, target } = s;
+  const project = target.project;
   await jsonFile(
-    s.target.file,
-    composeFile({ pkg: s.pkg, project, tags, recordFile, gatewayFile, seedsDir })
+    target.file,
+    composeFile({ pkg, project, tags, recordFile, gatewayFile, seedsDir, secretFiles })
   );
 };
 
@@ -102,7 +105,8 @@ const sessionOf = async (options: UpOptions, deps: UpDeps): Promise<Session> => 
   const target = { file, project: projectName(pkg.agentage.id, dir) };
   const line = (label: string, what: string, detail?: string) =>
     options.onLine?.(stepLine(label, what, detail));
-  return { dir, pkg, target, line, deps: { ...deps, run: quietly(deps.run) } };
+  const secretFiles = await writeUpSecrets(dir, pkg, options.env ?? process.env);
+  return { dir, pkg, target, line, deps: { ...deps, run: quietly(deps.run) }, secretFiles };
 };
 
 // The laptop shape of a deployment: the release images, a local record, store, issuer, gateway.
@@ -116,9 +120,9 @@ export const up = async (
   await buildStep(s, options.env ?? process.env);
   // Again after the build: another up may have started meanwhile, and the store comes next.
   await assertPortsFree(s.deps.run, s.target.project);
-  if (hasPostgres(s.pkg)) await storeStep(s);
+  if (hasStore(s.pkg, 'postgres')) await storeStep(s);
   await partsStep(s);
-  const parts = imageParts(s.pkg).length + (hasPostgres(s.pkg) ? 1 : 0) + cliParts(s.pkg);
+  const parts = imageParts(s.pkg).length + (hasStore(s.pkg, 'postgres') ? 1 : 0) + cliParts(s.pkg);
   const seconds = Math.round((Date.now() - started) / 1000);
   s.line('ready', `${plural(parts, 'part')} healthy`, `${seconds} s`);
   return { parts, seconds, project: s.target.project };

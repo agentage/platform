@@ -19,6 +19,12 @@ const REFUSED: Record<string, string> = {
   sealing: 'sealing: src/api/index.ts:7 reads process.env',
 };
 
+// Store kind refusals: one overlay each, beside the per-rule ones.
+const KINDS: Record<string, string> = {
+  'bad-store-kind': 'manifest: agentage.parts.store: one of postgres, signoz, git',
+  'bad-store-served': 'store: kind git is not served yet; served: postgres, signoz',
+};
+
 // A copy of base, the overlay, the repo's modules, and the base's build, which is a copy.
 const fixture = async (name: string): Promise<string> => {
   const dir = await tempPackage({});
@@ -40,6 +46,12 @@ describe('6 of 6 refused, each for its own rule (bad-store needs docker)', () =>
   for (const rule of RULES.map(({ name }) => name)) {
     it(`REFUSED bad-${rule.padEnd(9)} ${REFUSED[rule]}`, async () => {
       expect(problemLines(await check(await fixture(`bad-${rule}`)))).toEqual([REFUSED[rule]]);
+    });
+  }
+
+  for (const [name, line] of Object.entries(KINDS)) {
+    it(`REFUSED ${name.padEnd(16)} ${line}`, async () => {
+      expect(problemLines(await check(await fixture(name)))).toEqual([line]);
     });
   }
 });
