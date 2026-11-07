@@ -7,9 +7,9 @@ const SPEC: CommandSpec = {
   summary: 'Answers pong',
   args: [
     { name: 'msg', type: 'string', description: 'what to echo' },
-    { name: 'times', type: 'integer', optional: true },
+    { name: 'times', type: 'integer', required: false },
     { name: 'ratio', type: 'number', required: false },
-    { name: 'loud', type: 'boolean', optional: true },
+    { name: 'loud', type: 'boolean', required: false },
   ],
 };
 

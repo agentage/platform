@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { type ErrorRequestHandler } from 'express';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { recordedLog, serveApp, type Served } from '../test-support/http.js';
 import { API_MANIFEST } from '../test-support/packages.js';
@@ -132,6 +133,31 @@ describe('mcp wire per protocol era', () => {
     expect(res.headers.get('access-control-allow-headers')).toBe(
       'Authorization,Content-Type,agcid,traceparent,If-Match,Mcp-Protocol-Version,Mcp-Method,Mcp-Name,Accept'
     );
+  });
+});
+
+describe('a client that closes early', () => {
+  it('mid-answer: one warn line, no error line, no second answer on the started response', async () => {
+    const { lines, log } = recordedLog();
+    const { tool, tools } = createToolRegistry();
+    const spec = {
+      description: 'Big',
+      input: z.object({}),
+      output: z.object({ text: z.string() }),
+    };
+    tool('big', spec, () => ({ text: 'x'.repeat(2 ** 24) }));
+    const thrown: unknown[] = [];
+    const after: ErrorRequestHandler = (err, _req, _res, next) => (thrown.push(err), next());
+    const mcp = createMcpApp({ pkg: PKG, build: BUILD, log, tools, listing: 'open' });
+    served = await serveApp(mcp.use(after));
+    const params = { name: 'probe__big', arguments: {} };
+    const body = JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/call', params });
+    const abort = new AbortController();
+    const init = { method: 'POST', headers: HEADERS, body, signal: abort.signal };
+    await (await fetch(`${served.url}/mcp`, init)).body?.getReader().read();
+    abort.abort();
+    await vi.waitFor(() => expect(lines.map((l) => l['msg'])).toContain('client closed early'));
+    expect([lines.filter((l) => l['level'] === 'error'), thrown]).toEqual([[], []]);
   });
 });
 

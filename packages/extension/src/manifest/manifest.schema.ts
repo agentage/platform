@@ -45,7 +45,6 @@ const CommandSchema = z.strictObject({
       z.strictObject({
         name: CommandNameSchema,
         type: ArgTypeSchema,
-        optional: z.boolean().optional(),
         required: z.boolean().optional(),
         description: z.string().min(1).max(200).optional(),
       })

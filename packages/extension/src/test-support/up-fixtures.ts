@@ -17,7 +17,7 @@ export const PROBE = {
       {
         name: 'ping',
         summary: 'Answers pong',
-        args: [{ name: 'msg', type: 'string', optional: true }],
+        args: [{ name: 'msg', type: 'string', required: false }],
       },
     ],
   },

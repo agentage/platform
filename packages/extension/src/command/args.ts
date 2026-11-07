@@ -13,8 +13,7 @@ type ArgSpec = NonNullable<CommandSpec['args']>[number];
 
 export class UsageError extends Error {}
 
-export const isOptional = (arg: ArgSpec): boolean =>
-  arg.optional === true || arg.required === false;
+export const isOptional = (arg: ArgSpec): boolean => arg.required === false;
 
 const coerce = (arg: ArgSpec, raw: string | boolean): ArgValue => {
   if (arg.type === 'boolean') return raw === true || raw === 'true';

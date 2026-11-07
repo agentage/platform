@@ -58,10 +58,9 @@ describe('an mcp part checks tokens (C5, C7)', () => {
       403,
       INSUFFICIENT,
     ]);
-    const read = await issuer.bearer({ scope: 'probe:read' });
-    expect((await rpc(url, 'tools/call', CALL, read)).body['result']).toMatchObject({
-      structuredContent: { msg: 'pong hi' },
-    });
+    const read = await rpc(url, 'tools/call', CALL, await issuer.bearer({ scope: 'probe:read' }));
+    expect(read.res.headers.get('cache-control')).toBe('no-store');
+    expect(read.body['result']).toMatchObject({ structuredContent: { msg: 'pong hi' } });
   });
 
   it('a body the kit cannot read is a parse error, never a call without a check', async () => {

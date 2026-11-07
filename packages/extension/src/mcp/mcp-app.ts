@@ -52,14 +52,15 @@ const callAccess = (options: McpAppOptions, body: unknown): Access[] =>
     });
 
 // Tokens off: calls stay anonymous and a closed listing refuses every tools/list (nothing can verify).
-const guard = async (options: McpAppOptions, req: Request, body: unknown): Promise<void> => {
+const guard = async (options: McpAppOptions, req: Request, body: unknown): Promise<boolean> => {
   const listing = options.listing === 'token' && isListing(body) ? (['read'] as Access[]) : [];
   const needed = [...listing, ...callAccess(options, body)];
   if (!options.tokenCheck) {
     if (listing.length > 0) throw fail('UNAUTHORIZED', 'tools/list needs a token');
-    return;
+    return false;
   }
-  if (needed.length > 0) await options.tokenCheck(req.get('authorization'), strongest(needed));
+  if (needed.length === 0) return false;
+  return (await options.tokenCheck(req.get('authorization'), strongest(needed))) !== null;
 };
 
 const webRequest = (req: Request, body: Buffer): globalThis.Request => {
@@ -74,9 +75,11 @@ const webRequest = (req: Request, body: Buffer): globalThis.Request => {
   });
 };
 
-const send = async (response: globalThis.Response, res: Response): Promise<void> => {
+const send = async (response: globalThis.Response, res: Response, auth: boolean) => {
   res.status(response.status);
   response.headers.forEach((value, key) => void res.setHeader(key, value));
+  // After the SDK headers: its SSE answer sets no-cache, which a token-checked answer overrides.
+  if (auth) res.setHeader('Cache-Control', 'no-store');
   if (!response.body) return void res.end();
   await pipeline(Readable.fromWeb(response.body as never), res);
 };
@@ -88,8 +91,8 @@ const handle =
     const message = parsed(body);
     // The SDK reads a body again when given none (a BOM, say): it must only run what guard read.
     if (message === undefined) return void res.status(400).json(PARSE_ERROR);
-    await guard(options, req, message);
-    await send(await handler.fetch(webRequest(req, body), { parsedBody: message }), res);
+    const auth = await guard(options, req, message);
+    await send(await handler.fetch(webRequest(req, body), { parsedBody: message }), res, auth);
   };
 
 const methodNotAllowed = (_req: Request, res: Response): void => {
