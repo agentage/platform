@@ -15,7 +15,7 @@ export interface ExtensionInfo {
   commit: string;
 }
 
-// The kit 0.3 subset of the host ctx; secrets and spans arrive in later versions.
+// The kit's subset of the host ctx; secrets and spans arrive in later versions.
 export interface PartContext {
   readonly extension: Readonly<ExtensionInfo>;
   // api only: who called, as the token check found it; null on a public route and in other parts.
