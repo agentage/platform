@@ -33,6 +33,7 @@ export interface TestCommandContext extends CliContext {
 export interface TestContextOptions {
   extension?: Partial<ExtensionInfo>;
   settings?: Record<string, SettingValue>;
+  secrets?: Record<string, string>;
   // A throwaway postgres with the package's migrations/ and seeds/ applied (dir: the package root).
   store?: boolean | { dir: string };
 }
@@ -87,6 +88,7 @@ const serverContext = (options: TestContextOptions): TestContext => {
     logs,
     settings: { ...options.settings },
     store: store ?? NO_STORE,
+    secrets: Object.freeze({ ...options.secrets }),
     close: async () => store?.close(),
     ...recorders(log),
   };

@@ -1,3 +1,4 @@
+import { writeFile } from 'node:fs/promises';
 import { type Server } from 'node:http';
 import { type AddressInfo } from 'node:net';
 import { Router } from 'express';
@@ -84,6 +85,40 @@ describe('runPart', () => {
       'dist/api/index.js does not export create(ctx)'
     );
     expect(() => createOf(null, 'x.js')).toThrow('x.js does not export create(ctx)');
+  });
+});
+
+describe('runPart secrets', () => {
+  it('fills ctx.secrets from the mounted files and refuses to start without one', async () => {
+    const manifest = {
+      ...API_MANIFEST,
+      agentage: { ...API_MANIFEST.agentage, secrets: ['github-read'] },
+    };
+    const dir = await tempPackage({ 'package.json': json(manifest) });
+    const env = {
+      PORT: '0',
+      AGENTAGE_ISSUER: 'https://127.0.0.1:9',
+      AGENTAGE_AUDIENCE: '*.agentage.io',
+      AGENTAGE_ORIGIN: 'https://probe.next.agentage.io',
+    };
+    const seen: unknown[] = [];
+    const importModule = async () => ({
+      create: (ctx: { secrets: unknown }) => (seen.push(ctx.secrets), Router()),
+    });
+    const options = {
+      dir,
+      part: 'api',
+      env,
+      importModule,
+      secretsDir: dir,
+      serve: { signals: [] },
+    };
+    await expect(runPart(options)).rejects.toThrow(
+      /^api refused to start: secret github-read has no value$/
+    );
+    await writeFile(`${dir}/github-read`, 'ghp_x\n');
+    server = await runPart(options);
+    expect(seen).toEqual([{ githubRead: 'ghp_x' }]);
   });
 });
 

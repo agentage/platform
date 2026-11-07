@@ -8,7 +8,6 @@ import {
   SecretNameSchema,
   SemverRangeSchema,
   SettingKeySchema,
-  STORE_KIND_ERROR,
   StoreKindSchema,
   VersionSchema,
 } from './primitives.schema.js';
@@ -19,7 +18,7 @@ const CodePartSchema = z.union([
 ]);
 
 const StorePartSchema = z.union([StoreKindSchema, z.strictObject({ kind: StoreKindSchema })], {
-  error: STORE_KIND_ERROR,
+  error: `one of ${StoreKindSchema.options.join(', ')}`,
 });
 
 const ROUTED = ['pages', 'ui', 'api', 'mcp'] as const;

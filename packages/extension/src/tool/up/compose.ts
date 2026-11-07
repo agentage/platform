@@ -17,6 +17,8 @@ export interface ComposeInput {
   gatewayFile: string;
   // The package's seeds/: local runs only, so they reach the migrate job as a mount.
   seedsDir?: string;
+  // Declared secret name to the local file holding its value; absent when none is declared.
+  secretFiles?: Record<string, string>;
 }
 
 // A local-only credential: the store has no published port, only the parts' network reaches it.
@@ -57,8 +59,12 @@ const partService = (input: ComposeInput, part: ImagePartKind) => ({
   image: input.tags[part],
   environment: partEnv(input.pkg, part),
   volumes: [`${input.recordFile}:${RECORD_TARGET}:ro`],
+  ...(part !== 'ui' && input.secretFiles ? { secrets: Object.keys(input.secretFiles) } : {}),
   depends_on: dependsOn(input.pkg, part),
 });
+
+const secretsOf = (files: Record<string, string>) =>
+  Object.fromEntries(Object.entries(files).map(([name, file]) => [name, { file }]));
 
 const fixedServices = (input: ComposeInput, anyImage: string) => ({
   gateway: {
@@ -98,5 +104,6 @@ export const composeFile = (input: ComposeInput) => {
     if (input.tags['api']) services['migrate'] = migrateService(input);
   }
   const volumes = hasStore(input.pkg, 'postgres') ? { store: {} } : {};
-  return { name: input.project, services, volumes };
+  const secrets = input.secretFiles ? { secrets: secretsOf(input.secretFiles) } : {};
+  return { name: input.project, services, volumes, ...secrets };
 };

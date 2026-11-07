@@ -114,6 +114,18 @@ describe('composeFile', () => {
     });
   });
 
+  it('mounts each secret file on every part but ui, the top level holding paths only', () => {
+    const secretFiles = { 'github-read': '/x/.agentage/secrets/github-read' };
+    const file = composeFile({ pkg: FULL, tags: TAGS, ...FILES, secretFiles });
+    const services = file.services as Record<string, Service>;
+    expect(file.secrets).toEqual({ 'github-read': { file: '/x/.agentage/secrets/github-read' } });
+    for (const part of ['pages', 'api', 'mcp', 'worker'])
+      expect(services[part]?.['secrets']).toEqual(['github-read']);
+    expect(services['ui']).not.toHaveProperty('secrets');
+    expect(services['migrate']).not.toHaveProperty('secrets');
+    expect(composeFile({ pkg: FULL, tags: TAGS, ...FILES })).not.toHaveProperty('secrets');
+  });
+
   it('without a store has no store, no migrate, no volume and no store env', () => {
     const file = composeFile({ pkg: API_MANIFEST, tags: { api: TAGS['api'] ?? '' }, ...FILES });
     const services = file.services as Record<string, Service>;

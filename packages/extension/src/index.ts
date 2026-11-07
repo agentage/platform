@@ -12,6 +12,7 @@ export {
   type ServerPartKind,
   type SettingValue,
 } from './context/context.js';
+export { type Secrets } from './context/secrets.js';
 export {
   createTestContext,
   type LogEntry,
