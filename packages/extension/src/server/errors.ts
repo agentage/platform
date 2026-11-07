@@ -23,6 +23,13 @@ export const notFound: RequestHandler = () => {
 export const errorHandler =
   (log: Log): ErrorRequestHandler =>
   (err: unknown, _req, res, _next) => {
+    // A gone client or a started answer cannot take an envelope: close it, never write twice.
+    const closed = (err as { code?: unknown } | null)?.code === 'ERR_STREAM_PREMATURE_CLOSE';
+    if (closed || res.headersSent) {
+      if (closed) log.warn('client closed early');
+      else log.error(err);
+      return void res.destroy();
+    }
     const failure = toFailure(err);
     if (failure.status >= 500) log.error(err);
     if (failure.retryAfter !== undefined) res.setHeader('Retry-After', String(failure.retryAfter));
