@@ -41,6 +41,13 @@ describe('exec', () => {
       'agentage-no-such-binary is not installed or not on PATH'
     );
   });
+
+  it('mustRun names a failure message written to stdout only, as tsc does', async () => {
+    const script = 'console.log("error TS6133: x is declared but never used"); process.exit(2)';
+    await expect(mustRun(runCommand, process.execPath, ['-e', script])).rejects.toThrow(
+      'error TS6133: x is declared but never used'
+    );
+  });
 });
 
 describe('exec timeouts', () => {

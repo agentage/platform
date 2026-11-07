@@ -85,8 +85,9 @@ export const mustRun = async (
 ): Promise<string> => {
   const result = await run(command, args, options);
   if (result.code !== 0) {
+    // tsc writes its diagnostics to stdout, so an empty stderr falls back to it.
     throw new Error(
-      `${command} ${args[0] ?? ''} failed with exit code ${result.code}${tail(result.stderr)}`
+      `${command} ${args[0] ?? ''} failed with exit code ${result.code}${tail(result.stderr?.trim() ? result.stderr : result.stdout)}`
     );
   }
   return result.stdout;
