@@ -47,16 +47,8 @@ jobs:
         run: npm install -g npm@latest && npm --version # OIDC needs npm >= 11.5.1
 
       - name: Publish to npm (skips a version already published)
-        env:
-          # TEMPORARY: stages the first publish of a new name; delete once @agentage/widget is on npm
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
-          if [ -n "${NPM_TOKEN:-}" ]; then
-            # Single quotes on purpose: npm expands ${NPM_TOKEN} itself, the token never lands on disk
-            echo '//registry.npmjs.org/:_authToken=${NPM_TOKEN}' >> ~/.npmrc
-            echo "first-publish token in use" >> "$GITHUB_STEP_SUMMARY"
-          fi
           for manifest in packages/*/package.json; do
             name=$(node -p "require('./${manifest}').name")
             version=$(node -p "require('./${manifest}').version")
@@ -65,6 +57,9 @@ jobs:
               echo "${name}@${version} is already on npm"
               continue
             fi
-            if [ -n "${NPM_TOKEN:-}" ] && ! npm view "${name}" name >/dev/null 2>&1; then npm stage publish -w "${name}" --access public --provenance; elif ! npm publish -w "${name}" --access public --provenance; then echo "direct publish of ${name}@${version} not authorized (no validated trusted publisher): staging it for approval"; npm stage publish -w "${name}" --access public --provenance; fi
+            if ! npm publish -w "${name}" --access public --provenance; then
+              echo "direct publish of ${name}@${version} not authorized (no validated trusted publisher): staging it for approval"
+              npm stage publish -w "${name}" --access public --provenance
+            fi
             echo "published ${name}@${version}" >> "$GITHUB_STEP_SUMMARY"
           done
