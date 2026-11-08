@@ -121,7 +121,8 @@ describe('api app: envelope and headers', () => {
   it('hides internals behind INTERNAL 500 and logs the error whole, tagged with the agcid', async () => {
     const lines: Record<string, unknown>[] = [];
     const log = createLog({ extension: 'probe', part: 'api' }, (line) => {
-      lines.push(JSON.parse(line) as Record<string, unknown>);
+      const parsed = JSON.parse(line) as Record<string, unknown>;
+      if (parsed['msg'] !== 'request') lines.push(parsed);
     });
     const { get } = await start({ log });
     const res = await get('/api/v1/boom', { headers: { agcid: 'trace-500-check' } });
@@ -145,9 +146,10 @@ describe('api app: envelope and headers', () => {
     const { get, ctx } = await start();
     await get('/api/v1/nope');
     await get('/api/v1/body', { method: 'POST', body: '{bad', headers: JSON_TYPE });
-    expect(ctx.logs).toEqual([]);
+    const errors = () => ctx.logs.filter((entry) => entry.message !== 'request');
+    expect(errors()).toEqual([]);
     await get('/api/v1/busy');
-    expect(ctx.logs.map((entry) => entry.message)).toEqual(['Try later']);
+    expect(errors().map((entry) => entry.message)).toEqual(['Try later']);
   });
 
   it('sends Retry-After with 503', async () => {

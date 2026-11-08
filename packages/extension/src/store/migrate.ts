@@ -11,7 +11,7 @@ const MIGRATE_TIMEOUTS: StoreTimeouts = { connectMs: 10_000, statementMs: 300_00
 let log = createLog({ extension: 'unknown', part: 'migrate' });
 try {
   const pkg = await readManifest(process.cwd());
-  log = createLog({ extension: pkg.agentage.id, part: 'migrate' });
+  log = createLog({ extension: pkg.agentage.id, part: 'migrate', version: pkg.version });
   const store = createStore(process.env, log, MIGRATE_TIMEOUTS);
   const result = await migrate(store, process.cwd(), log);
   process.stdout.write(`${JSON.stringify(result)}\n`);

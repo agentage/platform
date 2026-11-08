@@ -115,7 +115,7 @@ const inputFor = async (options: RunPartOptions, start: Start): Promise<RunnerIn
 export const runPart = async (options: RunPartOptions): Promise<Server> => {
   const pkg = await readManifest(options.dir);
   const part = partOf(pkg, options.part);
-  const log = createLog({ extension: pkg.agentage.id, part });
+  const log = createLog({ extension: pkg.agentage.id, part, version: pkg.version });
   const names = part === 'ui' ? [] : (pkg.agentage.secrets ?? []);
   const secrets = await readSecrets(names, options.secretsDir ?? SECRETS_DIR, part);
   const start = { pkg, part, env: options.env, log, secrets };
