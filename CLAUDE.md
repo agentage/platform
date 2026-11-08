@@ -13,6 +13,13 @@ security, backend); this file only adds what the tree does not say.
 
 - Bump a package's version only when that package's files changed (`scripts/check-bumps.mjs` gates PRs)
 
+## Commits
+
+- Scopes: `extension, widget, identity, shell, release, ci, docs, deps`; repo-level `ci`, `docs`, `chore`
+  and `build` commits may go scopeless. Titles are conventional commits, 72 characters at most; CI
+  checks the PR title.
+- A release bump commit touches one package, or uses the `release` scope.
+
 ## Layout (`packages/extension/src`)
 
 - `envelope/` ok, fail, parse, the closed error codes; `agcid/` UUIDv7, the request scope

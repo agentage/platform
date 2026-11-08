@@ -14,6 +14,21 @@ permissions:
   contents: read
 
 jobs:
+  prTitle:
+    name: PR title
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Title is a conventional commit with a scope from CLAUDE.md
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          scoped='^(feat|fix|refactor|test|chore|ci|docs|perf|build)\((extension|widget|identity|shell|release|ci|docs|deps)\)!?: .{1,60}$'
+          bare='^(ci|docs|chore|build): '
+          if [ "${#TITLE}" -le 72 ] && { [[ $TITLE =~ $scoped ]] || [[ $TITLE =~ $bare ]]; }; then exit 0; fi
+          echo "::error::PR title '$TITLE' breaks the commit title rules in CLAUDE.md (type(scope): text, max 72)"; exit 1
+
   verify:
     name: Verify
     runs-on: ubuntu-latest
