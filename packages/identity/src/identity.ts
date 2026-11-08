@@ -1,4 +1,5 @@
-import { authCalls, type FetchLike, type MintedPat } from './auth.js';
+import { authCalls } from './auth.client.js';
+import { type FetchLike, type MintedPat } from './auth.schema.js';
 
 export type TokenSource = () => Promise<string | undefined>;
 export type Identity = ReturnType<typeof createIdentity>;

@@ -28,6 +28,10 @@ await id.signOut(); // revokes the token, then ends the session
   (1-730 days) and resolves `{ id, token, expiresAt }`; the token is shown once.
   `revokeToken(id)` revokes one (`DELETE /account/pat/{id}`).
 
+Two options are for tests and embedders: `fetch` (a `fetch`-shaped function; the global `fetch` is
+used, read at call time, when left out) and `location` (`{ href, assign }`; `window.location` when
+left out) that `signIn()` navigates.
+
 `scopes` is required: auth mints no PAT without one. Auth sets the token's audience itself. A
 failed call throws an `IdentityError` with `code`, `message` and the HTTP `status`. The client
 never logs a token.

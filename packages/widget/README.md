@@ -51,5 +51,10 @@ without it the system `prefers-color-scheme` decides. `useHost().context` carrie
 page takes `?theme=light|dark`, `?widget=`, `?token=` and `?scope=` (the dev token's scope,
 default `{id}:read`).
 
+The root export also has `hostError(code, message)` (the error a bridge call throws),
+`EnvelopeSchema` (the `{ success, data | error }` reply a bridge parses) and the types `FetchLike`
+and `TokenSource`. The `@agentage/widget/register` subpath has `registerWidgets(id, widgets)`:
+a shell page calls it with a loaded bundle's map to define the elements.
+
 See the [platform README](https://github.com/agentage/platform#readme) for the bridge protocol
 and the harness page.

@@ -5,4 +5,4 @@ export {
   type MintOptions,
   type TokenSource,
 } from './identity.js';
-export type { Account, FetchLike, IdentityError, MintedPat, TokenSummary } from './auth.js';
+export type { Account, FetchLike, IdentityError, MintedPat, TokenSummary } from './auth.schema.js';
