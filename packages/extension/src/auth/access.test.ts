@@ -19,6 +19,8 @@ describe('access', () => {
     expect(accessOfSecurity([{ agentage: ['probe:read', 'probe:admin'] }])).toBe('admin');
     expect(accessOfSecurity(undefined)).toBe('read');
     expect(accessOfSecurity([{ agentage: ['odd'] }])).toBe('read');
+    expect(accessOfSecurity([{}, { pat: ['probe:read'] }])).toBe('optional');
+    expect(accessOfSecurity([{}])).toBe('public');
   });
 
   it('finds the operation of a request, templates included; anything undeclared needs read', () => {
@@ -55,5 +57,7 @@ describe('access', () => {
   it('takes the strongest of several needs', () => {
     expect(strongest([])).toBe('public');
     expect(strongest(['read', 'admin', 'write'])).toBe('admin');
+    expect(strongest(['public', 'optional'])).toBe('optional');
+    expect(strongest(['optional', 'read'])).toBe('read');
   });
 });

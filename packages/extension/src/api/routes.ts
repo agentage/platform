@@ -24,11 +24,11 @@ export type ParamsOf<P extends string> = P extends `${string}{${infer N}}${infer
   ? { [K in N]: string } & ParamsOf<R>
   : Record<never, string>;
 
-// The token check ran before a scoped route, so only a public one can be anonymous.
+// The token check ran before a scoped route, so only a public or optional one can be anonymous.
 export interface RouteRequest<I, P extends string, S extends Access = Access> {
   input: I;
   params: ParamsOf<P>;
-  caller: S extends 'public' ? Caller | null : Caller;
+  caller: S extends 'public' | 'optional' ? Caller | null : Caller;
   ifMatch?: string;
 }
 
@@ -67,7 +67,7 @@ export interface RouteEntry {
 }
 
 const PATH = /^(\/([A-Za-z0-9._~-]+|\{[A-Za-z_][A-Za-z0-9_]*\}))+$/;
-const SCOPES: readonly Access[] = ['public', 'read', 'write', 'admin'];
+const SCOPES: readonly Access[] = ['public', 'optional', 'read', 'write', 'admin'];
 
 const problemOf = (routes: RouteEntry[], { method, path, spec }: RouteEntry) => {
   if (!ROUTE_METHODS.includes(method))

@@ -55,12 +55,19 @@ const parameters = (entry: RouteEntry): Json[] => {
   return [...path, ...query];
 };
 
+const securityOf = (id: string, scope: RouteEntry['spec']['scope']): Json[] => {
+  if (scope === 'public') return [];
+  // The empty requirement lets a call through anonymous; a bearer sent must grant read.
+  if (scope === 'optional') return [{}, { pat: [scopeOf(id, 'read')] }];
+  return [{ pat: [scopeOf(id, scope)] }];
+};
+
 const operation = (id: string, entry: RouteEntry): Json => {
   const { summary, scope, input, output } = entry.spec;
   const params = parameters(entry);
   return {
     summary,
-    security: scope === 'public' ? [] : [{ pat: [scopeOf(id, scope)] }],
+    security: securityOf(id, scope),
     ...(params.length > 0 && { parameters: params }),
     ...(input &&
       !inQuery(entry) && { requestBody: { required: true, content: json(bare(input, 'input')) } }),

@@ -157,7 +157,7 @@ describe('token check on mcp tools', () => {
   it('refuses a tool that declares a scope the kit does not know', () => {
     const { tool } = createToolRegistry();
     const spec = { description: 'x', input: z.object({}), output: z.object({}) };
-    expect(() => tool('odd', { ...spec, scope: 'root' as Access }, () => ({}))).toThrow(
+    expect(() => tool('odd', { ...spec, scope: 'root' as 'read' }, () => ({}))).toThrow(
       'tool odd scope root: one of public, read, write, admin'
     );
   });
