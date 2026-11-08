@@ -54,6 +54,46 @@ describe('pages app', () => {
     expect(await doc.json()).toMatchObject({ id: 'probe', host: served.url });
   });
 
+  it('types each file by its extension, HTML when it has none or an unknown one', async () => {
+    const types: Record<string, RegExp> = {
+      '/main.js': /^text\/javascript/,
+      '/main.mjs': /^text\/javascript/,
+      '/a.css': /^text\/css/,
+      '/a.json': /^application\/json/,
+      '/a.svg': /^image\/svg\+xml/,
+      '/a.png': /^image\/png/,
+      '/favicon.ico': /^image\/(vnd\.microsoft\.icon|x-icon)/,
+      '/shell': /^text\/html/,
+      '/a.xyz': /^text\/html/,
+    };
+    const site = Object.fromEntries(Object.keys(types).map((path) => [path, 'x']));
+    served = await serveApp(
+      createPagesApp({ pkg: PKG, build: BUILD, log: recordedLog().log, site })
+    );
+    for (const [path, type] of Object.entries(types)) {
+      const res = await fetch(`${served.url}${path}`);
+      expect(res.headers.get('content-type'), path).toMatch(type);
+      expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+    }
+  });
+
+  it('sends the browser CSP for its host and issuer', async () => {
+    const origin = 'https://fixture.next.agentage.io';
+    const issuer = 'https://auth.agentage.io';
+    const app = createPagesApp({
+      pkg: PKG,
+      build: BUILD,
+      log: recordedLog().log,
+      site: {},
+      origin,
+      issuer,
+    });
+    served = await serveApp(app);
+    const csp = (await fetch(`${served.url}/`)).headers.get('content-security-policy');
+    expect(csp).toContain("script-src 'self' https://*.next.agentage.io;");
+    expect(csp).toContain(`connect-src 'self' ${issuer} https://*.next.agentage.io`);
+  });
+
   it('refuses a site map whose keys are not paths or whose pages are not text', () => {
     const log = recordedLog().log;
     const pages = (site: Record<string, unknown>) =>

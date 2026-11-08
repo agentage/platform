@@ -54,13 +54,15 @@ const mcp = async (input: RunnerInput): Promise<Running> => {
 
 const pages = async (input: RunnerInput): Promise<Running> => {
   const site = (await callCreate(input, 'pages', input.ctx())) as Record<string, string>;
-  return { app: createPagesApp({ ...input.base, site }) };
+  const { AGENTAGE_ISSUER: issuer, AGENTAGE_DEV_ISSUER: devIssuer } = input.env;
+  return { app: createPagesApp({ ...input.base, site, issuer, devIssuer }) };
 };
 
 const ui = async (input: RunnerInput): Promise<Running> => ({
   app: createUiApp({
     ...input.base,
     dir: join(input.dir, 'dist', 'ui'),
+    issuer: input.env['AGENTAGE_ISSUER'],
     devIssuer: input.env['AGENTAGE_DEV_ISSUER'],
   }),
 });

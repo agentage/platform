@@ -20,7 +20,7 @@ const start = async (devIssuer?: string) => {
   return served;
 };
 
-// Helmet's defaults plus the kit's directives; script-src stays 'self' only, no upgrade.
+// Helmet's defaults plus the kit's directives; no origin or issuer here, so 'self' only.
 const CSP =
   "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';" +
   "frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';" +

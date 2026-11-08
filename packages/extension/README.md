@@ -25,5 +25,19 @@ false); `file` and `line` are there only when a problem has them:
 }
 ```
 
+The pages part's `create(ctx)` returns a site map, path to file text. Each file goes out with the
+type of its extension (`.js`/`.mjs` as `text/javascript`, `.css`, `.json`, `.svg`, `.png`,
+`.ico`; anything else as HTML), so a page can load its own ES module. Pages and ui send one CSP:
+
+```text
+default-src 'self'; script-src 'self' https://*.<parent>;
+connect-src 'self' <AGENTAGE_ISSUER origin> https://*.<parent>; img-src 'self' data:;
+style-src 'self' 'unsafe-inline'
+```
+
+`<parent>` is the part's own host (`AGENTAGE_ORIGIN`) minus its first label
+(`fixture.next.agentage.io` -> `next.agentage.io`); there is no wildcard for a one-label host,
+a bare domain or an IP, so under `up` (`localhost`) a page reaches only itself and the issuer.
+
 See the [platform README](https://github.com/agentage/platform#readme) for every part kind, the
 manifest, the tool and how a part image runs.

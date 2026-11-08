@@ -103,13 +103,15 @@ describe('runPart per part', () => {
     const url = await start('ui', { AGENTAGE_SETTINGS: 'not json' });
     const res = await fetch(`${url}/ui/0.2.0/probe.js`);
     expect(await res.text()).toBe('export const widget = 1;\n');
-    expect(res.headers.get('content-security-policy')).toMatch(/connect-src 'self'(;|$)/);
+    expect(res.headers.get('content-security-policy')).toMatch(
+      /connect-src 'self' http:\/\/127\.0\.0\.1:9(;|$)/
+    );
   });
 
   it('ui: lets widgets reach the dev issuer only when up sets AGENTAGE_DEV_ISSUER', async () => {
     const url = await start('ui', { AGENTAGE_DEV_ISSUER: 'http://localhost:4281' });
     const csp = (await fetch(`${url}/ui/0.2.0/probe.js`)).headers.get('content-security-policy');
-    expect(csp).toMatch(/connect-src 'self' http:\/\/localhost:4281(;|$)/);
+    expect(csp).toMatch(/connect-src 'self' http:\/\/127\.0\.0\.1:9 http:\/\/localhost:4281(;|$)/);
     await expect(start('ui', { AGENTAGE_DEV_ISSUER: 'https://auth.agentage.io' })).rejects.toThrow(
       /not a loopback http origin/
     );
