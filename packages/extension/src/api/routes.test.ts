@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { createTestContext } from '../context/test-context.js';
+import { ok } from '../envelope/envelope.js';
 import { ErrorEnvelopeSchema } from '../envelope/envelope.schema.js';
 import { startTestServer, type TestServer } from '../testing/test-server.js';
 import { createRouteRegistry, type ApiContext } from './routes.js';
@@ -10,6 +11,7 @@ const Msg = z.object({ msg: z.string().min(1) });
 
 const create = ({ route }: ApiContext) => {
   route('get', '/echo', { summary: 'Echo', input: Msg, output: Msg }, ({ input }) => input);
+  route('get', '/who', { summary: 'Scoped caller' }, ({ caller }) => caller.sub);
   route('get', '/me', { summary: 'Caller', scope: 'public' }, ({ caller }) => caller?.sub);
   route('post', '/items/{id}', { summary: 'Item', scope: 'write', input: Msg }, (req) => ({
     id: req.params.id,
@@ -35,6 +37,7 @@ describe('ctx.route', () => {
       success: true,
       data: { msg: 'hi' },
     });
+    expect(await (await server!.fetch('/api/v1/who')).json()).toEqual(ok('usr_test'));
     expect(await (await server!.fetch('/api/v1/me')).json()).toEqual({
       success: true,
       data: 'usr_test',

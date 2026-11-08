@@ -8,10 +8,10 @@ export type RouteMethod = (typeof ROUTE_METHODS)[number];
 
 type ObjectSchema = z.ZodObject;
 
-export interface RouteSpec<I extends ObjectSchema, O extends z.ZodType> {
+export interface RouteSpec<I extends ObjectSchema, O extends z.ZodType, S extends Access = Access> {
   summary: string;
   // What the route needs: {id}:{scope}, or public; read when left out.
-  scope?: Access;
+  scope?: S;
   // get and delete read it from the query, post, put and patch from the JSON body.
   input?: I;
   output?: O;
@@ -22,26 +22,31 @@ export type ParamsOf<P extends string> = P extends `${string}{${infer N}}${infer
   ? { [K in N]: string } & ParamsOf<R>
   : Record<never, string>;
 
-export interface RouteRequest<I, P extends string> {
+// The token check ran before a scoped route, so only a public one can be anonymous.
+export interface RouteRequest<I, P extends string, S extends Access = Access> {
   input: I;
   params: ParamsOf<P>;
-  caller: Caller | null;
+  caller: S extends 'public' ? Caller | null : Caller;
 }
 
-export type RouteHandler<I extends ObjectSchema, O extends z.ZodType, P extends string> = (
-  request: RouteRequest<z.output<I>, P>
-) => z.input<O> | Promise<z.input<O>>;
+export type RouteHandler<
+  I extends ObjectSchema,
+  O extends z.ZodType,
+  P extends string,
+  S extends Access = Access,
+> = (request: RouteRequest<z.output<I>, P, S>) => z.input<O> | Promise<z.input<O>>;
 
 // Registers a route under /api/v1; the kit validates, wraps the envelope and writes openapi.json.
 export type RouteRegistrar = <
   P extends string,
   I extends ObjectSchema = z.ZodObject<Record<never, z.ZodType>>,
   O extends z.ZodType = z.ZodUnknown,
+  S extends Access = 'read',
 >(
   method: RouteMethod,
   path: P,
-  spec: RouteSpec<I, O>,
-  handler: RouteHandler<I, O, P>
+  spec: RouteSpec<I, O, S>,
+  handler: RouteHandler<I, O, P, S>
 ) => void;
 
 export interface ApiContext extends PartContext {
@@ -52,7 +57,7 @@ export interface RouteEntry {
   method: RouteMethod;
   path: string;
   spec: RouteSpec<ObjectSchema, z.ZodType>;
-  handler: (request: RouteRequest<Record<string, unknown>, string>) => unknown;
+  handler: (request: RouteRequest<Record<string, unknown>, string, 'public'>) => unknown;
 }
 
 const PATH = /^(\/([A-Za-z0-9._~-]+|\{[A-Za-z_][A-Za-z0-9_]*\}))+$/;
