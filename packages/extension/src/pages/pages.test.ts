@@ -4,7 +4,7 @@ import { createTestContext } from '../context/test-context.js';
 import { recordedLog, serveApp, type Served } from '../test-support/http.js';
 import { API_MANIFEST, SHA } from '../test-support/packages.js';
 import { createPagesApp, NOT_FOUND_PAGE, platformSources } from './pages-app.js';
-import { versionPage } from './pages.js';
+import { type PagesSite, versionPage } from './pages.js';
 
 const BUILD = { commit: SHA, buildTime: '2026-11-05T10:00:00Z' };
 const PKG = { ...API_MANIFEST, agentage: { id: 'probe', parts: { pages: true } } };
@@ -54,10 +54,10 @@ describe('pages app', () => {
     expect(await doc.json()).toMatchObject({ id: 'probe', host: served.url });
   });
 
-  it('refuses a site map whose keys are not paths or whose pages are not text', () => {
+  it('refuses a site map whose keys are not paths or whose pages are not text or bytes', () => {
     const log = recordedLog().log;
     const pages = (site: Record<string, unknown>) =>
-      createPagesApp({ pkg: PKG, build: BUILD, log, site: site as Record<string, string> });
+      createPagesApp({ pkg: PKG, build: BUILD, log, site: site as PagesSite });
     const codes = (site: Record<string, unknown>): string[] => {
       try {
         pages(site);
@@ -70,7 +70,8 @@ describe('pages app', () => {
     };
     expect(codes({ 'about.html': '<p></p>' })).toEqual(['about.html invalid_key']);
     expect(codes({ '/a b': '<p></p>' })).toEqual(['/a b invalid_key']);
-    expect(codes({ '/': 42 })).toEqual(['/ invalid_type']);
+    expect(codes({ '/': 42 })).toEqual(['/ invalid_union']);
+    expect(codes({ '/': { type: '', body: 'x' } })).toEqual(['/.type too_small']);
   });
 
   it('types an entry by its extension and lets a page reach the platform hosts only', async () => {

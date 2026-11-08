@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { type PlatformInfo } from '../context/context.js';
 import { OriginSchema } from '../discovery/discovery.schema.js';
 import { messageOf, type Log } from '../log/log.js';
 import { formatIssues } from '../manifest/read-manifest.js';
@@ -20,6 +21,18 @@ const AuthEnvSchema = z.object({
   AGENTAGE_AUDIENCE: z.string().refine(isAudience, '*.{domain} or one host'),
   AGENTAGE_ORIGIN: z.url(),
 });
+
+const valid = (env: Env, key: keyof typeof AuthEnvSchema.shape): string => {
+  const parsed = AuthEnvSchema.shape[key].safeParse(env[key]);
+  return parsed.success ? parsed.data : '';
+};
+
+// ctx.platform from the token check's env; pages and worker start without it and get ''.
+export const platformOf = (env: Env): PlatformInfo => {
+  const telemetry = env['AGENTAGE_TELEMETRY_URL'] || undefined;
+  const issuer = valid(env, 'AGENTAGE_ISSUER');
+  return { issuer, audience: valid(env, 'AGENTAGE_AUDIENCE'), ...(telemetry && { telemetry }) };
+};
 
 // *.agentage.io covers the domain and every host under it at any depth; else one exact host.
 export const covers = (audience: string, host: string): boolean =>

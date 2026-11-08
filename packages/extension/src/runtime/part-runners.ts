@@ -10,6 +10,7 @@ import { createSpan } from '../log/span.js';
 import { createMcpApp } from '../mcp/mcp-app.js';
 import { createToolRegistry } from '../mcp/tools.js';
 import { createPagesApp, platformSources } from '../pages/pages-app.js';
+import { type PagesSite } from '../pages/pages.js';
 import { createApiApp, createPartApp, type PartAppBase } from '../server/app.js';
 import { mountApi } from '../server/api-routes.js';
 import { type Env } from './build-info.js';
@@ -54,7 +55,7 @@ const mcp = async (input: RunnerInput): Promise<Running> => {
 };
 
 const pages = async (input: RunnerInput): Promise<Running> => {
-  const site = (await callCreate(input, 'pages', input.ctx())) as Record<string, string>;
+  const site = (await callCreate(input, 'pages', input.ctx())) as PagesSite;
   return { app: createPagesApp({ ...input.base, site, platform: platformSources(input.env) }) };
 };
 

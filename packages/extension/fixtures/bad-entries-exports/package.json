@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "engines": {
-    "agentage": "^0.9"
+    "agentage": "^0.10"
   },
   "agentage": {
     "id": "base",
@@ -13,7 +13,7 @@
     }
   },
   "dependencies": {
-    "@agentage/extension": "^0.9.0",
+    "@agentage/extension": "^0.10.0",
     "express": "^5.1.0",
     "zod": "^4.2.0"
   },

@@ -21,6 +21,7 @@ export { type Out } from './command/out.js';
 export {
   type ExtensionInfo,
   type PartContext,
+  type PlatformInfo,
   type ServerPartKind,
   type SettingValue,
 } from './context/context.js';
@@ -62,7 +63,8 @@ export {
   type ToolRegistrar,
   type ToolSpec,
 } from './mcp/tools.js';
-export { versionPage, type PagesContext, type PagesSite } from './pages/pages.js';
+export { versionPage, type PagesContext, type PagesEntry, type PagesSite } from './pages/pages.js';
+export { siteFromDir, type SiteFromDirOptions } from './pages/site-from-dir.js';
 export { type ApiCreate, type ApiHandler, type ApiPart } from './server/part.types.js';
 export { type QueryResult, type Row, type Store } from './store/store.types.js';
 export {

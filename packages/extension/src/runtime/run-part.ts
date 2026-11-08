@@ -4,7 +4,7 @@ import { readSecrets, SECRETS_DIR, type Secrets } from '../context/secrets.js';
 import { settingsFromEnv } from '../context/settings.js';
 import { DEFAULT_RECORD_FILE, loadRecord } from '../discovery/discovery.js';
 import { type ExtensionRecord } from '../discovery/discovery.schema.js';
-import { declaredScopes, partAuth } from '../auth/part-auth.js';
+import { declaredScopes, partAuth, platformOf } from '../auth/part-auth.js';
 import { readOpenapi } from '../discovery/openapi.js';
 import { createLog, type Log } from '../log/log.js';
 import { type ImportModule } from '../manifest/entry.js';
@@ -65,6 +65,7 @@ const contextFor = (start: Start, part: ServerPartKind, store: Store | undefined
     settings: settingsFromEnv(start.pkg, start.env, start.log),
     store,
     secrets: start.secrets,
+    platform: platformOf(start.env),
   });
 
 // Built on first use, so the ui runner, which never asks, has no ctx at all.

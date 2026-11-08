@@ -89,7 +89,7 @@ describe('runPart', () => {
 });
 
 describe('runPart secrets', () => {
-  it('fills ctx.secrets from the mounted files and refuses to start without one', async () => {
+  it('fills ctx.secrets and ctx.platform, and refuses to start without one', async () => {
     const manifest = {
       ...API_MANIFEST,
       agentage: { ...API_MANIFEST.agentage, secrets: ['github-read'] },
@@ -103,7 +103,10 @@ describe('runPart secrets', () => {
     };
     const seen: unknown[] = [];
     const importModule = async () => ({
-      create: (ctx: { secrets: unknown }) => (seen.push(ctx.secrets), Router()),
+      create: (ctx: { secrets: unknown; platform: unknown }) => (
+        seen.push(ctx.secrets, ctx.platform),
+        Router()
+      ),
     });
     const options = {
       dir,
@@ -118,7 +121,10 @@ describe('runPart secrets', () => {
     );
     await writeFile(`${dir}/github-read`, 'ghp_x\n');
     server = await runPart(options);
-    expect(seen).toEqual([{ githubRead: 'ghp_x' }]);
+    expect(seen).toEqual([
+      { githubRead: 'ghp_x' },
+      { issuer: 'https://127.0.0.1:9', audience: '*.agentage.io' },
+    ]);
   });
 });
 

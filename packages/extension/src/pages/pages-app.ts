@@ -1,10 +1,10 @@
-import { extname } from 'node:path';
 import { type Express, type RequestHandler } from 'express';
 import { z } from 'zod';
 import { isAudience } from '../auth/part-auth.js';
 import { type Env } from '../runtime/build-info.js';
 import { createPartApp, type PartAppBase } from '../server/app.js';
 import { type PagesSite } from './pages.js';
+import { typeOf } from './types.js';
 
 export interface PagesAppOptions extends PartAppBase {
   site: PagesSite;
@@ -28,9 +28,9 @@ export const platformSources = (env: Env): string[] => {
   );
 };
 
-const TYPES: Record<string, string> = { '.js': 'js', '.mjs': 'js', '.css': 'css', '.json': 'json' };
-
-const SiteSchema = z.record(z.string().regex(/^\/[A-Za-z0-9._~/-]*$/), z.string());
+const BODY = z.union([z.string(), z.instanceof(Uint8Array)]);
+const ENTRY = z.union([BODY, z.object({ type: z.string().min(1), body: BODY })]);
+const SiteSchema = z.record(z.string().regex(/^\/[A-Za-z0-9._~/-]*$/), ENTRY);
 
 export const NOT_FOUND_PAGE =
   '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>Not found</title></head><body><p>Not found</p></body></html>\n';
@@ -38,10 +38,14 @@ export const NOT_FOUND_PAGE =
 const serve =
   (site: PagesSite): RequestHandler =>
   (req, res, next) => {
-    const html = site[req.path];
-    if (html === undefined) return next();
-    res.type(TYPES[extname(req.path)] ?? 'html').setHeader('Cache-Control', 'no-cache');
-    res.send(html);
+    const entry = site[req.path];
+    if (entry === undefined) return next();
+    const { type, body } = typeof entry === 'object' && 'type' in entry ? entry : { body: entry };
+    res.type(type ?? typeOf(req.path)).setHeader('Cache-Control', 'no-cache');
+    // express sends a Buffer as bytes but a plain Uint8Array as JSON.
+    res.send(
+      typeof body === 'string' ? body : Buffer.from(body.buffer, body.byteOffset, body.length)
+    );
   };
 
 const missing: RequestHandler = (_req, res) => {

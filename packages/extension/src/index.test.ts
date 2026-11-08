@@ -18,6 +18,7 @@ describe('public surface', () => {
       'pageOf',
       'parse',
       'reply',
+      'siteFromDir',
       'startTestMcp',
       'startTestServer',
       'versionPage',

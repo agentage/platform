@@ -20,6 +20,15 @@ export interface ExtensionInfo {
   store?: StoreKind;
 }
 
+// The platform this deployment trusts: AGENTAGE_ISSUER, AGENTAGE_AUDIENCE, AGENTAGE_TELEMETRY_URL.
+export interface PlatformInfo {
+  issuer: string;
+  audience: string;
+  telemetry?: string;
+}
+
+export const NO_PLATFORM: PlatformInfo = Object.freeze({ issuer: '', audience: '' });
+
 // The kit's subset of the host ctx.
 export interface PartContext {
   readonly extension: Readonly<ExtensionInfo>;
@@ -31,6 +40,7 @@ export interface PartContext {
   readonly settings: Readonly<Record<string, SettingValue>>;
   readonly store: Store;
   readonly secrets: Secrets;
+  readonly platform: Readonly<PlatformInfo>;
 }
 
 // ctx.store is always there; without a store part in the manifest it says so on first use.
@@ -54,6 +64,7 @@ export interface ContextInput {
   settings?: Record<string, SettingValue>;
   store?: Store;
   secrets?: Secrets;
+  platform?: PlatformInfo;
 }
 
 export const createContext = (input: ContextInput): PartContext => {
@@ -72,5 +83,15 @@ export const createContext = (input: ContextInput): PartContext => {
   const auth = Object.freeze({ caller: callerOf });
   const secrets = input.secrets ?? {};
   const span = createSpan(log);
-  return Object.freeze({ extension, auth, log, span, settings, store: store ?? NO_STORE, secrets });
+  const platform = Object.freeze({ ...(input.platform ?? NO_PLATFORM) });
+  return Object.freeze({
+    extension,
+    auth,
+    log,
+    span,
+    settings,
+    store: store ?? NO_STORE,
+    secrets,
+    platform,
+  });
 };
