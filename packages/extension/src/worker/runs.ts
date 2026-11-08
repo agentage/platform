@@ -1,3 +1,4 @@
+import { JOB_RUNS_SQL } from '../store/kit-migrations.js';
 import { type Store } from '../store/store.types.js';
 
 export type RunStatus = 'ok' | 'failed';
@@ -17,16 +18,6 @@ export interface RunStore {
 }
 
 export const KEEP_RUNS = 50;
-
-export const RUNS_TABLE = `create table if not exists agentage_job_runs (
-  id bigint generated always as identity primary key,
-  job text not null,
-  started_at timestamptz not null,
-  ended_at timestamptz not null,
-  status text not null,
-  log text not null,
-  timeout_ms integer
-)`;
 
 const INSERT = `insert into agentage_job_runs (job, started_at, ended_at, status, log, timeout_ms)
   values ($1, $2, $3, $4, $5, $6)`;
@@ -66,7 +57,8 @@ const valuesOf = (run: JobRun): unknown[] => [
 // Runs live in the extension's own store, in a table the kit owns; the last 50 per job are kept.
 export const storeRuns = (store: Store): RunStore => {
   let table: Promise<unknown> | undefined;
-  const ready = () => (table ??= store.query(RUNS_TABLE));
+  // Also here: a worker-only extension has no migrate job (only the api image runs it).
+  const ready = () => (table ??= store.query(JOB_RUNS_SQL));
   return {
     save: async (run) => {
       await ready();

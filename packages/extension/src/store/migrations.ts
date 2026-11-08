@@ -1,6 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { messageOf, type Log } from '../log/log.js';
+import { KIT_MIGRATIONS, KIT_PREFIX, KIT_TABLES } from './kit-migrations.js';
 import { type Store } from './store.types.js';
 
 export const SQL_FILE = /^[0-9]{3}-[a-z0-9-]+\.sql$/;
@@ -39,10 +40,12 @@ export const SEEDS_OWED = 'seeds:owed';
 // Tables other than the kit's own: a store holding any (a restored dump) never gets the seeds.
 const USER_TABLES = `select count(*)::int as n from information_schema.tables
   where table_schema not in ('pg_catalog', 'information_schema')
-  and table_name not in ('_migrations', 'agentage_job_runs')`;
+  and table_name not in (${KIT_TABLES.map((name) => `'${name}'`).join(', ')})`;
 
+// Kit rows alone leave a store empty: an extension that adds its first migration later still seeds.
 const isEmpty = async (store: Store, done: Set<string>): Promise<boolean> =>
-  done.size === 0 && ((await store.query<{ n: number }>(USER_TABLES)).rows[0]?.n ?? 0) === 0;
+  [...done].every((name) => name.startsWith(KIT_PREFIX)) &&
+  ((await store.query<{ n: number }>(USER_TABLES)).rows[0]?.n ?? 0) === 0;
 
 const appliedNames = async (store: Store): Promise<Set<string>> => {
   await store.query(LEDGER);
@@ -51,8 +54,7 @@ const appliedNames = async (store: Store): Promise<Set<string>> => {
 };
 
 // One string, one round trip: the file and its ledger row commit together or not at all.
-const applyFile = async (store: Store, file: string, name: string): Promise<void> => {
-  const sql = await readFile(file, 'utf8');
+const applySql = async (store: Store, sql: string, name: string): Promise<void> => {
   try {
     await store.query(
       `begin;\n${sql}\n;insert into _migrations (name) values ('${name}');\ncommit;`
@@ -69,10 +71,14 @@ const applyAll = async (store: Store, dir: string, prefix: string, done: Set<str
   for (const file of await sqlFiles(dir)) {
     const name = `${prefix}${file}`;
     if (done.has(name)) continue;
-    await applyFile(store, join(dir, file), name);
+    await applySql(store, await readFile(join(dir, file), 'utf8'), name);
     count += 1;
   }
   return count;
+};
+
+const applyKit = async (store: Store, done: Set<string>): Promise<void> => {
+  for (const { name, sql } of KIT_MIGRATIONS) if (!done.has(name)) await applySql(store, sql, name);
 };
 
 const seedOnce = async (store: Store, dir: string, done: Set<string>): Promise<number> => {
@@ -81,12 +87,13 @@ const seedOnce = async (store: Store, dir: string, done: Set<string>): Promise<n
   return seeds;
 };
 
-// Migrations in order, each once; seeds once, only on a store with no ledger row and no user table.
+// The kit's migrations, then the extension's in order, each once; seeds once, only on a store with no ledger row and no user table.
 export const migrate = async (store: Store, dir: string, log: Log): Promise<MigrateResult> => {
   const done = await appliedNames(store);
   const empty = await isEmpty(store, done);
   if (empty) await store.query(`insert into _migrations (name) values ('${SEEDS_OWED}')`);
   const owed = empty || done.has(SEEDS_OWED);
+  await applyKit(store, done);
   const migrations = (await sqlFiles(join(dir, 'migrations'))).length;
   const applied = await applyAll(store, join(dir, 'migrations'), '', done);
   const seeds = owed ? await seedOnce(store, dir, done) : 0;

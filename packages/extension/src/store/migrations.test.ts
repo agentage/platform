@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { recordedLog } from '../test-support/http.js';
 import { tempPackage } from '../test-support/packages.js';
-import { RUNS_TABLE } from '../worker/runs.js';
+import { JOB_RUNS_SQL } from './kit-migrations.js';
 import { migrate, sqlFiles } from './migrations.js';
 import { createTestStore, type TestStore } from './test-store.js';
 
@@ -16,10 +16,10 @@ beforeEach(async () => {
 });
 afterEach(() => store.close());
 
+// The extension's own rows; the kit's migration rows are kit-migrations.test.ts.
+const OWN = "select name from _migrations where name not like 'kit:%' order by name";
 const names = async (s: TestStore) =>
-  (await s.query<{ name: string }>('select name from _migrations order by name')).rows.map(
-    (row) => row.name
-  );
+  (await s.query<{ name: string }>(OWN)).rows.map((row) => row.name);
 
 describe('migrate', () => {
   it('applies migrations in file order, records them, seeds an empty store once', async () => {
@@ -74,7 +74,7 @@ describe('migrate', () => {
       'seeds/001-hello.sql': HELLO,
     });
     const s = store;
-    await s.query(RUNS_TABLE);
+    await s.query(JOB_RUNS_SQL);
     expect((await migrate(s, dir, recordedLog().log)).seeds).toBe(1);
   });
 
