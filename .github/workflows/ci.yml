@@ -100,6 +100,8 @@ jobs:
             fi
           done
           npm install --no-audit --no-fund "${tarballs[@]}"
+          # The smoke proves the runtime, not probe's pin: a kit minor bump must not wait on a probe release.
+          jq --arg r "^$(jq -r .version node_modules/@agentage/extension/package.json | cut -d. -f1,2)" '.engines.agentage = $r' package.json > /tmp/pkg.json && cp /tmp/pkg.json package.json
           node node_modules/@agentage/extension/dist/tool/cli.js up
 
       - name: Image smoke - every part carries this commit, discovery is valid through the gateway
