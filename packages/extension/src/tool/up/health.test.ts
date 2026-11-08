@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { json, SHA } from '../../test-support/packages.js';
 import { ENV, fakeDocker, probeDir } from '../../test-support/up-fixtures.js';
+import { type Run } from '../exec.js';
 import { up } from './up.js';
 import { assertHealthBodies } from './health.js';
 
@@ -35,6 +36,16 @@ describe('up asserts each part /health body', () => {
         'FAIL worker /health part api, needs worker',
         'FAIL pages /health body is not the health envelope: not json',
       ].join('\n')
+    );
+  });
+
+  it('names a part whose /health gives no answer, beside the parts that answer', async () => {
+    const run: Run = async (_cmd, args) =>
+      args.includes('api')
+        ? { code: 1, stdout: '', stderr: 'TypeError: fetch failed' }
+        : { code: 0, stdout: body({ ...OK, part: 'mcp' }) };
+    await expect(assertHealthBodies(run, { project: 'p' }, ['api', 'mcp'], SHA)).rejects.toThrow(
+      /^FAIL api \/health body is not the health envelope: no answer: TypeError: fetch failed$/
     );
   });
 

@@ -1,4 +1,4 @@
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { tempPackage } from '../test-support/packages.js';
@@ -30,6 +30,14 @@ describe('secrets', () => {
     await writeFile(join(dir, 'github-read'), '\n');
     await expect(readSecrets(['github-read'], dir, 'api')).rejects.toThrow(
       'api refused to start: secret github-read has no value'
+    );
+  });
+
+  it('names a secret file it cannot read, not as an empty value', async () => {
+    const dir = await tempPackage({});
+    await mkdir(join(dir, 'github-read'));
+    await expect(readSecrets(['github-read'], dir, 'api')).rejects.toThrow(
+      /^api refused to start: secret github-read cannot be read: EISDIR/
     );
   });
 

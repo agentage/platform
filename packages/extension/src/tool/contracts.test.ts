@@ -37,6 +37,13 @@ describe('writeContracts', () => {
     expect(await surfaceOk(dir)).toHaveLength(1);
   });
 
+  it('rewrites a contract left half-written by an earlier run', async () => {
+    const dir = await probeDir();
+    await writeFile(join(dir, 'probe.mcpc.json'), '{ "name": "agentage-pro');
+    expect(await writeContracts(dir)).toEqual(['probe.mcpc.json']);
+    expect(await surfaceOk(dir)).toEqual([]);
+  });
+
   it('refuses an unbuilt package as check does', async () => {
     const dir = await probeDir();
     await rm(join(dir, 'dist'), { recursive: true });

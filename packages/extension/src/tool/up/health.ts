@@ -44,7 +44,11 @@ export const assertHealthBodies = async (
   parts: string[],
   commit: string
 ): Promise<[part: string, checks: string][]> => {
-  const read = parts.map((part) => compose(run, target, ['exec', '-T', part, 'node', '-e', FETCH]));
+  const exec = (part: string) => compose(run, target, ['exec', '-T', part, 'node', '-e', FETCH]);
+  // A part that gives no answer is its own FAIL line, its cause the command's last line.
+  const read = parts.map((part) =>
+    exec(part).catch((err: Error) => `no answer: ${err.message.split('\n').at(-1) ?? ''}`)
+  );
   const bodies = await Promise.all(read);
   const data = bodies.map(dataOf);
   const failed = parts.flatMap((part, i) => mismatch(part, commit, data[i], bodies[i] ?? '') ?? []);
