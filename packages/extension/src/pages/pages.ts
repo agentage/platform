@@ -2,7 +2,7 @@ import { type PartContext } from '../context/context.js';
 
 export type PagesContext = PartContext;
 
-// The kit 0.2 pages part: create(ctx) returns path -> HTML; Next.js pages arrive in a later kit.
+// The pages part: create(ctx) returns path -> HTML, or JS, CSS, JSON by the path's extension.
 export type PagesSite = Readonly<Record<string, string>>;
 
 const escape = (value: string): string => value.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);

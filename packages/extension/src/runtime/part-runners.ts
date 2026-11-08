@@ -8,7 +8,7 @@ import { hasStore } from '../manifest/parts.js';
 import { type ImagePartKind } from '../manifest/primitives.schema.js';
 import { createMcpApp } from '../mcp/mcp-app.js';
 import { createToolRegistry } from '../mcp/tools.js';
-import { createPagesApp } from '../pages/pages-app.js';
+import { createPagesApp, platformSources } from '../pages/pages-app.js';
 import { createApiApp, createPartApp, type PartAppBase } from '../server/app.js';
 import { mountApi } from '../server/api-routes.js';
 import { type Env } from './build-info.js';
@@ -54,7 +54,7 @@ const mcp = async (input: RunnerInput): Promise<Running> => {
 
 const pages = async (input: RunnerInput): Promise<Running> => {
   const site = (await callCreate(input, 'pages', input.ctx())) as Record<string, string>;
-  return { app: createPagesApp({ ...input.base, site }) };
+  return { app: createPagesApp({ ...input.base, site, platform: platformSources(input.env) }) };
 };
 
 const ui = async (input: RunnerInput): Promise<Running> => ({
