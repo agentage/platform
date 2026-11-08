@@ -2,7 +2,7 @@ import { mountWidgets, readInstallation, type Deployment } from '@agentage/shell
 import { createBridge } from '@agentage/widget';
 
 // A shell page as C6 types it: the installation from root, one bridge per deployment.
-const doc = await readInstallation(location.origin, 'harness');
+const { installation: doc } = await readInstallation(location.origin, 'harness');
 const container = document.getElementById('shell') ?? document.body;
 const token = () => Promise.resolve('aga_shell');
 const host = (d: Deployment) => createBridge({ baseUrl: d.url, token });

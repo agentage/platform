@@ -1,6 +1,10 @@
 import * as z from 'zod/mini';
 
-const ErrorSchema = z.object({ code: z.string(), message: z.string() });
+const ErrorSchema = z.object({
+  code: z.string(),
+  message: z.string(),
+  agcid: z.optional(z.string()),
+});
 
 export const RpcResponseSchema = z.object({
   jsonrpc: z.optional(z.literal('2.0')),

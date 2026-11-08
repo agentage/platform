@@ -52,7 +52,9 @@ export const InstallationSchema = z.object({
 // A route present here replaces that route's layout in the installation.
 export const OverlaySchema = z.object({ routes: RoutesSchema });
 
-export const EnvelopeSchema = z.object({ success: z.literal(true), data: InstallationSchema });
+const ok = <T extends z.ZodMiniType>(data: T) => z.object({ success: z.literal(true), data });
+export const InstallationEnvelope = ok(InstallationSchema);
+export const OverlayEnvelope = ok(OverlaySchema);
 
 export type Installation = z.infer<typeof InstallationSchema>;
 export type Overlay = z.infer<typeof OverlaySchema>;
