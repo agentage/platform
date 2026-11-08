@@ -1,3 +1,5 @@
+import { uuidv7 } from '../agcid/agcid.js';
+import { requestScope } from '../agcid/current.js';
 import { type HealthCheck } from '../health/health.js';
 import { type Log } from '../log/log.js';
 import { nextRun, parseCron, type Cron } from './cron.js';
@@ -91,14 +93,20 @@ const runJob = async (entry: Entry, log: Log, buffer: RunBuffer) => {
 };
 
 // Never twice at once; every run saved with its log, a failed save is logged and the job goes on.
-const execute = async (s: State, entry: Entry): Promise<JobRun> => {
+const execute = (s: State, entry: Entry): Promise<JobRun> =>
+  requestScope.run({ agcid: uuidv7() }, () => executeScoped(s, entry));
+
+// Inside the run's scope: every log line of the job, its failure and its save share one agcid.
+const executeScoped = async (s: State, entry: Entry): Promise<JobRun> => {
   const startedAt = s.now();
   Object.assign(entry, { running: true, runningSince: startedAt, overran: false });
   const buffer: RunBuffer = { text: '', truncated: false };
   const status = await runJob(entry, s.deps.log, buffer);
   entry.running = false;
   entry.last = status;
+  const agcid = requestScope.getStore()?.agcid;
   const run: JobRun = { job: entry.name, startedAt, endedAt: s.now(), status, log: buffer.text };
+  if (agcid) run.agcid = agcid;
   if (entry.timeoutMs !== undefined) run.timeoutMs = entry.timeoutMs;
   await s.deps.runs.save(run).catch((err: unknown) => s.deps.log.error(err, { job: entry.name }));
   return run;

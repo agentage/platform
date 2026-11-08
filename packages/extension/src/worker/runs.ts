@@ -10,6 +10,8 @@ export interface JobRun {
   status: RunStatus;
   log: string;
   timeoutMs?: number;
+  // The correlation id every log line of the run carries; null on runs saved before kit 0.8.
+  agcid?: string;
 }
 
 export interface RunStore {
@@ -19,8 +21,8 @@ export interface RunStore {
 
 export const KEEP_RUNS = 50;
 
-const INSERT = `insert into agentage_job_runs (job, started_at, ended_at, status, log, timeout_ms)
-  values ($1, $2, $3, $4, $5, $6)`;
+const INSERT = `insert into agentage_job_runs
+  (job, started_at, ended_at, status, log, timeout_ms, agcid) values ($1, $2, $3, $4, $5, $6, $7)`;
 
 const PRUNE = `delete from agentage_job_runs where job = $1 and id not in
   (select id from agentage_job_runs where job = $1 order by id desc limit ${KEEP_RUNS})`;
@@ -32,6 +34,7 @@ interface RunRow {
   status: RunStatus;
   log: string;
   timeout_ms: number | null;
+  agcid?: string | null;
 }
 
 const fromRow = (row: RunRow): JobRun => ({
@@ -41,6 +44,7 @@ const fromRow = (row: RunRow): JobRun => ({
   status: row.status,
   log: row.log,
   ...(row.timeout_ms === null ? {} : { timeoutMs: row.timeout_ms }),
+  ...(row.agcid ? { agcid: row.agcid } : {}),
 });
 
 const LAST = 'select * from agentage_job_runs where job = $1 order by id desc limit 1';
@@ -52,6 +56,7 @@ const valuesOf = (run: JobRun): unknown[] => [
   run.status,
   run.log,
   run.timeoutMs ?? null,
+  run.agcid ?? null,
 ];
 
 // Runs live in the extension's own store, in a table the kit owns; the last 50 per job are kept.
