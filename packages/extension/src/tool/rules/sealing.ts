@@ -2,6 +2,7 @@ import { lstat, readdir, readFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { readJsonIfExists } from '../../manifest/read-manifest.js';
 import { type CheckRule, type Finding } from '../check.js';
+import { crossPartImports } from './folders.js';
 
 const CODE = /\.[cm]?[jt]sx?$/;
 const TEST = /\.(test|spec)\.[cm]?[jt]sx?$/;
@@ -47,7 +48,8 @@ const matches = (file: string, text: string, patterns: Pattern[]): Finding[] =>
 const fileFindings = (file: string, text: string): Finding[] => {
   const kept = text.replace(TOKENS, (t) => (t.startsWith('/') ? t.replace(/[^\n]/g, '') : t));
   const code = kept.replace(QUOTED, (s) => (/\s/.test(s) ? "''" : s));
-  return [...matches(file, code, ON_CODE), ...matches(file, kept, ON_STRINGS)];
+  const found = [...matches(file, code, ON_CODE), ...matches(file, kept, ON_STRINGS)];
+  return [...found, ...crossPartImports(file, kept)];
 };
 
 const LINKED = 'is a symlink: part code is plain files';

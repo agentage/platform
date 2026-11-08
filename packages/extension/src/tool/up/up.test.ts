@@ -43,12 +43,13 @@ describe('up', () => {
     const dir = await probeDir();
     const docker = fakeDocker();
     await up({ dir, env: ENV }, { run: docker.run });
-    expect(docker.compose()).toEqual([
+    expect(docker.compose().map((c) => c.replace(/ node -e .*/s, ''))).toEqual([
       'up -d store',
       'ps -a --format json',
       'run --rm --no-deps migrate',
       'up -d --remove-orphans',
       'ps -a --format json',
+      ...['pages', 'ui', 'api', 'mcp', 'worker'].map((part) => `exec -T ${part}`),
     ]);
     expect(docker.calls[0]?.args.slice(0, 3)).toEqual(['docker', 'ps', '--format']);
     expect(docker.calls[1]?.args).toEqual(['npm', 'run', 'build']);
@@ -76,6 +77,7 @@ describe('up', () => {
       TIMEOUTS.migrate,
       TIMEOUTS.start,
       undefined,
+      ...Array<undefined>(5).fill(undefined),
     ]);
   });
 

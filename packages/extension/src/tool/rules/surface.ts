@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { type PartContext } from '../../context/context.js';
 import { OPENAPI_FILE, readOpenapi } from '../../discovery/openapi.js';
 import { loadCreate } from '../../manifest/entry.js';
+import { type ExtensionPackage } from '../../manifest/manifest.schema.js';
 import { normalizeParts } from '../../manifest/parts.js';
 import { readJsonIfExists } from '../../manifest/read-manifest.js';
 import { canonical, type McpSnapshot } from '../../mcp/snapshot.js';
@@ -89,16 +90,23 @@ const byName = ({ serverInfo, tools }: McpSnapshot): Json => ({
   ...Object.fromEntries(tools.map((tool) => [String(tool['name']), tool])),
 });
 
+// The tool list the mcp part serves, generated from its code: what {id}.mcpc.json must hold.
+export const generatedMcp = async (
+  create: (ctx: McpContext) => unknown,
+  pkg: ExtensionPackage
+): Promise<McpSnapshot> => {
+  const { id } = pkg.agentage;
+  const tools = (await registeredTools(create, pkg)).map((tool) => listed(id, tool));
+  return { serverInfo: { name: `agentage-${id}`, version: pkg.version }, tools };
+};
+
 const mcpSurface = async ({ dir, pkg }: CheckInput): Promise<Finding[]> => {
   const create = await loadCreate<McpContext>(dir, pkg, 'mcp').catch(() => null);
   if (!create) return [];
-  const { id } = pkg.agentage;
-  const file = `${id}.mcpc.json`;
+  const file = `${pkg.agentage.id}.mcpc.json`;
   const committed = (await readJsonIfExists(join(dir, file))) as McpSnapshot | undefined;
   if (!committed) return [{ file, problem: 'is missing: the mcp part commits its tool list' }];
-  const tools = (await registeredTools(create, pkg)).map((tool) => listed(id, tool));
-  const serverInfo = { name: `agentage-${id}`, version: pkg.version };
-  const diff = differing(byName({ serverInfo, tools }), byName(committed));
+  const diff = differing(byName(await generatedMcp(create, pkg)), byName(committed));
   const problem = `differs from the generated tool list (${diff.join(', ')})`;
   return diff.length > 0 ? [{ file, problem }] : [];
 };

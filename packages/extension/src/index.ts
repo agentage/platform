@@ -16,6 +16,7 @@ export { type Secrets } from './context/secrets.js';
 export {
   createTestContext,
   type LogEntry,
+  type ScheduledJob,
   type TestCommandContext,
   type TestCommandOptions,
   type TestContext,
@@ -70,6 +71,7 @@ export { type QueryResult, type Row, type Store } from './store/store.types.js';
 export {
   startTestMcp,
   startTestServer,
+  type TestMcp,
   type TestMcpOptions,
   type TestServer,
   type TestServerOptions,

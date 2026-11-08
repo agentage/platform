@@ -1,5 +1,7 @@
 import { callerOf, type Caller } from '../auth/token-check.js';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
+import { storeOf } from '../manifest/parts.js';
+import { type StoreKind } from '../manifest/primitives.schema.js';
 import { createLog, type Log } from '../log/log.js';
 import { type Store } from '../store/store.types.js';
 import { type Secrets } from './secrets.js';
@@ -14,6 +16,7 @@ export interface ExtensionInfo {
   part: ServerPartKind;
   origin: string;
   commit: string;
+  store?: StoreKind;
 }
 
 // The kit's subset of the host ctx; spans arrive in a later version.
@@ -52,12 +55,14 @@ export interface ContextInput {
 
 export const createContext = (input: ContextInput): PartContext => {
   const { pkg, part, origin, commit, store } = input;
+  const kind = storeOf(pkg);
   const extension = Object.freeze({
     id: pkg.agentage.id,
     version: pkg.version,
     part,
     origin,
     commit,
+    ...(kind && { store: kind }),
   });
   const log = input.log ?? createLog({ extension: pkg.agentage.id, part });
   const settings = Object.freeze({ ...settingDefaults(pkg), ...input.settings });

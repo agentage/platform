@@ -25,6 +25,14 @@ const KINDS: Record<string, string> = {
   'bad-store-served': 'store: kind git is not served yet; served: postgres, signoz',
 };
 
+// Folder rules: one overlay each, inside the entries and sealing rules.
+const FOLDERS: Record<string, string> = {
+  'bad-entries-exports':
+    'entries: package.json exports ./dist/api/index.js: the package exports no part code',
+  'bad-sealing-imports':
+    'sealing: src/api/index.ts:7 imports ../mcp/prefix.js: a part imports only its own folder and src/lib',
+};
+
 // A copy of base, the overlay, the repo's modules, and the base's build, which is a copy.
 const fixture = async (name: string): Promise<string> => {
   const dir = await tempPackage({});
@@ -49,8 +57,8 @@ describe('6 of 6 refused, each for its own rule (bad-store needs docker)', () =>
     });
   }
 
-  for (const [name, line] of Object.entries(KINDS)) {
-    it(`REFUSED ${name.padEnd(16)} ${line}`, async () => {
+  for (const [name, line] of Object.entries({ ...KINDS, ...FOLDERS })) {
+    it(`REFUSED ${name.padEnd(19)} ${line}`, async () => {
       expect(problemLines(await check(await fixture(name)))).toEqual([line]);
     });
   }

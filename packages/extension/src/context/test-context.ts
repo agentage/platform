@@ -4,6 +4,7 @@ import { messageOf, type Log, type LogFields, type LogLevel } from '../log/log.j
 import { createToolRegistry, type ToolEntry, type ToolRegistrar } from '../mcp/tools.js';
 import { migrate } from '../store/migrations.js';
 import { createTestStore, type TestStore } from '../store/test-store.js';
+import { type JobOptions } from '../worker/job-options.js';
 import { runLog } from '../worker/run-log.js';
 import { type JobRun, memoryRuns } from '../worker/runs.js';
 import { createScheduler, type Schedule } from '../worker/scheduler.js';
@@ -22,7 +23,14 @@ export interface TestContext extends PartContext {
   readonly schedule: Schedule;
   readonly tool: ToolRegistrar;
   readonly tools: ToolEntry[];
+  readonly jobs: ScheduledJob[];
   runJob(name: string): Promise<JobRun | undefined>;
+}
+
+export interface ScheduledJob {
+  name: string;
+  cron: string;
+  options?: JobOptions;
 }
 
 export interface TestCommandContext extends CliContext {
@@ -72,14 +80,20 @@ const TEST_EXTENSION: ExtensionInfo = {
 // Jobs run by hand with runJob, tools recorded as the mcp part registers them.
 const recorders = (log: Log) => {
   const scheduler = createScheduler({ runs: memoryRuns(), log });
-  return { ...createToolRegistry(), schedule: scheduler.schedule, runJob: scheduler.run };
+  const jobs: ScheduledJob[] = [];
+  const schedule: Schedule = (name, cron, job, options) => {
+    scheduler.schedule(name, cron, job, options);
+    jobs.push({ name, cron, options });
+  };
+  return { ...createToolRegistry(), schedule, jobs, runJob: scheduler.run };
 };
 
 const serverContext = (options: TestContextOptions): TestContext => {
   const logs: LogEntry[] = [];
   const log = runLog(recordingLog(logs));
   const store = testStore(options.store, recordingLog([]));
-  const extension = { ...TEST_EXTENSION, ...options.extension };
+  const kind = options.store ? { store: 'postgres' as const } : {};
+  const extension = { ...TEST_EXTENSION, ...kind, ...options.extension };
   const caller = { sub: 'usr_test', scopes: [`${extension.id}:read`] };
   return {
     extension,

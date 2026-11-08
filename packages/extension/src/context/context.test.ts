@@ -30,6 +30,7 @@ describe('ctx', () => {
       part: 'api',
       origin: 'https://probe.next.agentage.io',
       commit: 'a'.repeat(40),
+      store: 'postgres',
     });
     expect(ctx.settings).toEqual({ 'mcp.listing': 'open' });
     expect([ctx, ctx.extension, ctx.settings].every((part) => Object.isFrozen(part))).toBe(true);

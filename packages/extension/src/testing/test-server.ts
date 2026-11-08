@@ -4,7 +4,8 @@ import { type PartContext } from '../context/context.js';
 import { createTestContext } from '../context/test-context.js';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
 import { createMcpApp } from '../mcp/mcp-app.js';
-import { createToolRegistry, type McpContext } from '../mcp/tools.js';
+import { callTool } from '../mcp/snapshot.js';
+import { createToolRegistry, prefixed, type McpContext } from '../mcp/tools.js';
 import { createApiApp } from '../server/app.js';
 import { type ApiCreate } from '../server/part.types.js';
 import { listen } from '../server/serve.js';
@@ -23,6 +24,11 @@ export interface TestServer {
   url: string;
   fetch(path: string, init?: RequestInit): Promise<Response>;
   close(): Promise<void>;
+}
+
+export interface TestMcp extends TestServer {
+  // A tool by the name it registered, args as given: what it answers in structuredContent.
+  call(name: string, args?: Record<string, unknown>): Promise<unknown>;
 }
 
 const TEST_BUILD = { commit: '0'.repeat(40), buildTime: '2026-01-01T00:00:00Z' };
@@ -58,7 +64,7 @@ export const startTestServer = async <C extends PartContext = PartContext>(
 };
 
 // Runs an mcp part's create(ctx) inside the kit's real /mcp app: tools named {id}__{name}.
-export const startTestMcp = async (options: TestMcpOptions): Promise<TestServer> => {
+export const startTestMcp = async (options: TestMcpOptions): Promise<TestMcp> => {
   const ctx = options.ctx ?? createTestContext();
   const registry = createToolRegistry();
   await options.create({ ...ctx, tool: registry.tool });
@@ -70,5 +76,8 @@ export const startTestMcp = async (options: TestMcpOptions): Promise<TestServer>
     tools: registry.tools,
     listing: 'open',
   });
-  return startOn(app);
+  const server = await startOn(app);
+  const call = (name: string, args = {}) =>
+    callTool(`${server.url}/mcp`, prefixed(ctx.extension.id, name), args);
+  return { ...server, call };
 };

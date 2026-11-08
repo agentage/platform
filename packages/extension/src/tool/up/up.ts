@@ -17,6 +17,7 @@ import { assertPortsFree } from './ports.js';
 import { writeUpSecrets } from './secrets.js';
 import { projectName, workingCopy } from './project.js';
 import { storePhrase, summaryOf } from './store-line.js';
+import { assertHealthBodies } from './health.js';
 import { waitHealthy, type WaitDeps } from './wait.js';
 
 export interface UpOptions {
@@ -68,6 +69,7 @@ const buildStep = async (s: Session, env: Env) => {
   assertDiscoverable(record, GATEWAY);
   s.line('record', `${LOCAL_DIR}/record.json`, 'discovery valid');
   await renderFiles(s, file, Object.fromEntries(built.images.map((i) => [i.part, i.tag])));
+  return built.commit;
 };
 
 // The migrate job runs before any part starts; a kept volume reports what it already had.
@@ -87,9 +89,10 @@ export const routesOf = (pkg: ExtensionPackage): string[] =>
     .filter((part) => imageParts(pkg).includes(part))
     .map((part) => partPath(part, pkg.version));
 
-const partsStep = async (s: Session) => {
+const partsStep = async (s: Session, commit: string) => {
   await compose(s.deps.run, s.target, ['up', '-d', '--remove-orphans'], TIMEOUTS.start);
   await waitHealthy(s.target, [...imageParts(s.pkg), 'gateway', 'issuer'], s.deps);
+  await assertHealthBodies(s.deps.run, s.target, imageParts(s.pkg), commit);
   s.line('issuer', 'dev tokens', `http://localhost:${ISSUER_PORT}`);
   s.line('gateway', GATEWAY, routesOf(s.pkg).join(' · '));
 };
@@ -117,11 +120,11 @@ export const up = async (
   const started = Date.now();
   const s = await sessionOf(options, deps);
   await assertPortsFree(s.deps.run, s.target.project);
-  await buildStep(s, options.env ?? process.env);
+  const commit = await buildStep(s, options.env ?? process.env);
   // Again after the build: another up may have started meanwhile, and the store comes next.
   await assertPortsFree(s.deps.run, s.target.project);
   if (hasStore(s.pkg, 'postgres')) await storeStep(s);
-  await partsStep(s);
+  await partsStep(s, commit);
   const parts = imageParts(s.pkg).length + (hasStore(s.pkg, 'postgres') ? 1 : 0) + cliParts(s.pkg);
   const seconds = Math.round((Date.now() - started) / 1000);
   s.line('ready', `${plural(parts, 'part')} healthy`, `${seconds} s`);
