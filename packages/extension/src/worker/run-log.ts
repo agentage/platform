@@ -1,5 +1,13 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { messageOf, type Log, type LogFields, type LogLevel } from '../log/log.js';
+import {
+  logAt,
+  messageOf,
+  withLineAt,
+  type LineAt,
+  type Log,
+  type LogFields,
+  type LogLevel,
+} from '../log/log.js';
 
 export const LOG_CAP_BYTES = 64 * 1024;
 
@@ -33,17 +41,28 @@ const record = (level: LogLevel, message: string): void => {
 };
 
 // ctx.log for a worker: the usual JSON line, and inside a run also the run's own log.
-export const runLog = (base: Log): Log => ({
-  info: (message: string, fields?: LogFields) => {
-    record('info', message);
-    base.info(message, fields);
-  },
-  warn: (message: string, fields?: LogFields) => {
-    record('warn', message);
-    base.warn(message, fields);
-  },
-  error: (error: unknown, fields?: LogFields) => {
-    record('error', messageOf(error));
-    base.error(error, fields);
-  },
-});
+const runLogAt =
+  (base: Log): LineAt =>
+  (level, message, fields) => {
+    record(level, message);
+    logAt(base, level, message, fields);
+  };
+
+export const runLog = (base: Log): Log =>
+  withLineAt(
+    {
+      info: (message: string, fields?: LogFields) => {
+        record('info', message);
+        base.info(message, fields);
+      },
+      warn: (message: string, fields?: LogFields) => {
+        record('warn', message);
+        base.warn(message, fields);
+      },
+      error: (error: unknown, fields?: LogFields) => {
+        record('error', messageOf(error));
+        base.error(error, fields);
+      },
+    },
+    runLogAt(base)
+  );

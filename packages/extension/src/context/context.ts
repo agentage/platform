@@ -3,6 +3,7 @@ import { type ExtensionPackage } from '../manifest/manifest.schema.js';
 import { storeOf } from '../manifest/parts.js';
 import { type StoreKind } from '../manifest/primitives.schema.js';
 import { createLog, type Log } from '../log/log.js';
+import { createSpan, type Span } from '../log/span.js';
 import { type Store } from '../store/store.types.js';
 import { type Secrets } from './secrets.js';
 
@@ -19,12 +20,14 @@ export interface ExtensionInfo {
   store?: StoreKind;
 }
 
-// The kit's subset of the host ctx; spans arrive in a later version.
+// The kit's subset of the host ctx.
 export interface PartContext {
   readonly extension: Readonly<ExtensionInfo>;
   // api only: who called, as the token check found it; null on a public route and in other parts.
   readonly auth: { caller(request: object): Caller | null };
   readonly log: Log;
+  // Times fn as one span line (name, ms, ok); its value and its throw pass through.
+  readonly span: Span;
   readonly settings: Readonly<Record<string, SettingValue>>;
   readonly store: Store;
   readonly secrets: Secrets;
@@ -68,5 +71,6 @@ export const createContext = (input: ContextInput): PartContext => {
   const settings = Object.freeze({ ...settingDefaults(pkg), ...input.settings });
   const auth = Object.freeze({ caller: callerOf });
   const secrets = input.secrets ?? {};
-  return Object.freeze({ extension, auth, log, settings, store: store ?? NO_STORE, secrets });
+  const span = createSpan(log);
+  return Object.freeze({ extension, auth, log, span, settings, store: store ?? NO_STORE, secrets });
 };

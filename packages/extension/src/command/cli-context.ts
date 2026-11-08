@@ -2,6 +2,7 @@ import { chmodSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { type Caller } from '../auth/token-check.js';
 import { createLog } from '../log/log.js';
+import { createSpan } from '../log/span.js';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
 import { type CliClient, type CliContext } from './command.types.js';
 import { type Out, type Write } from './out.js';
@@ -35,11 +36,13 @@ export const cliContext = (pkg: ExtensionPackage, run: CommandRun): CliContext =
   const { id } = pkg.agentage;
   const tags = { extension: id, part: 'cli', version: pkg.version, base: { command: run.command } };
   const dir = ownDir(run.dataDir, id);
+  const log = createLog(tags, run.stderr);
   return Object.freeze({
     extension: Object.freeze({ id, version: pkg.version, part: 'cli' as const }),
     args: Object.freeze(run.args),
     out: run.out,
-    log: createLog(tags, run.stderr),
+    log,
+    span: createSpan(log),
     user: run.user ?? null,
     client: run.client ?? NO_CLIENT,
     get dir() {
