@@ -74,27 +74,42 @@ describe('pages app', () => {
   });
 
   it('types an entry by its extension and lets a page reach the platform hosts only', async () => {
-    const site = { '/': '<p>shell</p>', '/shell.js': 'export {};' };
+    const site = {
+      '/': '<p>shell</p>',
+      '/shell.js': 'export {};',
+      '/a.html': '<p>a</p>',
+      '/a.json': '{}',
+    };
     const platform = ['https://auth.agentage.io', 'https://*.agentage.io'];
     const log = recordedLog().log;
     served = await serveApp(createPagesApp({ pkg: PKG, build: BUILD, log, site, platform }));
-    const js = await fetch(`${served.url}/shell.js`);
-    expect(js.headers.get('content-type')).toMatch(/^text\/javascript/);
+    const typeOf = async (path: string) =>
+      (await fetch(`${served?.url}${path}`)).headers.get('content-type');
+    expect(await typeOf('/shell.js')).toBe('text/javascript; charset=utf-8');
+    expect(await typeOf('/a.html')).toBe('text/html; charset=utf-8');
+    expect(await typeOf('/a.json')).toBe('application/json; charset=utf-8');
     const csp = (await fetch(`${served.url}/`)).headers.get('content-security-policy') ?? '';
     const allowed = "'self' https://auth.agentage.io https://*.agentage.io";
-    expect(csp).toContain(`script-src ${allowed}`);
-    expect(csp).toContain(`connect-src ${allowed}`);
+    expect(csp.split(';')).toEqual(
+      expect.arrayContaining([
+        "default-src 'self'",
+        `script-src ${allowed}`,
+        `connect-src ${allowed}`,
+      ])
+    );
+    expect(csp).not.toContain('unsafe-eval');
   });
 });
 
+const NEXT = {
+  AGENTAGE_ISSUER: 'https://auth.agentage.io',
+  AGENTAGE_AUDIENCE: '*.agentage.io',
+  AGENTAGE_ORIGIN: 'https://fixture.next.agentage.io',
+};
+
 describe('platformSources', () => {
   it('is the issuer origin and the audience under the part origin scheme', () => {
-    const next = {
-      AGENTAGE_ISSUER: 'https://auth.agentage.io',
-      AGENTAGE_AUDIENCE: '*.agentage.io',
-      AGENTAGE_ORIGIN: 'https://fixture.next.agentage.io',
-    };
-    expect(platformSources(next)).toEqual(['https://auth.agentage.io', 'https://*.agentage.io']);
+    expect(platformSources(NEXT)).toEqual(['https://auth.agentage.io', 'https://*.agentage.io']);
     const up = { AGENTAGE_ISSUER: 'http://localhost:4281', AGENTAGE_AUDIENCE: 'localhost:4280' };
     expect(platformSources({ ...up, AGENTAGE_ORIGIN: 'http://localhost:4280' })).toEqual([
       'http://localhost:4281',
@@ -102,8 +117,35 @@ describe('platformSources', () => {
     ]);
   });
 
-  it('drops what is missing or not a host, so nothing else enters the header', () => {
+  it.each([
+    ['one host with a port', 'localhost:4280', ['http://localhost:4280']],
+    ['an IP', '127.0.0.1', ['http://127.0.0.1']],
+    ['a wildcard over two labels', '*.agentage.io', ['http://*.agentage.io']],
+    ['a wildcard over a top-level domain', '*.io', []],
+    ['a bare wildcard', '*', []],
+    ['a space', 'a b.io', []],
+    ['a scheme', 'https://agentage.io', []],
+    ['CSP syntax', "x; script-src 'unsafe-inline'", []],
+    ['empty', '', []],
+  ])('audience %s', (_name, audience, sources) => {
+    const env = { AGENTAGE_AUDIENCE: audience, AGENTAGE_ORIGIN: 'http://localhost:4280' };
+    expect(platformSources(env)).toEqual(sources);
+  });
+
+  it.each([
+    ['data:', 'data:text/plain,x'],
+    ['javascript:', 'javascript:alert(1)'],
+    ['not a URL', 'auth.agentage.io'],
+    ['empty', ''],
+  ])('drops an issuer that is %s', (_name, issuer) => {
+    expect(platformSources({ ...NEXT, AGENTAGE_ISSUER: issuer })).toEqual([
+      'https://*.agentage.io',
+    ]);
+  });
+
+  it('takes https when the origin is missing or not a web URL', () => {
+    const env = { AGENTAGE_AUDIENCE: 'agentage.io', AGENTAGE_ORIGIN: 'data:x' };
+    expect(platformSources(env)).toEqual(['https://agentage.io']);
     expect(platformSources({})).toEqual([]);
-    expect(platformSources({ AGENTAGE_AUDIENCE: "x; script-src 'unsafe-inline'" })).toEqual([]);
   });
 });

@@ -11,13 +11,18 @@ export interface PagesAppOptions extends PartAppBase {
   platform?: string[];
 }
 
-const AUDIENCE = /^(\*\.)?[a-z0-9-]+(\.[a-z0-9-]+)*(:\d+)?$/;
-const originOf = (url: string | undefined) => (url && URL.canParse(url) ? new URL(url) : undefined);
+// One host (a port allowed), or *. over at least two labels: never a whole top-level domain.
+const AUDIENCE = /^(\*\.[a-z0-9-]+(\.[a-z0-9-]+)+|[a-z0-9-]+(\.[a-z0-9-]+)*)(:\d+)?$/;
+const WEB = ['http:', 'https:'];
+const webUrl = (url: string | undefined) => {
+  const parsed = url && URL.canParse(url) ? new URL(url) : undefined;
+  return parsed && WEB.includes(parsed.protocol) ? parsed : undefined;
+};
 
 // A shell page talks to auth and mounts widgets from its siblings: the platform's own hosts only.
 export const platformSources = (env: Env): string[] => {
-  const issuer = originOf(env['AGENTAGE_ISSUER'])?.origin;
-  const scheme = originOf(env['AGENTAGE_ORIGIN'])?.protocol ?? 'https:';
+  const issuer = webUrl(env['AGENTAGE_ISSUER'])?.origin;
+  const scheme = webUrl(env['AGENTAGE_ORIGIN'])?.protocol ?? 'https:';
   const audience = env['AGENTAGE_AUDIENCE'] ?? '';
   return [issuer, AUDIENCE.test(audience) ? `${scheme}//${audience}` : undefined].filter(
     (source): source is string => Boolean(source)
