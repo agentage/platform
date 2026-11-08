@@ -7,6 +7,7 @@ const [deployment] = doc.deployments;
 const container = document.getElementById('shell') ?? document.body;
 if (deployment) {
   const host = createBridge({ baseUrl: deployment.url, token: () => Promise.resolve('aga_shell') });
-  await mountWidgets(doc.layout, { host, container, deployments: doc.deployments });
+  const layout = doc.routes[location.pathname] ?? doc.routes['/'];
+  if (layout) await mountWidgets(layout, { host, container, deployments: doc.deployments });
 }
 document.body.dataset.mounted = 'true';

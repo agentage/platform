@@ -40,15 +40,22 @@ const Origin = z
 
 const DeploymentSchema = z.object({ id: Kebab, url: Origin });
 
+const RouteKey = z.string().check(z.maxLength(64), z.regex(/^\//));
+const RoutesSchema = z.record(RouteKey, LayoutSchema);
+
 export const InstallationSchema = z.object({
   target: z.string().check(z.minLength(1), z.maxLength(253)),
   deployments: z.array(DeploymentSchema),
-  layout: LayoutSchema,
+  routes: RoutesSchema,
 });
+
+// A route present here replaces that route's layout in the installation.
+export const OverlaySchema = z.object({ routes: RoutesSchema });
 
 export const EnvelopeSchema = z.object({ success: z.literal(true), data: InstallationSchema });
 
 export type Installation = z.infer<typeof InstallationSchema>;
+export type Overlay = z.infer<typeof OverlaySchema>;
 export type Deployment = z.infer<typeof DeploymentSchema>;
 
 // The slice of /.well-known/agentage-extension.json a shell reads.

@@ -50,7 +50,11 @@ test('the shell mounts probe echo from a static installation, with its host and 
       { kind: 'widget', extension: 'probe', name: 'missing' },
     ],
   };
-  const data = { target: 'harness', deployments: [{ id: 'probe', url: origin }], layout };
+  const data = {
+    target: 'harness',
+    deployments: [{ id: 'probe', url: origin }],
+    routes: { '/': layout },
+  };
   await tab.route('**/api/v1/installations/harness', (route) =>
     route.fulfill({ json: { success: true, data } })
   );

@@ -4,7 +4,9 @@ import { readInstallation } from './read-installation.js';
 const installation = {
   target: 'fixture.next.agentage.io',
   deployments: [{ id: 'probe', url: 'https://probe.next.agentage.io' }],
-  layout: { kind: 'row', children: [{ kind: 'widget', extension: 'probe', name: 'echo' }] },
+  routes: {
+    '/': { kind: 'row', children: [{ kind: 'widget', extension: 'probe', name: 'echo' }] },
+  },
 };
 
 const answer = (body: unknown, status = 200) =>
@@ -40,7 +42,13 @@ describe('readInstallation', () => {
   );
 
   it('rejects a document outside the schema', async () => {
-    const bad = { ...installation, layout: { kind: 'grid', children: [] } };
+    const bad = { ...installation, routes: { '/': { kind: 'grid', children: [] } } };
+    vi.stubGlobal('fetch', answer({ success: true, data: bad }));
+    await expect(readInstallation('https://agentage.io', 'x')).rejects.toThrow();
+  });
+
+  it.each(['settings', `/${'a'.repeat(64)}`])('rejects the route key %s', async (key) => {
+    const bad = { ...installation, routes: { [key]: installation.routes['/'] } };
     vi.stubGlobal('fetch', answer({ success: true, data: bad }));
     await expect(readInstallation('https://agentage.io', 'x')).rejects.toThrow();
   });
