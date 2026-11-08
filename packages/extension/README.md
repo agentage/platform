@@ -37,7 +37,7 @@ style-src 'self' 'unsafe-inline'
 
 `<parent>` is the part's own host (`AGENTAGE_ORIGIN`) minus its first label
 (`fixture.next.agentage.io` -> `next.agentage.io`); there is no wildcard for a one-label host,
-a bare domain or an IP, so under `up` (`localhost`) a page reaches only itself and the issuer.
+a bare domain or an IP, so under `up` (`localhost`) a page reaches only itself (a widget also the dev issuer).
 
 See the [platform README](https://github.com/agentage/platform#readme) for every part kind, the
 manifest, the tool and how a part image runs.

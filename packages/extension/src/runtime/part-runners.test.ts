@@ -96,6 +96,8 @@ describe('runPart per part', () => {
     const url = await start('pages');
     expect(await (await fetch(`${url}/`)).text()).toBe('<p>probe pages</p>');
     expect((await fetch(`${url}/nope`)).status).toBe(404);
+    const csp = (await fetch(`${url}/`)).headers.get('content-security-policy');
+    expect(csp).toMatch(/connect-src 'self' http:\/\/127\.0\.0\.1:9(;|$)/);
   });
 
   it('ui: serves dist/ui under /ui/{version}/, runs no code and builds no ctx', async () => {
