@@ -1,6 +1,6 @@
 {
   "name": "@agentage/shell",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The agentage shell kit: readInstallation reads what a target runs, mountWidgets places each extension's widgets by a nested layout",
   "type": "module",
   "license": "MIT",
