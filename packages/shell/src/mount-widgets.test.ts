@@ -43,7 +43,7 @@ const importModule = vi.fn((url: string) => {
   return Promise.resolve({});
 });
 
-const fetchMock = vi.fn((url: string) => {
+const fetchMock = vi.fn((url: string, _init?: RequestInit) => {
   const origin = url.replace('/.well-known/agentage-extension.json', '');
   const body = widgets[origin];
   return Promise.resolve(
@@ -55,19 +55,19 @@ const widget = (extension: string, name: string): Layout => ({ kind: 'widget', e
 let container: HTMLElement;
 
 beforeEach(() => {
-  vi.stubGlobal('fetch', fetchMock);
   container = document.body.appendChild(document.createElement('main'));
   seen.clear();
   fetchMock.mockClear();
   importModule.mockClear();
+  hostFor.mockClear();
 });
 afterEach(() => {
   container.remove();
-  vi.unstubAllGlobals();
 });
 
+const hostFor = vi.fn(() => host);
 const mount = (layout: Layout) =>
-  mountWidgets(layout, { host, container, deployments, importModule });
+  mountWidgets(layout, { host: hostFor, container, deployments, importModule, fetch: fetchMock });
 
 describe('mountWidgets', () => {
   it('places nested layouts in order, each widget element with the host set before connect', async () => {
@@ -93,6 +93,36 @@ describe('mountWidgets', () => {
     ]);
     expect(row.style.flexDirection).toBe('row');
     expect([...seen.values()]).toEqual([host, host, host]);
+  });
+
+  it('builds one host per deployment and gives each widget its own', async () => {
+    const hosts = new Map(
+      deployments.map((d) => [d.id, { ...host, context: { ...host.context } }])
+    );
+    const placed = await mountWidgets(
+      {
+        kind: 'row',
+        children: [widget('probe', 'echo'), widget('memo', 'list'), widget('probe', 'clock')],
+      },
+      {
+        host: (d) => hosts.get(d.id) as Host,
+        container,
+        deployments,
+        importModule,
+        fetch: fetchMock,
+      }
+    );
+    expect(placed.map((el) => (el as HTMLElement & { host?: Host }).host)).toEqual([
+      hosts.get('probe'),
+      hosts.get('memo'),
+      hosts.get('probe'),
+    ]);
+  });
+
+  it('asks for a host once per deployment, not per widget', async () => {
+    await mount({ kind: 'row', children: [widget('probe', 'echo'), widget('probe', 'clock')] });
+    expect(hostFor).toHaveBeenCalledOnce();
+    expect(hostFor).toHaveBeenCalledWith(deployments[0]);
   });
 
   it('imports a module from its deployment url and reads each discovery once', async () => {
@@ -153,10 +183,11 @@ describe('mountWidgets', () => {
   it('an unreachable discovery becomes the error element', async () => {
     const offline = [{ id: 'probe', url: 'https://offline.test' }];
     const placed = await mountWidgets(widget('probe', 'echo'), {
-      host,
+      host: hostFor,
       container,
       deployments: offline,
       importModule,
+      fetch: fetchMock,
     });
     expect(placed[0]?.getAttribute('data-widget-error')).toBe('probe/echo');
     expect(placed[0]?.textContent).toContain('HTTP 404');

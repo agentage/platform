@@ -1,0 +1,14 @@
+{
+  "target": "fixture.next.agentage.io",
+  "deployments": [{ "id": "probe", "url": "https://probe.next.agentage.io" }],
+  "routes": {
+    "/": {
+      "kind": "column",
+      "children": [
+        { "kind": "widget", "extension": "probe", "name": "echo" },
+        { "kind": "row", "children": [{ "kind": "widget", "extension": "probe", "name": "clock" }] }
+      ]
+    },
+    "/settings": { "kind": "widget", "extension": "probe", "name": "echo" }
+  }
+}

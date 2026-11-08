@@ -5,20 +5,25 @@ export type Identity = ReturnType<typeof createIdentity>;
 type Nav = Pick<Location, 'href' | 'assign'>;
 export interface IdentityOptions {
   authUrl: string;
-  audience: string;
-  scopes?: string[];
+  scopes: string[];
   fetch?: FetchLike;
   location?: Nav;
 }
 
 // A token this close to its expiry is minted again, so a call never carries a dying one.
 const SKEW_MS = 60_000;
-const DAY_MS = 86_400_000;
+// The browser token's label and lifetime; the shell token replaces them.
+const BROWSER = { format: 'jwt', label: 'browser', expiresInDays: 1 } as const;
+const DAY_MS = BROWSER.expiresInDays * 86_400_000;
+
+// Late-binds the global, so a fetch patched after createIdentity is still the one called.
+const globalFetch: FetchLike = (url, init) => fetch(url, init);
 
 // From the local mint time, so a client clock off from auth's cannot force a mint per call.
 const deadline = (pat: MintedPat, startedAt: number) => {
   const life = Date.parse(pat.expiresAt) - startedAt;
-  return startedAt + (life > SKEW_MS ? Math.min(life, DAY_MS) : DAY_MS) - SKEW_MS;
+  const trusted = life > SKEW_MS ? Math.min(life, DAY_MS) : DAY_MS;
+  return startedAt + trusted - SKEW_MS;
 };
 
 // The PAT lives in page memory only: one mint in flight, again once it expires.
@@ -65,17 +70,24 @@ const signOut = async (auth: Auth, cache: ReturnType<typeof tokenCache>) => {
   }
 };
 
+export interface MintOptions {
+  label: string;
+  scopes: string[];
+  expiresInDays: number;
+}
+
 export const createIdentity = (options: IdentityOptions) => {
   const authUrl = options.authUrl.replace(/\/+$/, '');
-  const auth = authCalls(authUrl, options.fetch ?? ((url, init) => fetch(url, init)));
-  const { scopes, audience } = options;
-  const body = { format: 'jwt', label: 'browser', expiresInDays: 1, scopes, audience };
+  const auth = authCalls(authUrl, options.fetch ?? globalFetch);
+  const body = { ...BROWSER, scopes: options.scopes };
   const cache = tokenCache(async () => ((await auth.account()) ? auth.mint(body) : undefined));
   return {
     account: auth.account,
     signIn: () => signIn(auth, authUrl, options.location),
     token: () => cache.current,
     tokens: auth.list,
+    mintToken: (mint: MintOptions) => auth.mint({ format: 'jwt', ...mint }),
+    revokeToken: async (id: string) => void (await auth.revoke(id)),
     signOut: () => signOut(auth, cache),
   };
 };

@@ -1,0 +1,4 @@
+{
+  "request": { "method": "GET", "path": "/api/auth/token" },
+  "response": { "status": 200, "body": { "token": "session-jwt" } }
+}
