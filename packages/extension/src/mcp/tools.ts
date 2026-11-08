@@ -1,5 +1,5 @@
 import { type z } from 'zod';
-import { type Access } from '../auth/token-check.js';
+import { ACCESS, badScope, type Access } from '../auth/token-check.js';
 import { type PartContext } from '../context/context.js';
 
 type ObjectSchema = z.ZodObject;
@@ -34,7 +34,7 @@ export interface ToolEntry {
 }
 
 const TOOL_NAME = /^[a-z][a-z0-9_-]*$/;
-const SCOPES: readonly Access[] = ['public', 'read', 'write', 'admin'];
+const TOOL_ACCESS = ACCESS.filter((access) => access !== 'optional');
 
 export const createToolRegistry = () => {
   const tools: ToolEntry[] = [];
@@ -43,8 +43,8 @@ export const createToolRegistry = () => {
     if (tools.some((entry) => entry.name === name))
       throw new Error(`tool ${name} is registered twice`);
     if (!spec.description) throw new Error(`tool ${name} needs a description: it routes the model`);
-    if (spec.scope !== undefined && !SCOPES.includes(spec.scope))
-      throw new Error(`tool ${name} scope ${String(spec.scope)}: one of ${SCOPES.join(', ')}`);
+    const bad = badScope(spec.scope, TOOL_ACCESS);
+    if (bad) throw new Error(`tool ${name} ${bad}`);
     tools.push({ name, spec, handler: handler as ToolEntry['handler'] });
   };
   return { tool, tools };

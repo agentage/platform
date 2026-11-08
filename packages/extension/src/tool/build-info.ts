@@ -1,9 +1,9 @@
 import { type BuildInfo } from '../discovery/discovery.js';
 import { FULL_SHA } from '../manifest/primitives.schema.js';
-import { isoSeconds, type Env } from '../runtime/build-info.js';
+import { buildTimeOf, type Env } from '../runtime/build-info.js';
 import { mustRun, type Run } from './exec.js';
 
-const commitOf = async (dir: string, env: Env, run: Run): Promise<string> => {
+const headCommit = async (dir: string, env: Env, run: Run): Promise<string> => {
   const given = env['COMMIT_SHA'] || env['GITHUB_SHA'];
   if (given) return given;
   return (await mustRun(run, 'git', ['rev-parse', 'HEAD'], { cwd: dir })).trim();
@@ -16,7 +16,7 @@ export const resolveBuildInfo = async (
   run: Run,
   now: Date = new Date()
 ): Promise<BuildInfo> => {
-  const commit = await commitOf(dir, env, run);
+  const commit = await headCommit(dir, env, run);
   if (!FULL_SHA.test(commit)) throw new Error(`commit is not a full 40-hex sha: ${commit}`);
-  return { commit, buildTime: env['BUILD_TIME'] || isoSeconds(now) };
+  return { commit, buildTime: buildTimeOf(env, now) };
 };
