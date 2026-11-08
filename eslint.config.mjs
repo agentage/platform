@@ -67,4 +67,25 @@ export default [
     plugins: { 'jsx-a11y': jsxA11y, 'react-hooks': reactHooks },
     rules: { ...jsxA11y.flatConfigs.recommended.rules, ...reactHooks.configs.recommended.rules },
   },
+  {
+    files: [
+      'packages/widget/src/**/*.{ts,tsx}',
+      'packages/identity/src/**/*.ts',
+      'packages/shell/src/**/*.ts',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'zod',
+              message:
+                "Use `import * as z from 'zod/mini'`: full zod puts about 400 KB into every bundle.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ];
