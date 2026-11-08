@@ -1,26 +1,21 @@
 import * as z from 'zod/mini';
-
-export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
-export type IdentityError = Error & { code: string; status: number };
+import {
+  Failed,
+  Minted,
+  Revoked,
+  Summary,
+  User,
+  ok,
+  str,
+  type FetchLike,
+  type IdentityError,
+} from './auth.schema.js';
 
 // status 0 means no HTTP answer reached us.
 const fail = ({ code, message }: { code: string; message: string }, status = 0): IdentityError =>
   Object.assign(new Error(message), { name: 'IdentityError', code, status });
 const unreachable = (path: string) => () =>
   Promise.reject(fail({ code: 'NETWORK', message: `auth unreachable: ${path}` }));
-
-const ok = <T extends z.ZodMiniType>(data: T) => z.object({ success: z.literal(true), data });
-const str = z.string();
-const Failed = z.object({ error: z.object({ code: str, message: str }) });
-const User = z.object({ id: str, email: str, name: z.optional(z.nullable(str)) });
-const Minted = ok(z.object({ id: str, token: str, expiresAt: str }));
-const Times = { createdAt: z.nullable(str), expiresAt: z.nullable(str) };
-const Revoked = ok(z.object({ revoked: z.literal(true) }));
-const Summary = z.object({ id: str, label: str, scopes: z.array(str), ...Times });
-
-export type Account = z.infer<typeof User>;
-export type MintedPat = z.infer<typeof Minted>['data'];
-export type TokenSummary = z.infer<typeof Summary>;
 
 // One credentialed call to auth: the body parsed by `schema`, else a typed error.
 const caller =

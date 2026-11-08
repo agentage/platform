@@ -10,6 +10,23 @@ security, backend); this file only adds what the tree does not say.
 - `npm run build && npm run schemas` - regenerate `packages/extension/schemas/*.json` from Zod; a
   test fails when the committed files drift
 - `node packages/extension/dist/tool/cli.js build [--push] [--dir <ext>] [--registry <host/owner>]`
+- One package's tests: `npx vitest run packages/<p>`; its type-check:
+  `npx tsc -p packages/<p>/tsconfig.eslint.json --noEmit`
+- A version bump touches the package's `package.json`; widget also `src/host/version.ts`; extension
+  also the kit range `^<major.minor>` in `fixtures/*/package.json`, `src/test-support/packages.ts`
+  and `src/tool/check.test.ts`
+- Bump a package's version only when that package's files changed (`scripts/check-bumps.mjs` gates PRs)
+- A new package: `tsconfig.json`, `tsconfig.eslint.json`, a root `tsconfig.json` reference, a
+  `type-check` line, a CI pack-smoke step, then the lock (`npx npm@10 install`)
+- Release: tag `v<version>` on master (the release workflow publishes every package not on npm yet)
+- Lockfile edits go through `npx npm@10 install`; keep only the lines you mean to change
+
+## Commits
+
+- Scopes: `extension, widget, identity, shell, release, ci, docs, deps`; repo-level `ci`, `docs`, `chore`
+  and `build` commits may go scopeless. Titles are conventional commits, 72 characters at most; CI
+  checks the PR title.
+- A release bump commit touches one package, or uses the `release` scope.
 
 ## Layout (`packages/extension/src`)
 
@@ -52,10 +69,10 @@ security, backend); this file only adds what the tree does not say.
 
 ## Layout (`packages/identity`, `packages/shell`)
 
-- identity: `auth.ts` (auth's REST, typed errors), `identity.ts` (`createIdentity`, the token
+- identity: `auth.schema.ts` (schemas, types), `auth.client.ts` (auth's REST, typed errors), `identity.ts` (`createIdentity`, the token
   cache), `index.ts`, `test-support/fake-auth.ts` (a fake auth built from `fixtures/auth-*.json`)
-- shell: `installation.schema.ts` (installation, overlay, discovery slice), `read-installation.ts`
-  (root calls, etag, `ShellError`), `mount-widgets.ts`, `index.ts`, `discovery-drift.test.ts` (the
+- shell: `installation.schema.ts` (installation, overlay, discovery slice), `http.ts` (`send`,
+  `getJson`, `trimSlash`, `ShellError`), `read-installation.ts` (root calls, etag), `mount-widgets.ts`, `index.ts`, `discovery-drift.test.ts` (the
   kit's published patterns), `fixtures/installation.json` (the README document)
 
 ## Gotchas

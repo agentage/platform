@@ -1,7 +1,16 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 
 // What a route or tool declares (api-standards section 5): public, optional (anonymous or a read bearer), or a verb.
-export type Access = 'public' | 'optional' | 'read' | 'write' | 'admin';
+export const ACCESS = ['public', 'optional', 'read', 'write', 'admin'] as const;
+export type Access = (typeof ACCESS)[number];
+
+export const VERBS = ['read', 'write', 'admin'] as const;
+
+// Where a route or a tool may declare its scope: tools have no optional.
+export const badScope = (scope: unknown, allowed: readonly Access[] = ACCESS): string | null =>
+  scope === undefined || allowed.includes(scope as Access)
+    ? null
+    : `scope ${String(scope)}: one of ${allowed.join(', ')}`;
 
 export interface Caller {
   sub: string;
@@ -21,15 +30,15 @@ export const setCaller = (request: object, caller: Caller | null): void =>
 
 export const callerOf = (request: object): Caller | null => callers.get(request) ?? null;
 
-export const RANK: Record<Access, number> = { public: 0, optional: 1, read: 2, write: 3, admin: 4 };
+export const rank = (access: Access): number => ACCESS.indexOf(access);
 
 export const scopeOf = (id: string, access: Access = 'read'): string =>
   access === 'public' ? 'public' : `${id}:${access === 'optional' ? 'read' : access}`;
 
 export const strongest = (needed: readonly Access[]): Access =>
-  needed.reduce<Access>((top, access) => (RANK[access] > RANK[top] ? access : top), 'public');
+  needed.reduce<Access>((top, access) => (rank(access) > rank(top) ? access : top), 'public');
 
-const VERB = /:(read|write|admin)$/;
+const VERB = new RegExp(`:(${VERBS.join('|')})$`);
 
 const isAnonymous = (requirement: unknown): boolean =>
   typeof requirement === 'object' && requirement !== null && Object.keys(requirement).length === 0;

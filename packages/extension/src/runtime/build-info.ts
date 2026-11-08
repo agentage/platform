@@ -9,10 +9,12 @@ export const isoSeconds = (date: Date): string => `${date.toISOString().slice(0,
 
 const commitOf = (sha = ''): string => (FULL_SHA.test(sha) ? sha : UNKNOWN_COMMIT);
 
+export const buildTimeOf = (env: Env, now: Date): string => env['BUILD_TIME'] || isoSeconds(now);
+
 // COMMIT_SHA and BUILD_TIME are baked into every image by the recipe; a bare dev run shows zeros.
 export const buildInfoFromEnv = (env: Env, now: Date = new Date()): BuildInfo => ({
   commit: commitOf(env['COMMIT_SHA']),
-  buildTime: env['BUILD_TIME'] || isoSeconds(now),
+  buildTime: buildTimeOf(env, now),
 });
 
 export const portFromEnv = (env: Env, fallback = 3000): number => {

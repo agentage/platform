@@ -6,7 +6,7 @@ import {
   type Layout,
   type WidgetNode,
 } from './installation.schema.js';
-import { getJson, trimSlash } from './read-installation.js';
+import { getJson, trimSlash } from './http.js';
 
 export interface MountOptions {
   host: (deployment: Deployment) => Host;

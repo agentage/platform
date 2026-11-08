@@ -1,5 +1,5 @@
 import { type z } from 'zod';
-import { type Access, type Caller } from '../auth/token-check.js';
+import { badScope, type Access, type Caller } from '../auth/token-check.js';
 import { type PartContext } from '../context/context.js';
 import { type Reply } from '../envelope/envelope.js';
 import { createWellKnownRegistry, type WellKnownRegistrar } from './well-known.js';
@@ -82,7 +82,6 @@ export interface RouteEntry {
 }
 
 const PATH = /^(\/([A-Za-z0-9._~-]+|\{[A-Za-z_][A-Za-z0-9_]*\}))+$/;
-const SCOPES: readonly Access[] = ['public', 'optional', 'read', 'write', 'admin'];
 
 const problemOf = (routes: RouteEntry[], { method, path, spec }: RouteEntry) => {
   if (!ROUTE_METHODS.includes(method))
@@ -90,9 +89,7 @@ const problemOf = (routes: RouteEntry[], { method, path, spec }: RouteEntry) => 
   if (!PATH.test(path)) return 'path: /segments and {param} segments under /api/v1';
   if (routes.some((r) => r.method === method && r.path === path)) return 'is registered twice';
   if (!spec.summary) return 'needs a summary: it documents the route';
-  if (spec.scope !== undefined && !SCOPES.includes(spec.scope))
-    return `scope ${String(spec.scope)}: one of ${SCOPES.join(', ')}`;
-  return null;
+  return badScope(spec.scope);
 };
 
 export const createRouteRegistry = () => {

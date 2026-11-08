@@ -8,7 +8,7 @@ import { accessOfSecurity, scopeOf } from './token-check.js';
 import { createTokenCheck, remoteKeys } from './verify-token.js';
 
 // *.{a domain of two labels or more}, or one host, as a deployment's origin may name it.
-const isAudience = (audience: string) => {
+export const isAudience = (audience: string) => {
   const host = audience.startsWith('*.') ? audience.slice(2) : audience;
   return ['https', 'http'].some((scheme) => OriginSchema.safeParse(`${scheme}://${host}`).success);
 };

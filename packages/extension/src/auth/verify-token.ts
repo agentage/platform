@@ -1,7 +1,7 @@
 import { createRemoteJWKSet, errors, jwtVerify, type JWTVerifyGetKey } from 'jose';
 import { z } from 'zod';
 import { fail, isFailure } from '../envelope/envelope.js';
-import { RANK, retryOnce, scopeOf, type Access, type TokenCheck } from './token-check.js';
+import { rank, retryOnce, scopeOf, VERBS, type Access, type TokenCheck } from './token-check.js';
 
 export interface TokenCheckDeps {
   issuer: string;
@@ -71,9 +71,7 @@ const claimsOf = async (authorization: string, deps: TokenCheckDeps) => {
 
 export const grants = (scope: string, id: string, access: Access): boolean => {
   const held = new Set(scope.split(' '));
-  return (['read', 'write', 'admin'] as const).some(
-    (verb) => RANK[verb] >= RANK[access] && held.has(`${id}:${verb}`)
-  );
+  return VERBS.some((verb) => rank(verb) >= rank(access) && held.has(`${id}:${verb}`));
 };
 
 export const createTokenCheck =

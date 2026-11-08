@@ -20,6 +20,11 @@ jobs:
     name: Publish
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -30,6 +35,23 @@ jobs:
         run: |
           git fetch origin master
           git merge-base --is-ancestor "$GITHUB_SHA" origin/master || { echo "::error::$GITHUB_SHA is not on master"; exit 1; }
+
+      - name: Tag guards (tag = v<version> of a package; a moved tag is refused)
+        if: github.ref_type == 'tag'
+        run: |
+          set -euo pipefail
+          ok=false
+          for manifest in packages/*/package.json; do
+            [ "v$(node -p "require('./${manifest}').version")" = "$GITHUB_REF_NAME" ] && ok=true
+          done
+          $ok || { echo "::error::$GITHUB_REF_NAME is not v<version> of any workspace package"; exit 1; }
+          remote=$(git ls-remote origin "refs/tags/${GITHUB_REF_NAME}^{}" | cut -f1)
+          [ -n "$remote" ] || remote=$(git ls-remote origin "refs/tags/${GITHUB_REF_NAME}" | cut -f1)
+          [ "$remote" = "$GITHUB_SHA" ] || { echo "::error::tag $GITHUB_REF_NAME moved ($remote, run is $GITHUB_SHA)"; exit 1; }
+          # A release that exists on a first attempt means the tag was reused; a re-run keeps its commit.
+          if [ "$GITHUB_RUN_ATTEMPT" = 1 ] && gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "::error::a release for $GITHUB_REF_NAME already exists: a fix is a new version"; exit 1
+          fi
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -62,4 +84,16 @@ jobs:
               npm stage publish -w "${name}" --access public --provenance
             fi
             echo "published ${name}@${version}" >> "$GITHUB_STEP_SUMMARY"
+            # The extension kit keeps the pushed v<version> tag; every other package gets <name>@<version>.
+            dir=$(dirname "${manifest}")
+            if [ "${name}" = "@agentage/extension" ]; then
+              tag="v${version}"
+              prev=$(git tag --list 'v*' --sort=-v:refname | grep -vx "$tag" | head -1 || true)
+            else
+              tag="${name}@${version}"
+              prev=$(git tag --list "${name}@*" --sort=-v:refname | head -1 || true)
+            fi
+            if [ -n "$prev" ]; then range="${prev}..HEAD"; else range="-30"; fi
+            notes=$(git log --oneline "$range" -- "$dir")
+            gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --target "$GITHUB_SHA" --title "${name}@${version}" --notes "${notes:-No changes under ${dir}}"
           done

@@ -1,6 +1,7 @@
 import { extname } from 'node:path';
 import { type Express, type RequestHandler } from 'express';
 import { z } from 'zod';
+import { isAudience } from '../auth/part-auth.js';
 import { type Env } from '../runtime/build-info.js';
 import { createPartApp, type PartAppBase } from '../server/app.js';
 import { type PagesSite } from './pages.js';
@@ -11,8 +12,6 @@ export interface PagesAppOptions extends PartAppBase {
   platform?: string[];
 }
 
-// One host (a port allowed), or *. over at least two labels: never a whole top-level domain.
-const AUDIENCE = /^(\*\.[a-z0-9-]+(\.[a-z0-9-]+)+|[a-z0-9-]+(\.[a-z0-9-]+)*)(:\d+)?$/;
 const WEB = ['http:', 'https:'];
 const webUrl = (url: string | undefined) => {
   const parsed = url && URL.canParse(url) ? new URL(url) : undefined;
@@ -24,7 +23,7 @@ export const platformSources = (env: Env): string[] => {
   const issuer = webUrl(env['AGENTAGE_ISSUER'])?.origin;
   const scheme = webUrl(env['AGENTAGE_ORIGIN'])?.protocol ?? 'https:';
   const audience = env['AGENTAGE_AUDIENCE'] ?? '';
-  return [issuer, AUDIENCE.test(audience) ? `${scheme}//${audience}` : undefined].filter(
+  return [issuer, isAudience(audience) ? `${scheme}//${audience}` : undefined].filter(
     (source): source is string => Boolean(source)
   );
 };
