@@ -101,7 +101,10 @@ jobs:
           done
           npm install --no-audit --no-fund "${tarballs[@]}"
           # The smoke proves the runtime, not probe's pin: a kit minor bump must not wait on a probe release.
-          jq --arg r "^$(jq -r .version node_modules/@agentage/extension/package.json | cut -d. -f1,2)" '.engines.agentage = $r' package.json > /tmp/pkg.json && cp /tmp/pkg.json package.json
+          pin="^$(jq -r .version node_modules/@agentage/extension/package.json | cut -d. -f1,2)"
+          was=$(jq -r .engines.agentage package.json)
+          if [ "$was" != "$pin" ]; then echo "::warning::probe pin stale: engines.agentage $was, smoke runs it as $pin"; fi
+          jq --arg r "$pin" '.engines.agentage = $r' package.json > /tmp/pkg.json && cp /tmp/pkg.json package.json
           node node_modules/@agentage/extension/dist/tool/cli.js up
 
       - name: Image smoke - discovery is valid through the gateway, e2e (up already asserted each part's /health commit)
