@@ -9,7 +9,9 @@ Everything an agentage extension author imports or runs, and no product code. Th
   shadow root, the host bridge (`useHost`), design-system `Button` and `Card`, and the bundler
   with its harness page.
 - [`@agentage/shell`](packages/shell): the shell kit. `readInstallation` reads what a target
-  runs, `mountWidgets` places each extension's widgets by a nested layout.
+  runs, `mountWidgets` places each extension's widgets by the nested layout of a route.
+- [`@agentage/identity`](packages/identity): the identity client for browser pages. Sign in at
+  auth, a one-day token for the parts, `mintToken` and `revokeToken`, sign out.
 
 ## Install
 

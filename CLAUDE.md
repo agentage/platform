@@ -50,6 +50,14 @@ security, backend); this file only adds what the tree does not say.
   `src/test-support/fixture` is the probe's echo widget (C7 text); widget `.tsx` lints with
   jsx-a11y and react-hooks (`overrides` lets jsx-a11y run on ESLint 10)
 
+## Layout (`packages/identity`, `packages/shell`)
+
+- identity: `auth.ts` (auth's REST, typed errors), `identity.ts` (`createIdentity`, the token
+  cache), `index.ts`, `test-support/fake-auth.ts` (a fake auth built from `fixtures/auth-*.json`)
+- shell: `installation.schema.ts` (installation, overlay, discovery slice), `read-installation.ts`
+  (root calls, etag, `ShellError`), `mount-widgets.ts`, `index.ts`, `discovery-drift.test.ts` (the
+  kit's published patterns), `fixtures/installation.json` (the README document)
+
 ## Gotchas
 
 - Screenshot baselines are made in `mcr.microsoft.com/playwright:v1.64.1-noble` (the CI job's
