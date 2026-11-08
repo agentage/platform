@@ -104,11 +104,10 @@ jobs:
           jq --arg r "^$(jq -r .version node_modules/@agentage/extension/package.json | cut -d. -f1,2)" '.engines.agentage = $r' package.json > /tmp/pkg.json && cp /tmp/pkg.json package.json
           node node_modules/@agentage/extension/dist/tool/cli.js up
 
-      - name: Image smoke - every part carries this commit, discovery is valid through the gateway
+      - name: Image smoke - discovery is valid through the gateway, e2e (up already asserted each part's /health commit)
         working-directory: /tmp/probe
         run: |
           set -euo pipefail
-          scripts/image-smoke.sh "$GITHUB_SHA"
           curl -sf http://localhost:4280/.well-known/agentage-extension.json > /tmp/discovery.json
           node --input-type=module -e "import { DiscoveryDocumentSchema } from '@agentage/extension'; import { readFileSync } from 'node:fs'; DiscoveryDocumentSchema.parse(JSON.parse(readFileSync('/tmp/discovery.json', 'utf8'))); console.log('PASS discovery valid')"
           npx playwright install chromium
