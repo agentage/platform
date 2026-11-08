@@ -1,67 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createIdentity, type IdentityOptions } from './index.js';
-
-const AUTH = 'https://auth.example.test';
-const USER = { id: 'u1', email: 'a@example.test', name: 'A' };
-const DAY_MS = 86_400_000;
-
-type Route = (init: RequestInit) => [number, unknown];
-
-// A fake auth: one handler per "METHOD /path", every call recorded.
-const fakeAuth = (overrides: Record<string, Route> = {}) => {
-  let session = true;
-  let minted = 0;
-  const calls: { at: string; init: RequestInit }[] = [];
-  const routes: Record<string, Route> = {
-    'GET /api/auth/get-session': () => [
-      200,
-      session ? { user: USER, session: { id: 's1' } } : null,
-    ],
-    'GET /api/auth/token': () => (session ? [200, { token: 'session-jwt' }] : [401, {}]),
-    'POST /account/pat': () => {
-      minted += 1;
-      const expiresAt = new Date(Date.now() + DAY_MS).toISOString();
-      return [
-        201,
-        { success: true, data: { id: `tok_${minted}`, token: `aga_${minted}`, expiresAt } },
-      ];
-    },
-    'GET /account/pat': () => [
-      200,
-      {
-        success: true,
-        data: [
-          {
-            id: 'tok_1',
-            label: 'browser',
-            scopes: ['probe:read'],
-            createdAt: null,
-            expiresAt: null,
-            format: 'jwt',
-          },
-        ],
-      },
-    ],
-    'DELETE /account/pat/tok_1': () => [
-      200,
-      { success: true, data: { id: 'tok_1', revoked: true } },
-    ],
-    'POST /api/auth/sign-out': () => {
-      session = false;
-      return [200, { success: true }];
-    },
-    ...overrides,
-  };
-  const fetch = vi.fn(async (url: string, init: RequestInit = {}) => {
-    const at = `${init.method ?? 'GET'} ${url.slice(AUTH.length)}`;
-    calls.push({ at, init });
-    const route = routes[at];
-    if (!route) return new Response('{}', { status: 404 });
-    const [status, body] = route(init);
-    return new Response(JSON.stringify(body), { status });
-  });
-  return { fetch, calls, at: () => calls.map((c) => c.at), signOutNow: () => (session = false) };
-};
+import { AUTH, DAY_MS, USER, fakeAuth, wire } from './test-support/fake-auth.js';
+import { createIdentity, type IdentityOptions, type TokenSummary } from './index.js';
 
 const identity = (auth: ReturnType<typeof fakeAuth>, extra: Partial<IdentityOptions> = {}) =>
   createIdentity({
@@ -107,12 +46,7 @@ describe('token()', () => {
     expect(await token()).toBe('aga_1');
     const mints = auth.calls.filter((c) => c.at === 'POST /account/pat');
     expect(mints).toHaveLength(1);
-    expect(JSON.parse(String(mints[0]?.init.body))).toEqual({
-      format: 'jwt',
-      label: 'browser',
-      expiresInDays: 1,
-      scopes: ['probe:read'],
-    });
+    expect(JSON.parse(String(mints[0]?.init.body))).toEqual(wire.mint.request.body);
     expect(mints[0]?.init.headers).toMatchObject({ authorization: 'Bearer session-jwt' });
     expect(auth.calls.every((c) => c.init.credentials === 'include')).toBe(true);
   });
@@ -216,9 +150,15 @@ describe('mintToken() and revokeToken()', () => {
 describe('tokens() and errors', () => {
   it('lists the account PATs through the session JWT', async () => {
     const auth = fakeAuth();
-    expect(await identity(auth).tokens()).toEqual([
-      { id: 'tok_1', label: 'browser', scopes: ['probe:read'], createdAt: null, expiresAt: null },
-    ]);
+    const rows = (wire.list.response.body as { data: TokenSummary[] }).data;
+    const summary = rows.map(({ id, label, scopes, createdAt, expiresAt }) => ({
+      id,
+      label,
+      scopes,
+      createdAt,
+      expiresAt,
+    }));
+    expect(await identity(auth).tokens()).toEqual(summary);
   });
 
   it('raises the auth error envelope as a typed error', async () => {

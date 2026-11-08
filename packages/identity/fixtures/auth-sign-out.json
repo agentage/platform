@@ -1,0 +1,4 @@
+{
+  "request": { "method": "POST", "path": "/api/auth/sign-out", "body": {} },
+  "response": { "status": 200, "body": { "success": true } }
+}

@@ -1,0 +1,7 @@
+{
+  "request": { "method": "DELETE", "path": "/account/pat/tok_1" },
+  "response": {
+    "status": 200,
+    "body": { "success": true, "data": { "id": "tok_1", "revoked": true } }
+  }
+}
