@@ -20,6 +20,8 @@ const create = ({ route }: ApiContext) => {
   route('put', '/doc', { summary: 'Doc', scope: 'write' }, ({ ifMatch }) =>
     reply({ ifMatch }, { etag: '"v2"', meta: { at: 2 } })
   );
+  const Num = z.object({ n: z.string().regex(/^[0-9]+$/) });
+  route('get', '/n/{n}', { summary: 'N', params: Num }, ({ params }) => params.n);
   route('get', '/broken', { summary: 'Breaks', output: Msg }, () => ({ msg: 1 }) as never);
 };
 
@@ -80,6 +82,9 @@ describe('ctx.route', () => {
         details: [{ field: 'msg', message: expect.any(String) }],
       },
     ]);
+    expect(await (await server!.fetch('/api/v1/n/42')).json()).toEqual(ok('42'));
+    const path = await server!.fetch('/api/v1/n/x');
+    expect(ErrorEnvelopeSchema.parse(await path.json()).error.message).toBe('Invalid path');
     const body = await server!.fetch('/api/v1/items/i1', post('{}'));
     expect(ErrorEnvelopeSchema.parse(await body.json()).error.message).toBe('Invalid body');
     expect((await server!.fetch('/api/v1/broken')).status).toBe(500);

@@ -20,8 +20,10 @@ const handlerOf =
   async (req, res) => {
     const input = inputOf(entry, req.query, req.body);
     const caller = ctx.auth.caller(req);
+    const { params: schema } = entry.spec;
+    const params = schema ? parse(schema, req.params, 'Invalid path') : req.params;
     const ifMatch = req.get('if-match');
-    const answer = await entry.handler({ input, params: req.params, caller, ifMatch });
+    const answer = await entry.handler({ input, params, caller, ifMatch });
     const { data, meta, etag } = isReply(answer) ? answer : reply(answer);
     if (etag) res.setHeader('ETag', etag);
     res.json(ok(entry.spec.output ? entry.spec.output.parse(data) : data, meta));

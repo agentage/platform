@@ -1,4 +1,5 @@
 import { scopeOf } from '../auth/token-check.js';
+import { type ErrorCode } from '../envelope/codes.js';
 import { ErrorEnvelopeSchema } from '../envelope/envelope.schema.js';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
 import { type RouteEntry } from './routes.js';
@@ -20,39 +21,66 @@ const json = (schema: Json) => ({ 'application/json': { schema } });
 
 const content = (description: string, schema: Json) => ({ description, content: json(schema) });
 
-const okResponse = (output: object | undefined) =>
-  content('the envelope', {
+const STRING = { type: 'string' };
+
+const okResponse = ({ output, etag }: RouteEntry['spec']) => ({
+  ...content('the envelope', {
     type: 'object',
     properties: {
       success: { type: 'boolean', const: true },
       data: output ? bare(output, 'output') : {},
     },
     required: ['success', 'data'],
-  });
+  }),
+  ...(etag && { headers: { ETag: { schema: STRING } } }),
+});
 
-const INVALID = content('VALIDATION_ERROR', bare(ErrorEnvelopeSchema, 'input'));
+const refusal = (code: ErrorCode) => content(code, { $ref: '#/components/schemas/Error' });
 
 const inQuery = ({ method }: RouteEntry) => method === 'get' || method === 'delete';
 
-const parameters = (entry: RouteEntry): Json[] => {
-  const path = [...entry.path.matchAll(/\{(\w+)\}/g)].map(([, name]) => ({
+const fields = (zod: object) =>
+  bare(zod, 'input') as { properties?: Record<string, Json>; required?: string[] };
+
+const pathParameters = ({ path, spec }: RouteEntry): Json[] => {
+  const typed = spec.params ? (fields(spec.params).properties ?? {}) : {};
+  return [...path.matchAll(/\{(\w+)\}/g)].map(([, name = '']) => ({
     name,
     in: 'path',
     required: true,
-    schema: { type: 'string' },
+    schema: typed[name] ?? STRING,
   }));
-  if (!entry.spec.input || !inQuery(entry)) return path;
-  const { properties = {}, required = [] } = bare(entry.spec.input, 'input') as {
-    properties?: Json;
-    required?: string[];
-  };
-  const query = Object.entries(properties).map(([name, schema]) => ({
+};
+
+const queryParameters = (entry: RouteEntry): Json[] => {
+  if (!entry.spec.input || !inQuery(entry)) return [];
+  const { properties = {}, required = [] } = fields(entry.spec.input);
+  return Object.entries(properties).map(([name, schema]) => ({
     name,
     in: 'query',
     required: required.includes(name),
     schema,
   }));
-  return [...path, ...query];
+};
+
+const IF_MATCH = { name: 'If-Match', in: 'header', required: false, schema: STRING };
+
+const parameters = (entry: RouteEntry): Json[] => [
+  ...pathParameters(entry),
+  ...queryParameters(entry),
+  ...(entry.spec.etag ? [IF_MATCH] : []),
+];
+
+const responses = (entry: RouteEntry): Json => {
+  const { input, params, scope, etag } = entry.spec;
+  return {
+    '200': okResponse(entry.spec),
+    ...((input || params) && { '400': refusal('VALIDATION_ERROR') }),
+    ...(scope !== 'public' && { '401': refusal('UNAUTHORIZED'), '403': refusal('FORBIDDEN') }),
+    ...(entry.path.includes('{') && { '404': refusal('NOT_FOUND') }),
+    // If-Match absent on a PUT overwrites (no 428); only a stale tag is refused.
+    ...(etag && { '412': refusal('PRECONDITION_FAILED') }),
+  };
 };
 
 const securityOf = (id: string, scope: RouteEntry['spec']['scope']): Json[] => {
@@ -63,7 +91,7 @@ const securityOf = (id: string, scope: RouteEntry['spec']['scope']): Json[] => {
 };
 
 const operation = (id: string, entry: RouteEntry): Json => {
-  const { summary, scope, input, output } = entry.spec;
+  const { summary, scope, input } = entry.spec;
   const params = parameters(entry);
   return {
     summary,
@@ -71,7 +99,7 @@ const operation = (id: string, entry: RouteEntry): Json => {
     ...(params.length > 0 && { parameters: params }),
     ...(input &&
       !inQuery(entry) && { requestBody: { required: true, content: json(bare(input, 'input')) } }),
-    responses: { '200': okResponse(output), ...(input && { '400': INVALID }) },
+    responses: responses(entry),
   };
 };
 
@@ -86,7 +114,10 @@ export const generatedOpenapi = (pkg: ExtensionPackage, routes: RouteEntry[]): J
   return {
     openapi: '3.1.0',
     info: { title: id, version: pkg.version },
-    components: { securitySchemes: { pat: { type: 'http', scheme: 'bearer' } } },
+    components: {
+      securitySchemes: { pat: { type: 'http', scheme: 'bearer' } },
+      schemas: { Error: bare(ErrorEnvelopeSchema, 'input') },
+    },
     paths,
   };
 };
