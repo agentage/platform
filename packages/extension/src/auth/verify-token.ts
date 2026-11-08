@@ -69,7 +69,7 @@ const claimsOf = async (authorization: string, deps: TokenCheckDeps) => {
   return claims.data;
 };
 
-const grants = (scope: string, id: string, access: Access): boolean => {
+export const grants = (scope: string, id: string, access: Access): boolean => {
   const held = new Set(scope.split(' '));
   return (['read', 'write', 'admin'] as const).some(
     (verb) => RANK[verb] >= RANK[access] && held.has(`${id}:${verb}`)
@@ -79,7 +79,8 @@ const grants = (scope: string, id: string, access: Access): boolean => {
 export const createTokenCheck =
   (deps: TokenCheckDeps): TokenCheck =>
   async (authorization, access) => {
-    if (access === 'public') return null;
+    // optional: no bearer is anonymous, but a bearer sent is checked like read, never ignored.
+    if (access === 'public' || (access === 'optional' && !authorization)) return null;
     if (!authorization) throw invalid(deps.origin, 'Missing token');
     const { sub, scope, jti } = await claimsOf(authorization, deps);
     if (jti !== undefined && !deps.revoked.loaded()) throw unavailable('Revoked list unavailable');

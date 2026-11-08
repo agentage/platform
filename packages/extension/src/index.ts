@@ -7,6 +7,8 @@ export {
   type RouteRequest,
   type RouteSpec,
 } from './api/routes.js';
+export { pageOf, PageQuerySchema, type Pagination } from './api/page.js';
+export { type Access, type Caller } from './auth/token-check.js';
 export { type ArgValue } from './command/args.js';
 export {
   type CliContext,
@@ -43,11 +45,14 @@ export {
   fail,
   isFailure,
   ok,
+  reply,
   type ErrorDetail,
   type ErrorEnvelope,
   type Failure,
   type FailOptions,
   type OkEnvelope,
+  type Reply,
+  type ReplyOptions,
 } from './envelope/envelope.js';
 export { ErrorEnvelopeSchema, OkEnvelopeSchema } from './envelope/envelope.schema.js';
 export { parse, type ParseSchema } from './envelope/parse.js';

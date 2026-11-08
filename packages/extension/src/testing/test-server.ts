@@ -1,6 +1,8 @@
 import { type AddressInfo } from 'node:net';
 import { type Express } from 'express';
+import { generatedOpenapi } from '../api/openapi-doc.js';
 import { type ApiContext } from '../api/routes.js';
+import { callerOf, type Caller } from '../auth/token-check.js';
 import { type PartContext } from '../context/context.js';
 import { createTestContext } from '../context/test-context.js';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
@@ -11,10 +13,14 @@ import { mountApi } from '../server/api-routes.js';
 import { createApiApp } from '../server/app.js';
 import { type ApiCreate } from '../server/part.types.js';
 import { listen } from '../server/serve.js';
+import { KIT_VERSION } from '../tool/kit-version.js';
+import { callerCheck } from './test-caller.js';
 
 export interface TestServerOptions<C extends PartContext> {
   create: ApiCreate<C & ApiContext>;
   ctx?: C;
+  // Every request as this caller (null: anonymous), each route checked for its access.
+  caller?: Caller | null;
 }
 
 export interface TestMcpOptions {
@@ -41,7 +47,7 @@ const testPackage = (
 ): ExtensionPackage => ({
   name: `@agentage/extension-${ctx.extension.id}`,
   version: ctx.extension.version,
-  engines: { agentage: '^0.3.0' },
+  engines: { agentage: KIT_VERSION },
   agentage: { id: ctx.extension.id, parts },
 });
 
@@ -59,10 +65,17 @@ const startOn = async (app: Express): Promise<TestServer> => {
 export const startTestServer = async <C extends PartContext = PartContext>(
   options: TestServerOptions<C>
 ): Promise<TestServer> => {
-  const ctx = options.ctx ?? (createTestContext() as unknown as C);
-  const { router } = await mountApi(ctx, (api) => options.create({ ...ctx, ...api }));
+  const given = options.ctx ?? (createTestContext() as unknown as C);
+  const checked = options.caller !== undefined;
+  const ctx = checked ? { ...given, auth: { caller: callerOf } } : given;
+  const mounted = await mountApi(ctx, (api) => options.create({ ...ctx, ...api }));
   const pkg = testPackage(ctx, { api: true });
-  return startOn(createApiApp({ pkg, build: TEST_BUILD, router, log: ctx.log }));
+  const guard = checked && {
+    tokenCheck: callerCheck(ctx.extension.id, options.caller ?? null),
+    openapi: generatedOpenapi(pkg, mounted.routes),
+  };
+  const base = { pkg, build: TEST_BUILD, log: ctx.log, wellKnown: mounted.documents };
+  return startOn(createApiApp({ ...base, router: mounted.router, ...guard }));
 };
 
 // Runs an mcp part's create(ctx) inside the kit's real /mcp app: tools named {id}__{name}.

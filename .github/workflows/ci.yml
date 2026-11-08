@@ -194,6 +194,8 @@ jobs:
           cd probe
           npm ci
           npm install ./agentage-extension-*.tgz ./agentage-widget-*.tgz
+          # The gate proves the candidate runs the probe; the probe widens its own range after the release.
+          npm pkg set engines.agentage=">=0.6"
           grep -E "\"@agentage/(extension|widget)\": \"file:" package.json
           grep -cE "\"resolved\": \"file:agentage-(extension|widget)-" package-lock.json
           npm run build

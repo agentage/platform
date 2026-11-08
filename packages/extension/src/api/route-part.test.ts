@@ -10,7 +10,7 @@ import { authEnv, startPart, STOP } from '../test-support/part-fixture.js';
 const MANIFEST = {
   name: '@agentage/extension-probe',
   version: '0.6.0',
-  engines: { agentage: '^0.6' },
+  engines: { agentage: '^0.7' },
   agentage: { id: 'probe', parts: { api: true } },
 };
 const API = `import { z } from 'zod';
@@ -19,6 +19,7 @@ export const create = ({ route }) => {
     ({ input, caller }) => ({ msg: input.msg, caller: caller.sub }));
   route('get', '/ping', { summary: 'Ping', scope: 'public' }, () => 'pong');
   route('post', '/items', { summary: 'Add', scope: 'write' }, () => 'added');
+  route('get', '/whoami', { summary: 'Who', scope: 'optional' }, ({ caller }) => caller?.sub ?? null);
 };
 `;
 
@@ -73,11 +74,25 @@ describe('a ctx.route api part behind the token check', () => {
     expect(add.status).toBe(403);
   });
 
+  it('serves an optional route anonymously and to a read bearer, never to a bad one', async () => {
+    const who = `${url}/api/v1/whoami`;
+    expect(await (await fetch(who)).json()).toEqual({ success: true, data: null });
+    const read = await issuer.bearer({ scope: 'probe:read', sub: 'usr_2' });
+    const named = await fetch(who, { headers: { authorization: read } });
+    expect(await named.json()).toEqual({ success: true, data: 'usr_2' });
+    expect((await fetch(who, { headers: { authorization: 'Bearer aga_x' } })).status).toBe(401);
+  });
+
   it('serves the contract generated from the routes and answers NOT_FOUND with an agcid off the routes', async () => {
     const doc = (await (await fetch(`${url}/api/v1/openapi.json`)).json()) as {
       paths: Record<string, Record<string, { security: unknown }>>;
     };
-    expect(Object.keys(doc.paths)).toEqual(['/api/v1/echo', '/api/v1/ping', '/api/v1/items']);
+    expect(Object.keys(doc.paths)).toEqual([
+      '/api/v1/echo',
+      '/api/v1/ping',
+      '/api/v1/items',
+      '/api/v1/whoami',
+    ]);
     expect(doc.paths['/api/v1/items']?.['post']?.security).toEqual([{ pat: ['probe:write'] }]);
     // An undeclared path needs read, as before: the bearer first, then NOT_FOUND.
     const authorization = await issuer.bearer({ scope: 'probe:read' });

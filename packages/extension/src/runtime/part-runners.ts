@@ -38,10 +38,10 @@ const callCreate = async <C>(input: RunnerInput, part: ImagePartKind, ctx: C): P
 
 const api = async (input: RunnerInput): Promise<Running> => {
   const ctx = input.ctx();
-  const { router, routes } = await mountApi(ctx, (api) => callCreate(input, 'api', api));
+  const { router, routes, documents } = await mountApi(ctx, (api) => callCreate(input, 'api', api));
   // Declared routes guard at their own scope, whatever the committed file says.
   const openapi = routes.length > 0 ? generatedOpenapi(input.pkg, routes) : input.openapi;
-  return { app: createApiApp({ ...input.base, router, openapi }) };
+  return { app: createApiApp({ ...input.base, router, openapi, wellKnown: documents }) };
 };
 
 const mcp = async (input: RunnerInput): Promise<Running> => {

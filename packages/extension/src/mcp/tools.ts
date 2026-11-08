@@ -8,8 +8,8 @@ export interface ToolSpec<I extends ObjectSchema, O extends ObjectSchema> {
   description: string;
   input: I;
   output: O;
-  // What tools/call needs: {id}:{scope}, or public; read when left out.
-  scope?: Access;
+  // What tools/call needs: {id}:{scope}, or public; read when left out (optional is routes only).
+  scope?: Exclude<Access, 'optional'>;
 }
 
 export type ToolHandler<I extends ObjectSchema, O extends ObjectSchema> = (
