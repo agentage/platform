@@ -80,6 +80,10 @@ describe('ctx.route', () => {
     await expect(startTestServer({ create: both })).rejects.toThrow('pick one');
   });
 
+  it('refuses an api part that registers nothing and returns no router', async () => {
+    await expect(startTestServer({ create: () => undefined })).rejects.toThrow('registers nothing');
+  });
+
   it('keeps a returned router working', async () => {
     const router = Router().get('/old', (_req, res) => void res.json({ old: true }));
     server = await startTestServer({ create: () => router, ctx: createTestContext() });

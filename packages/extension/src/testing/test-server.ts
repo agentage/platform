@@ -1,13 +1,13 @@
 import { type AddressInfo } from 'node:net';
 import { type Express } from 'express';
-import { createRouteRegistry, type ApiContext } from '../api/routes.js';
+import { type ApiContext } from '../api/routes.js';
 import { type PartContext } from '../context/context.js';
 import { createTestContext } from '../context/test-context.js';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
 import { createMcpApp } from '../mcp/mcp-app.js';
 import { callTool } from '../mcp/snapshot.js';
 import { createToolRegistry, prefixed, type McpContext } from '../mcp/tools.js';
-import { apiHandlerOf } from '../server/api-routes.js';
+import { mountApi } from '../server/api-routes.js';
 import { createApiApp } from '../server/app.js';
 import { type ApiCreate } from '../server/part.types.js';
 import { listen } from '../server/serve.js';
@@ -60,9 +60,7 @@ export const startTestServer = async <C extends PartContext = PartContext>(
   options: TestServerOptions<C>
 ): Promise<TestServer> => {
   const ctx = options.ctx ?? (createTestContext() as unknown as C);
-  const registry = createRouteRegistry();
-  const returned = await options.create({ ...ctx, route: registry.route });
-  const router = apiHandlerOf(ctx, registry.routes, returned);
+  const { router } = await mountApi(ctx, (api) => options.create({ ...ctx, ...api }));
   const pkg = testPackage(ctx, { api: true });
   return startOn(createApiApp({ pkg, build: TEST_BUILD, router, log: ctx.log }));
 };

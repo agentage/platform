@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { createRouteRegistry } from '../api/routes.js';
+import { generatedOpenapi } from '../api/openapi-doc.js';
 import { type Express } from 'express';
 import { type PartContext } from '../context/context.js';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
@@ -10,7 +10,7 @@ import { createMcpApp } from '../mcp/mcp-app.js';
 import { createToolRegistry } from '../mcp/tools.js';
 import { createPagesApp } from '../pages/pages-app.js';
 import { createApiApp, createPartApp, type PartAppBase } from '../server/app.js';
-import { apiHandlerOf } from '../server/api-routes.js';
+import { mountApi } from '../server/api-routes.js';
 import { type Env } from './build-info.js';
 import { createUiApp } from '../ui/ui-app.js';
 import { runLog } from '../worker/run-log.js';
@@ -37,11 +37,11 @@ const callCreate = async <C>(input: RunnerInput, part: ImagePartKind, ctx: C): P
   (await loadCreate<C>(input.dir, input.pkg, part, input.importModule))(ctx);
 
 const api = async (input: RunnerInput): Promise<Running> => {
-  const registry = createRouteRegistry();
   const ctx = input.ctx();
-  const returned = await callCreate(input, 'api', { ...ctx, route: registry.route });
-  const router = apiHandlerOf(ctx, registry.routes, returned);
-  return { app: createApiApp({ ...input.base, router, openapi: input.openapi }) };
+  const { router, routes } = await mountApi(ctx, (api) => callCreate(input, 'api', api));
+  // Declared routes guard at their own scope, whatever the committed file says.
+  const openapi = routes.length > 0 ? generatedOpenapi(input.pkg, routes) : input.openapi;
+  return { app: createApiApp({ ...input.base, router, openapi }) };
 };
 
 const mcp = async (input: RunnerInput): Promise<Running> => {

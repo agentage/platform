@@ -1,5 +1,5 @@
 import { Router, type RequestHandler } from 'express';
-import { type RouteEntry } from '../api/routes.js';
+import { createRouteRegistry, type ApiContext, type RouteEntry } from '../api/routes.js';
 import { type PartContext } from '../context/context.js';
 import { ok } from '../envelope/envelope.js';
 import { parse } from '../envelope/parse.js';
@@ -32,14 +32,21 @@ const routesRouter = (ctx: PartContext, routes: RouteEntry[]): Router => {
   return router;
 };
 
-// What create(ctx) gave: its ctx.route routes, or the router it returned; never both.
-export const apiHandlerOf = (
-  ctx: PartContext,
-  routes: RouteEntry[],
-  returned: unknown
-): ApiHandler => {
-  if (routes.length === 0) return returned as ApiHandler;
-  if (returned)
+// What create(ctx) gave: its ctx.route routes, or the router it returned; exactly one.
+const handlerFor = (ctx: PartContext, routes: RouteEntry[], returned: unknown): ApiHandler => {
+  if (routes.length > 0 && returned)
     throw new Error('the api part registers ctx.route routes and returns a router: pick one');
-  return routesRouter(ctx, routes);
+  if (routes.length > 0) return routesRouter(ctx, routes);
+  if (!returned) throw new Error('the api part registers nothing and returns no router');
+  return returned as ApiHandler;
+};
+
+// Runs the api part's create(ctx) with ctx.route; the runtime and the test server mount alike.
+export const mountApi = async (
+  ctx: PartContext,
+  create: (ctx: ApiContext) => unknown
+): Promise<{ router: ApiHandler; routes: RouteEntry[] }> => {
+  const { route, routes } = createRouteRegistry();
+  const returned = await create({ ...ctx, route });
+  return { router: handlerFor(ctx, routes, returned), routes };
 };

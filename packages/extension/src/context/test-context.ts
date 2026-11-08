@@ -104,7 +104,9 @@ const recorders = (log: Log) => {
 const identityOf = (options: TestContextOptions) => {
   const { store: kind, ...identity } = packageExtension();
   const store = options.store ?? kind === 'postgres';
-  const own: StoreKind | undefined = store ? 'postgres' : kind === 'postgres' ? undefined : kind;
+  // An open test store is postgres; a closed one hides postgres but keeps a kind it cannot serve.
+  const closedKind = kind === 'postgres' ? undefined : kind;
+  const own: StoreKind | undefined = store ? 'postgres' : closedKind;
   const extension = { ...TEST_EXTENSION, ...identity, ...(own && { store: own }) };
   return { store, extension: { ...extension, ...options.extension } };
 };

@@ -20,15 +20,12 @@ const json = (schema: Json) => ({ 'application/json': { schema } });
 
 const content = (description: string, schema: Json) => ({ description, content: json(schema) });
 
-const META = { type: 'object', propertyNames: { type: 'string' }, additionalProperties: {} };
-
 const okResponse = (output: object | undefined) =>
   content('the envelope', {
     type: 'object',
     properties: {
       success: { type: 'boolean', const: true },
       data: output ? bare(output, 'output') : {},
-      meta: META,
     },
     required: ['success', 'data'],
   });
