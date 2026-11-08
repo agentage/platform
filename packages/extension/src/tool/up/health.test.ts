@@ -45,7 +45,7 @@ describe('up asserts each part /health body', () => {
         ? { code: 1, stdout: '', stderr: 'TypeError: fetch failed' }
         : { code: 0, stdout: body({ ...OK, part: 'mcp' }) };
     await expect(assertHealthBodies(run, { project: 'p' }, ['api', 'mcp'], SHA)).rejects.toThrow(
-      /^FAIL api \/health body is not the health envelope: no answer: TypeError: fetch failed$/
+      /^FAIL api \/health body is not the health envelope: no answer \(exit 1\): TypeError: fetch failed$/
     );
   });
 

@@ -37,6 +37,12 @@ const notOk = (data: Data): string =>
     .map(([name, status]) => `${name} ${String(status)}`)
     .join(' · ');
 
+// A part that gives no answer is its own FAIL line: the exit code and the command's last line.
+const noAnswer = (err: Error): string => {
+  const code = /exit code (\d+)/.exec(err.message)?.[1];
+  return `no answer${code ? ` (exit ${code})` : ''}: ${err.message.split('\n').at(-1) ?? ''}`;
+};
+
 // Docker's healthy only says the probe answered; the body must name this build and this part.
 export const assertHealthBodies = async (
   run: Run,
@@ -45,10 +51,7 @@ export const assertHealthBodies = async (
   commit: string
 ): Promise<[part: string, checks: string][]> => {
   const exec = (part: string) => compose(run, target, ['exec', '-T', part, 'node', '-e', FETCH]);
-  // A part that gives no answer is its own FAIL line, its cause the command's last line.
-  const read = parts.map((part) =>
-    exec(part).catch((err: Error) => `no answer: ${err.message.split('\n').at(-1) ?? ''}`)
-  );
+  const read = parts.map((part) => exec(part).catch(noAnswer));
   const bodies = await Promise.all(read);
   const data = bodies.map(dataOf);
   const failed = parts.flatMap((part, i) => mismatch(part, commit, data[i], bodies[i] ?? '') ?? []);

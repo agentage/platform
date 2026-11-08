@@ -16,16 +16,18 @@ import { exists } from './stage.js';
 
 const readText = (file: string) => readFile(file, 'utf8').catch(() => undefined);
 
-// A file a run left half-written is not the same: --write replaces it.
-const sameJson = (text: string | undefined, value: unknown): boolean => {
+// Only a parse failure (a file a run left half-written) reads as different: --write replaces it.
+const parsed = (text: string | undefined): unknown => {
   try {
-    return (
-      text !== undefined &&
-      JSON.stringify(canonical(JSON.parse(text))) === JSON.stringify(canonical(value))
-    );
+    return text === undefined ? undefined : JSON.parse(text);
   } catch {
-    return false;
+    return undefined;
   }
+};
+
+const sameJson = (text: string | undefined, value: unknown): boolean => {
+  const old = parsed(text);
+  return old !== undefined && JSON.stringify(canonical(old)) === JSON.stringify(canonical(value));
 };
 
 const json = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`;

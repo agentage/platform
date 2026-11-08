@@ -1,11 +1,23 @@
 import { readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import type * as Snapshot from '../mcp/snapshot.js';
 import { json } from '../test-support/packages.js';
 import { PROBE, probeDir } from '../test-support/up-fixtures.js';
 import { check } from './check.js';
 import { writeContracts } from './contracts.js';
 import { surface } from './rules/surface.js';
+
+// A committed contract holding the key __throw makes canonical() throw, as a kit bug would.
+vi.mock('../mcp/snapshot.js', async (original) => {
+  const real = await original<typeof Snapshot>();
+  const canonical = (value: unknown) => {
+    if (typeof value === 'object' && value !== null && '__throw' in value)
+      throw new Error('kit bug');
+    return real.canonical(value);
+  };
+  return { ...real, canonical };
+});
 
 const surfaceOk = async (dir: string) => (await check(dir, { rules: [surface] })).problems;
 
@@ -42,6 +54,12 @@ describe('writeContracts', () => {
     await writeFile(join(dir, 'probe.mcpc.json'), '{ "name": "agentage-pro');
     expect(await writeContracts(dir)).toEqual(['probe.mcpc.json']);
     expect(await surfaceOk(dir)).toEqual([]);
+  });
+
+  it('surfaces a canonical() failure, only a parse failure means rewrite', async () => {
+    const dir = await probeDir();
+    await writeFile(join(dir, 'probe.mcpc.json'), '{ "__throw": 1 }');
+    await expect(writeContracts(dir)).rejects.toThrow('kit bug');
   });
 
   it('refuses an unbuilt package as check does', async () => {
