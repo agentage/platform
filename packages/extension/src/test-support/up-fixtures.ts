@@ -98,8 +98,10 @@ export const fakeDocker = (health: Record<string, string> = {}, fake: FakeDocker
         JSON.stringify({ Service: s, State: 'running', Health: health[s] ?? 'healthy' })
       ).join('\n');
     if (args.includes('run')) return fake.migrate ?? MIGRATED;
-    const part = args[args.indexOf('exec') + 2] ?? '';
-    if (args.includes('exec')) return fake.bodies?.[part] ?? okBody(part);
+    if (args.includes('exec')) {
+      const part = args[args.indexOf('exec') + 2] ?? '';
+      return fake.bodies?.[part] ?? okBody(part);
+    }
     return '';
   };
   const run: Run = async (command, args, options) => {

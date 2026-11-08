@@ -86,8 +86,7 @@ const partProblem = async ({ dir, pkg }: CheckInput, part: Part): Promise<string
   return part === 'ui' ? null : exportProblem(dir, pkg, part);
 };
 
-// Every part built where its image looks, exporting create and nothing else; cli handlers = commands;
-// the package exports no part code.
+// Every part built and exporting only create; cli handlers = commands; exports hold no part code.
 const entries: CheckRule = {
   name: 'entries',
   run: async (input) => {
