@@ -1,6 +1,7 @@
 import { createRouteRegistry, type RouteEntry, type RouteRegistrar } from '../api/routes.js';
 import { type WellKnownRegistrar } from '../api/well-known.js';
 import { type Log } from '../log/log.js';
+import { createSpan, type SpanRecord } from '../log/span.js';
 import { createToolRegistry, type ToolEntry, type ToolRegistrar } from '../mcp/tools.js';
 import { migrate } from '../store/migrations.js';
 import { createTestStore, type TestStore } from '../store/test-store.js';
@@ -35,6 +36,7 @@ export interface TestContext extends PartContext {
   readonly routes: RouteEntry[];
   readonly wellKnown: WellKnownRegistrar;
   readonly jobs: ScheduledJob[];
+  readonly spans: SpanRecord[];
   runJob(name: string): Promise<JobRun | undefined>;
 }
 
@@ -98,6 +100,7 @@ const identityOf = (options: TestContextOptions) => {
 const serverContext = (options: TestContextOptions): TestContext => {
   const logs: LogEntry[] = [];
   const log = runLog(recordingLog(logs));
+  const spans: SpanRecord[] = [];
   const { extension, ...open } = identityOf(options);
   const store = testStore(open.store, recordingLog([]));
   const caller = { sub: 'usr_test', scopes: [`${extension.id}:read`] };
@@ -106,6 +109,8 @@ const serverContext = (options: TestContextOptions): TestContext => {
     auth: { caller: () => caller },
     log,
     logs,
+    span: createSpan(log, spans),
+    spans,
     settings: { ...options.settings },
     store: store ?? NO_STORE,
     secrets: Object.freeze({ ...options.secrets }),
@@ -114,7 +119,7 @@ const serverContext = (options: TestContextOptions): TestContext => {
   };
 };
 
-// A ctx for unit tests: identity from ./package.json, recorded logs, jobs, tools and routes; with `args`, a command ctx.
+// A ctx for unit tests: identity from ./package.json, recorded logs, spans, jobs, tools and routes; with `args`, a command ctx.
 export function createTestContext(options: TestCommandOptions): TestCommandContext;
 export function createTestContext(options?: TestContextOptions): TestContext;
 export function createTestContext(options: TestContextOptions | TestCommandOptions = {}) {

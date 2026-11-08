@@ -5,6 +5,7 @@ import { type ArgValue } from '../command/args.js';
 import { type Caller } from '../auth/token-check.js';
 import { type CliClient, type CliContext } from '../command/command.types.js';
 import { createOut } from '../command/out.js';
+import { createSpan, type SpanRecord } from '../log/span.js';
 import { packageExtension } from './package-extension.js';
 import { recordingLog, type LogEntry } from './recording-log.js';
 
@@ -16,6 +17,7 @@ export interface TestCommandContext extends CliContext {
   readonly output: { stdout: string[]; stderr: string[] };
   readonly exitCode: number | undefined;
   readonly logs: LogEntry[];
+  readonly spans: SpanRecord[];
   // Every ctx.client call in order; the answers come from options.client.
   readonly calls: ClientCall[];
 }
@@ -54,18 +56,26 @@ const recorded = (options: TestCommandOptions) => {
   const output = { stdout: [] as string[], stderr: [] as string[] };
   const json = options.json ?? false;
   const out = createOut({ json, stdout: lines(output.stdout), stderr: lines(output.stderr) });
-  return { out, output, logs: [] as LogEntry[], calls: [] as ClientCall[] };
+  return {
+    out,
+    output,
+    logs: [] as LogEntry[],
+    spans: [] as SpanRecord[],
+    calls: [] as ClientCall[],
+  };
 };
 
 export const commandContext = (options: TestCommandOptions): TestCommandContext => {
-  const { out, output, logs, calls } = recorded(options);
+  const { out, output, logs, spans, calls } = recorded(options);
   const { id = 'test', version = '0.0.0' } = packageExtension();
   const extension = { id, version, ...options.extension, part: 'cli' as const };
   const fixedUser = { sub: 'usr_test', scopes: [`${extension.id}:read`] };
   const dir = lazyDir();
+  const log = recordingLog(logs);
   return {
-    ...{ extension, args: { ...options.args }, out, output, logs, calls },
-    log: recordingLog(logs),
+    ...{ extension, args: { ...options.args }, out, output, logs, spans, calls },
+    log,
+    span: createSpan(log, spans),
     user: options.user === undefined ? fixedUser : options.user,
     client: recordingClient(calls, options.client),
     get dir() {

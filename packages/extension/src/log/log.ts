@@ -23,7 +23,7 @@ export type LogWrite = (line: string) => void;
 export const messageOf = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
-const errorFields = (error: unknown): LogFields => {
+export const errorFields = (error: unknown): LogFields => {
   if (!(error instanceof Error)) return { err: { message: String(error) } };
   return { err: { type: error.name, message: error.message, stack: error.stack } };
 };
@@ -40,9 +40,15 @@ const line = (level: LogLevel, message: string, tags: LogTags, fields: LogFields
 
 const stderrWrite: LogWrite = (text) => void process.stderr.write(text);
 
-type LineAt = (level: LogLevel, message: string, fields: LogFields) => void;
+export type LineAt = (level: LogLevel, message: string, fields: LogFields) => void;
 
 const raw = new WeakMap<Log, LineAt>();
+
+// Registers how a Log writes a line as given, so logAt keeps every field on it.
+export const withLineAt = (log: Log, at: LineAt): Log => {
+  raw.set(log, at);
+  return log;
+};
 
 export const createLog = (tags: LogTags, write: LogWrite = stderrWrite): Log => {
   const at: LineAt = (level, message, fields) => write(line(level, message, tags, fields));
@@ -52,8 +58,7 @@ export const createLog = (tags: LogTags, write: LogWrite = stderrWrite): Log => 
     error: (error, fields = {}) =>
       at('error', messageOf(error), { ...fields, ...errorFields(error) }),
   };
-  raw.set(log, at);
-  return log;
+  return withLineAt(log, at);
 };
 
 // A line at any level with no err field (an error-level line that is not an error event).

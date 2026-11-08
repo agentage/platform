@@ -1,6 +1,7 @@
 import { type RouteMethod } from '../api/routes.js';
 import { type Caller } from '../auth/token-check.js';
 import { type Log } from '../log/log.js';
+import { type Span } from '../log/span.js';
 import { type Out } from './out.js';
 import { type ArgValue } from './args.js';
 
@@ -25,6 +26,8 @@ export interface CliContext {
   readonly out: Out;
   // JSON lines on stderr tagged with the extension, part cli, the command and the run's agcid.
   readonly log: Log;
+  // Times fn as one span line on the run's agcid; its value and its throw pass through.
+  readonly span: Span;
   // The machine's signed-in user and its PAT's scopes; null when the host knows none.
   readonly user: Caller | null;
   readonly client: CliClient;

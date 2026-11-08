@@ -133,7 +133,7 @@ jobs:
         run: |
           set -euo pipefail
           curl -sf http://localhost:4280/.well-known/agentage-extension.json > /tmp/discovery.json
-          node --input-type=module -e "import { DiscoveryDocumentSchema } from '@agentage/extension'; import { readFileSync } from 'node:fs'; DiscoveryDocumentSchema.parse(JSON.parse(readFileSync('/tmp/discovery.json', 'utf8'))); console.log('PASS discovery valid')"
+          node --input-type=module -e "import { DiscoveryDocumentSchema } from '@agentage/extension/contracts'; import { readFileSync } from 'node:fs'; DiscoveryDocumentSchema.parse(JSON.parse(readFileSync('/tmp/discovery.json', 'utf8'))); console.log('PASS discovery valid')"
           npx playwright install chromium
           npm run test:e2e
 
@@ -215,7 +215,7 @@ jobs:
           cd probe
           npm ci
           npm install ./agentage-extension-*.tgz ./agentage-widget-*.tgz
-          # The gate proves the candidate runs the probe; the probe widens its own range after the release.
+          # Permanent: the probe's own range refuses every new kit minor; the gate proves the candidate runs the probe.
           npm pkg set engines.agentage=">=0.6"
           grep -E "\"@agentage/(extension|widget)\": \"file:" package.json
           grep -cE "\"resolved\": \"file:agentage-(extension|widget)-" package-lock.json

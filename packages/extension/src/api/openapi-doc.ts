@@ -37,7 +37,7 @@ const okResponse = ({ output, etag }: RouteEntry['spec']) => ({
 
 const refusal = (code: ErrorCode) => content(code, { $ref: '#/components/schemas/Error' });
 
-const inQuery = ({ method }: RouteEntry) => method === 'get' || method === 'delete';
+export const inQuery = (method: string): boolean => method === 'get' || method === 'delete';
 
 const fields = (zod: object) =>
   bare(zod, 'input') as { properties?: Record<string, Json>; required?: string[] };
@@ -53,7 +53,7 @@ const pathParameters = ({ path, spec }: RouteEntry): Json[] => {
 };
 
 const queryParameters = (entry: RouteEntry): Json[] => {
-  if (!entry.spec.input || !inQuery(entry)) return [];
+  if (!entry.spec.input || !inQuery(entry.method)) return [];
   const { properties = {}, required = [] } = fields(entry.spec.input);
   return Object.entries(properties).map(([name, schema]) => ({
     name,
@@ -98,7 +98,9 @@ const operation = (id: string, entry: RouteEntry): Json => {
     security: securityOf(id, scope),
     ...(params.length > 0 && { parameters: params }),
     ...(input &&
-      !inQuery(entry) && { requestBody: { required: true, content: json(bare(input, 'input')) } }),
+      !inQuery(entry.method) && {
+        requestBody: { required: true, content: json(bare(input, 'input')) },
+      }),
     responses: responses(entry),
   };
 };
