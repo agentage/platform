@@ -1,6 +1,7 @@
 import { type z } from 'zod';
 import { type Access, type Caller } from '../auth/token-check.js';
 import { type PartContext } from '../context/context.js';
+import { type Reply } from '../envelope/envelope.js';
 
 export const ROUTE_METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const;
 
@@ -27,14 +28,17 @@ export interface RouteRequest<I, P extends string, S extends Access = Access> {
   input: I;
   params: ParamsOf<P>;
   caller: S extends 'public' ? Caller | null : Caller;
+  ifMatch?: string;
 }
+
+type Answer<T> = T | Reply<T>;
 
 export type RouteHandler<
   I extends ObjectSchema,
   O extends z.ZodType,
   P extends string,
   S extends Access = Access,
-> = (request: RouteRequest<z.output<I>, P, S>) => z.input<O> | Promise<z.input<O>>;
+> = (request: RouteRequest<z.output<I>, P, S>) => Answer<z.input<O>> | Promise<Answer<z.input<O>>>;
 
 // Registers a route under /api/v1; the kit validates, wraps the envelope and writes openapi.json.
 export type RouteRegistrar = <

@@ -43,11 +43,14 @@ export {
   fail,
   isFailure,
   ok,
+  reply,
   type ErrorDetail,
   type ErrorEnvelope,
   type Failure,
   type FailOptions,
   type OkEnvelope,
+  type Reply,
+  type ReplyOptions,
 } from './envelope/envelope.js';
 export { ErrorEnvelopeSchema, OkEnvelopeSchema } from './envelope/envelope.schema.js';
 export { parse, type ParseSchema } from './envelope/parse.js';

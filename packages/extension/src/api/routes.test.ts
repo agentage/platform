@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { createTestContext } from '../context/test-context.js';
-import { ok } from '../envelope/envelope.js';
+import { ok, reply } from '../envelope/envelope.js';
 import { ErrorEnvelopeSchema } from '../envelope/envelope.schema.js';
 import { startTestServer, type TestServer } from '../testing/test-server.js';
 import { createRouteRegistry, type ApiContext } from './routes.js';
@@ -17,6 +17,9 @@ const create = ({ route }: ApiContext) => {
     id: req.params.id,
     msg: req.input.msg,
   }));
+  route('put', '/doc', { summary: 'Doc', scope: 'write' }, ({ ifMatch }) =>
+    reply({ ifMatch }, { etag: '"v2"', meta: { at: 2 } })
+  );
   route('get', '/broken', { summary: 'Breaks', output: Msg }, () => ({ msg: 1 }) as never);
 };
 
@@ -48,6 +51,21 @@ describe('ctx.route', () => {
     await start();
     const res = await server!.fetch('/api/v1/items/i1', post('{"msg":"x"}'));
     expect(await res.json()).toEqual({ success: true, data: { id: 'i1', msg: 'x' } });
+  });
+
+  it('sends a reply with its ETag and meta, and hands the handler If-Match', async () => {
+    await start();
+    const res = await server!.fetch('/api/v1/doc', {
+      method: 'PUT',
+      headers: { 'If-Match': '"v1"' },
+    });
+    expect(res.headers.get('etag')).toBe('"v2"');
+    expect(await res.json()).toEqual(ok({ ifMatch: '"v1"' }, { at: 2 }));
+    const bare = await server!.fetch('/api/v1/doc', { method: 'PUT' });
+    expect([bare.headers.get('access-control-expose-headers'), await bare.json()]).toEqual([
+      expect.stringContaining('ETag'),
+      ok({}, { at: 2 }),
+    ]);
   });
 
   it('answers VALIDATION_ERROR with details, INTERNAL on a bad answer, NOT_FOUND off the routes', async () => {

@@ -1,7 +1,7 @@
 import { Router, type RequestHandler } from 'express';
 import { createRouteRegistry, type ApiContext, type RouteEntry } from '../api/routes.js';
 import { type PartContext } from '../context/context.js';
-import { ok } from '../envelope/envelope.js';
+import { isReply, ok, reply } from '../envelope/envelope.js';
 import { parse } from '../envelope/parse.js';
 import { type ApiHandler } from './part.types.js';
 
@@ -13,14 +13,17 @@ const inputOf = ({ method, spec }: RouteEntry, query: unknown, body: unknown) =>
   return parse(spec.input, body ?? {}, 'Invalid body');
 };
 
-// Validated in, the handler's answer parsed by its output schema and sent in the envelope.
+// Validated in, the handler's data (bare or a reply) parsed by its output schema and sent in the envelope.
 const handlerOf =
   (ctx: PartContext, entry: RouteEntry): RequestHandler =>
   async (req, res) => {
     const input = inputOf(entry, req.query, req.body);
     const caller = ctx.auth.caller(req);
-    const data = await entry.handler({ input, params: req.params, caller });
-    res.json(ok(entry.spec.output ? entry.spec.output.parse(data) : data));
+    const ifMatch = req.get('if-match');
+    const answer = await entry.handler({ input, params: req.params, caller, ifMatch });
+    const { data, meta, etag } = isReply(answer) ? answer : reply(answer);
+    if (etag) res.setHeader('ETag', etag);
+    res.json(ok(entry.spec.output ? entry.spec.output.parse(data) : data, meta));
   };
 
 // /items/{id} as Express writes it.

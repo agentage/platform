@@ -28,6 +28,7 @@ describe('public surface', () => {
       'ok',
       'parse',
       'readManifest',
+      'reply',
       'startTestMcp',
       'startTestServer',
       'validateManifest',
