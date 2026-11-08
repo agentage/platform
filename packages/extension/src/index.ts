@@ -11,6 +11,7 @@ export { pageOf, PageQuerySchema, type Pagination } from './api/page.js';
 export { type Access, type Caller } from './auth/token-check.js';
 export { type ArgValue } from './command/args.js';
 export {
+  type CliClient,
   type CliContext,
   type CliCreate,
   type CommandExtension,
@@ -26,6 +27,7 @@ export {
 export { type Secrets } from './context/secrets.js';
 export {
   createTestContext,
+  type ClientCall,
   type LogEntry,
   type ScheduledJob,
   type TestCommandContext,

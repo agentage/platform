@@ -1,7 +1,10 @@
+import { uuidv7 } from '../agcid/agcid.js';
+import { requestScope } from '../agcid/current.js';
 import { loadCreate } from '../manifest/entry.js';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
 import { readManifest } from '../manifest/read-manifest.js';
 import { parseCommandArgs, usage, UsageError } from './args.js';
+import { cliContext, type CommandRun } from './cli-context.js';
 import { type CliContext, type CommandHandler } from './command.types.js';
 import { createOut, type Write } from './out.js';
 
@@ -11,6 +14,10 @@ export interface RunCommandOptions {
   argv: string[];
   stdout?: Write;
   stderr?: Write;
+  // What the host knows: the PAT's user, a client for the extension's own parts, its data dir.
+  user?: CommandRun['user'];
+  client?: CommandRun['client'];
+  dataDir?: string;
 }
 
 export const EXIT_OK = 0;
@@ -23,16 +30,6 @@ const writeErr: Write = (text) => void process.stderr.write(text);
 export const loadHandlers = async (dir: string, pkg: ExtensionPackage, ctx: CliContext) =>
   (await loadCreate<CliContext>(dir, pkg, 'cli'))(ctx) as Record<string, CommandHandler>;
 
-export const contextFor = (
-  pkg: ExtensionPackage,
-  args: CliContext['args'],
-  out: CliContext['out']
-): CliContext => ({
-  extension: Object.freeze({ id: pkg.agentage.id, version: pkg.version, part: 'cli' as const }),
-  args: Object.freeze(args),
-  out,
-});
-
 const execute = async (
   o: RunCommandOptions,
   pkg: ExtensionPackage,
@@ -44,11 +41,18 @@ const execute = async (
   const parsed = parseCommandArgs(spec, o.argv);
   if (parsed.help) return (stdout(`${usage(spec)}\n`), EXIT_OK);
   const out = createOut({ json: parsed.json, stdout, stderr });
-  const handler = (await loadHandlers(o.dir, pkg, contextFor(pkg, parsed.args, out)))[o.command];
+  const { user, client, dataDir, command } = o;
+  const ctx = cliContext(pkg, { command, args: parsed.args, out, stderr, user, client, dataDir });
+  // One agcid per command run: every log line and kit fetch of the run carries it.
+  const result = await requestScope.run({ agcid: uuidv7() }, () => handle(o, pkg, ctx));
+  return out.exitCode ?? (typeof result === 'number' ? result : EXIT_OK);
+};
+
+const handle = async (o: RunCommandOptions, pkg: ExtensionPackage, ctx: CliContext) => {
+  const handler = (await loadHandlers(o.dir, pkg, ctx))[o.command];
   if (typeof handler !== 'function')
     throw new Error(`the cli entry has no handler for ${o.command}`);
-  const result = await handler();
-  return out.exitCode ?? (typeof result === 'number' ? result : EXIT_OK);
+  return handler();
 };
 
 // Exit codes: 0 ok, 2 usage, 1 failure (a throw, a missing handler, an invalid manifest).
