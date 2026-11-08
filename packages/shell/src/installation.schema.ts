@@ -1,5 +1,6 @@
 import * as z from 'zod/mini';
 
+// 32, 253 and 270 mirror the kit's id, host-name and origin limits.
 const KEBAB = /^[a-z][a-z0-9-]*$/;
 const Kebab = z.string().check(z.maxLength(32), z.regex(KEBAB));
 

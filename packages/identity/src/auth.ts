@@ -3,6 +3,7 @@ import * as z from 'zod/mini';
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 export type IdentityError = Error & { code: string; status: number };
 
+// status 0 means no HTTP answer reached us.
 const fail = ({ code, message }: { code: string; message: string }, status = 0): IdentityError =>
   Object.assign(new Error(message), { name: 'IdentityError', code, status });
 const unreachable = (path: string) => () =>
@@ -30,6 +31,7 @@ const caller =
     const body: unknown = await res.json().catch(() => undefined);
     const parsed = schema.safeParse(body);
     if (res.ok && parsed.success) return parsed.data;
+    // An ok status with the wrong shape falls here too: the body is not one auth sends.
     const plain = { code: `HTTP_${res.status}`, message: `${path} answered ${res.status}` };
     throw fail(Failed.safeParse(body).data?.error ?? plain, res.status);
   };

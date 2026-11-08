@@ -32,6 +32,7 @@ interface Mount {
   hostFor: HostFor;
 }
 
+// The only import(): tests inject importModule, and bundlers leave a runtime URL alone.
 const nativeImport = (url: string): Promise<unknown> => import(url);
 
 // Boxes and one placeholder per widget, synchronously, so the page order is the layout order.

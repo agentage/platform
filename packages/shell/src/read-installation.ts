@@ -59,6 +59,7 @@ const headersOf = async ({ token, ifMatch, body }: Call): Promise<Record<string,
 
 const send = async (url: string, call: Call = {}) => {
   const method = call.method ?? 'GET';
+  // Public documents and bearer calls: cookies stay at auth.
   const init: RequestInit = { method, headers: await headersOf(call), credentials: 'omit' };
   if (call.body !== undefined) init.body = JSON.stringify(call.body);
   const res = await (call.fetch ?? globalFetch)(url, init);
