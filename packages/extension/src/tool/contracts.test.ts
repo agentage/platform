@@ -29,12 +29,20 @@ describe('writeContracts', () => {
     expect(await writeContracts(dir)).toEqual([]);
   });
 
-  it('rewrites the whole openapi when info.version sits behind a nested object', async () => {
+  it('leaves an openapi whose info.version sits behind a nested object to check', async () => {
     const dir = await probeDir();
     const info = { title: 'probe', contact: { name: 'x' }, version: '0.0.1' };
     await writeFile(join(dir, 'openapi.json'), json({ openapi: '3.1.0', info, paths: {} }));
-    expect(await writeContracts(dir)).toEqual(['openapi.json']);
-    expect(await surfaceOk(dir)).toEqual([]);
+    expect(await writeContracts(dir)).toEqual([]);
+    expect(await surfaceOk(dir)).toHaveLength(1);
+  });
+
+  it('refuses an unbuilt package as check does', async () => {
+    const dir = await probeDir();
+    await rm(join(dir, 'dist'), { recursive: true });
+    await expect(writeContracts(dir)).rejects.toThrow(
+      'dist is missing: build the package first (npm run build)'
+    );
   });
 
   it('leaves a package without api or mcp alone', async () => {

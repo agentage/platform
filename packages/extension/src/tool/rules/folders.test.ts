@@ -6,7 +6,11 @@ const CODE = `import { a } from './a.js';
 import { b } from '../lib/b.js';
 export * from '../api/c.js';
 import '../../package.json';
-const d = await import("../worker/d.js");`;
+const d = await import("../worker/d.js");
+import type { F } from '../api/f.js';
+export type {
+  G,
+} from '../api/g.js';`;
 
 describe('folder rules', () => {
   it('a part may import its own folder and src/lib, nothing else', () => {
@@ -30,6 +34,8 @@ describe('folder rules', () => {
       './package.json': './package.json',
       './agentage-extension.json': './dist/agentage-extension.json',
       './x': { types: './src/api/index.ts', default: ['./dist/worker/run.js'] },
+      './lib': './src/lib/index.js',
+      './root': './src/index.ts',
     };
     expect(exportedPartCode({ ...API_MANIFEST, exports } as typeof API_MANIFEST)).toEqual([
       {

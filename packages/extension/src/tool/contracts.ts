@@ -7,7 +7,9 @@ import { normalizeParts } from '../manifest/parts.js';
 import { readManifest } from '../manifest/read-manifest.js';
 import { canonical } from '../mcp/snapshot.js';
 import { type McpContext } from '../mcp/tools.js';
+import { NOT_BUILT } from './check.js';
 import { generatedMcp } from './rules/surface.js';
+import { exists } from './stage.js';
 
 const readText = (file: string) => readFile(file, 'utf8').catch(() => undefined);
 
@@ -28,18 +30,14 @@ const writeMcp = async (dir: string, pkg: ExtensionPackage): Promise<string[]> =
 
 const INFO_VERSION = /("info"\s*:\s*\{[^{}]*?"version"\s*:\s*)"[^"]*"/;
 
-// Only info.version, in place so the file keeps its formatting; openapi generation is 0.6.
+// Only info.version, in place so the file keeps its formatting; check reports any other drift.
 const writeOpenapiVersion = async (dir: string, version: string): Promise<string[]> => {
   const file = join(dir, OPENAPI_FILE);
   const text = await readText(file);
   if (text === undefined) return [];
-  const doc = JSON.parse(text) as { info?: Record<string, unknown> };
-  if (doc.info?.version === version) return [];
   const inPlace = text.replace(INFO_VERSION, `$1${JSON.stringify(version)}`);
-  await writeFile(
-    file,
-    inPlace !== text ? inPlace : json({ ...doc, info: { ...doc.info, version } })
-  );
+  if (inPlace === text) return [];
+  await writeFile(file, inPlace);
   return [OPENAPI_FILE];
 };
 
@@ -47,6 +45,7 @@ const writeOpenapiVersion = async (dir: string, version: string): Promise<string
 export const writeContracts = async (at: string): Promise<string[]> => {
   const dir = resolve(at);
   const pkg = await readManifest(dir);
+  if (!(await exists(join(dir, 'dist')))) throw new Error(`dist ${NOT_BUILT}`);
   const { code } = normalizeParts(pkg.agentage.parts);
   const mcp = code.mcp ? await writeMcp(dir, pkg) : [];
   return [...mcp, ...(code.api ? await writeOpenapiVersion(dir, pkg.version) : [])];

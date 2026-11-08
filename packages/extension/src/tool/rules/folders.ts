@@ -7,17 +7,20 @@ import { type Finding } from '../check.js';
 type Part = ImagePartKind | 'cli';
 
 const PARTS: readonly string[] = [...IMAGE_PART_KINDS, 'cli'];
-const PART_FOLDER = /^(?:src|dist\/(?:pages|ui|api|mcp|worker|cli))(?:\/|$)/;
+const PART_FOLDER = /^(?:src|dist)\/(?:pages|ui|api|mcp|worker|cli)(?:\/|$)/;
+// Erased at build, so a type crosses no image; blanked keeping newlines for the line count.
+const TYPE_ONLY = /\b(?:import|export)\s+type\b[^;'"]*?from\s*(['"])[^'"]*\1/g;
 const RELATIVE = /\b(?:from|import)\s*\(?\s*(['"])(\.{1,2}\/[^'"]*)\1/g;
 
 // Each image carries one part folder and src/lib, so a part imports nothing else.
 export const crossPartImports = (file: string, code: string): Finding[] => {
   const [src, part = ''] = file.split('/');
   if (src !== 'src' || !PARTS.includes(part)) return [];
-  return [...code.matchAll(RELATIVE)].flatMap((m) => {
+  const values = code.replace(TYPE_ONLY, (t) => t.replace(/[^\n]/g, ''));
+  return [...values.matchAll(RELATIVE)].flatMap((m) => {
     const target = posix.join(posix.dirname(file), m[2] ?? '');
     if (target.startsWith(`src/${part}/`) || target.startsWith('src/lib/')) return [];
-    const line = code.slice(0, m.index).split('\n').length;
+    const line = values.slice(0, m.index).split('\n').length;
     return [
       { file, line, problem: `imports ${m[2]}: a part imports only its own folder and src/lib` },
     ];

@@ -92,7 +92,8 @@ export const routesOf = (pkg: ExtensionPackage): string[] =>
 const partsStep = async (s: Session, commit: string) => {
   await compose(s.deps.run, s.target, ['up', '-d', '--remove-orphans'], TIMEOUTS.start);
   await waitHealthy(s.target, [...imageParts(s.pkg), 'gateway', 'issuer'], s.deps);
-  await assertHealthBodies(s.deps.run, s.target, imageParts(s.pkg), commit);
+  const degraded = await assertHealthBodies(s.deps.run, s.target, imageParts(s.pkg), commit);
+  for (const [part, checks] of degraded) s.line('degraded', part, checks);
   s.line('issuer', 'dev tokens', `http://localhost:${ISSUER_PORT}`);
   s.line('gateway', GATEWAY, routesOf(s.pkg).join(' · '));
 };

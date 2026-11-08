@@ -47,6 +47,8 @@ export interface CheckReport {
 
 const RECIPE = /^(?:dockerfile|containerfile)(?:\..+)?$|^(?:docker-)?compose(?:\.[\w-]+)?\.ya?ml$/i;
 
+export const NOT_BUILT = 'is missing: build the package first (npm run build)';
+
 const NO_PACKAGE = 'is missing: run it in an extension package folder';
 
 const manifest: CheckRule = {
@@ -90,8 +92,7 @@ const partProblem = async ({ dir, pkg }: CheckInput, part: Part): Promise<string
 const entries: CheckRule = {
   name: 'entries',
   run: async (input) => {
-    if (!(await exists(join(input.dir, 'dist'))))
-      return [{ file: 'dist', problem: 'is missing: build the package first (npm run build)' }];
+    if (!(await exists(join(input.dir, 'dist')))) return [{ file: 'dist', problem: NOT_BUILT }];
     const parts = Object.keys(normalizeParts(input.pkg.agentage.parts).code) as Part[];
     const found = parts.map((part) => partProblem(input, part).catch(messageOf));
     const problems = (await Promise.all(found)).flatMap((problem) =>
