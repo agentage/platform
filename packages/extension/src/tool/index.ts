@@ -1,7 +1,20 @@
 export { checkCli } from '../command/check-cli.js';
 export { runCommand, type RunCommandOptions } from '../command/run-command.js';
-export { type ExtensionPackage, type CommandSpec } from '../manifest/manifest.schema.js';
+export {
+  PackageSchema,
+  type CommandSpec,
+  type ExtensionPackage,
+} from '../manifest/manifest.schema.js';
+export { imageParts } from '../manifest/parts.js';
+export { SERVED_KINDS, STORE_KINDS, type StoreKind } from '../manifest/primitives.schema.js';
 export { readManifest, validateManifest } from '../manifest/read-manifest.js';
+export {
+  canonical,
+  mcpSnapshot,
+  PROTOCOL_VERSIONS,
+  type McpSnapshot,
+  type ProtocolVersion,
+} from '../mcp/snapshot.js';
 export {
   build,
   type BuildDeps,

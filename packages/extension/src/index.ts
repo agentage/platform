@@ -35,17 +35,10 @@ export {
   type TestContext,
   type TestContextOptions,
 } from './context/test-context.js';
-export {
-  DiscoveryDocumentSchema,
-  ExtensionRecordSchema,
-  type DiscoveryDocument,
-  type ExtensionRecord,
-} from './discovery/discovery.schema.js';
-export { AGCID_HEADER, isAgcid } from './agcid/agcid.js';
-export { ERROR_CODES, ERROR_STATUS, type ErrorCode } from './envelope/codes.js';
+export { type DiscoveryDocument, type ExtensionRecord } from './discovery/discovery.schema.js';
+export { ERROR_STATUS, type ErrorCode } from './envelope/codes.js';
 export {
   fail,
-  isFailure,
   ok,
   reply,
   type ErrorDetail,
@@ -56,25 +49,12 @@ export {
   type Reply,
   type ReplyOptions,
 } from './envelope/envelope.js';
+// Also in /contracts: main drops them once probe master's e2e reads them from there.
+export { DiscoveryDocumentSchema } from './discovery/discovery.schema.js';
 export { ErrorEnvelopeSchema, OkEnvelopeSchema } from './envelope/envelope.schema.js';
 export { parse, type ParseSchema } from './envelope/parse.js';
-export { HealthSchema, type HealthBody, type HealthStatus } from './health/health.schema.js';
+export { type HealthBody, type HealthStatus } from './health/health.schema.js';
 export { type Log, type LogFields } from './log/log.js';
-export {
-  PackageSchema,
-  type CommandSpec,
-  type ExtensionPackage,
-} from './manifest/manifest.schema.js';
-export { imageParts } from './manifest/parts.js';
-export { SERVED_KINDS, STORE_KINDS, type StoreKind } from './manifest/primitives.schema.js';
-export { readManifest, validateManifest } from './manifest/read-manifest.js';
-export {
-  canonical,
-  mcpSnapshot,
-  PROTOCOL_VERSIONS,
-  type McpSnapshot,
-  type ProtocolVersion,
-} from './mcp/snapshot.js';
 export {
   type McpContext,
   type ToolHandler,

@@ -73,8 +73,9 @@ The manifest is the `agentage` block of the extension's `package.json` (see
 Unit tests: `createTestContext()` (a recording log, scheduled jobs you run with `runJob`, tools,
 `{ store: true }` for a throwaway in-process postgres with the package's migrations and seeds,
 `{ args }` for a command ctx that records its output), `startTestServer({ create })` for an api
-part and `startTestMcp({ create })` with `mcpSnapshot(url, '2025-11-25' | '2026-07-28')` for the
-committed `{id}.mcpc.json`.
+part and `startTestMcp({ create })` with `mcpSnapshot(url, '2025-11-25' | '2026-07-28')` (from
+`@agentage/extension/tool`) for the committed `{id}.mcpc.json`. The wire schemas a client reads
+(envelopes, `/health`, discovery, the record, `agcid`) are `@agentage/extension/contracts`.
 
 ## The tool: build, up, token
 

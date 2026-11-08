@@ -133,7 +133,7 @@ jobs:
         run: |
           set -euo pipefail
           curl -sf http://localhost:4280/.well-known/agentage-extension.json > /tmp/discovery.json
-          node --input-type=module -e "import { DiscoveryDocumentSchema } from '@agentage/extension'; import { readFileSync } from 'node:fs'; DiscoveryDocumentSchema.parse(JSON.parse(readFileSync('/tmp/discovery.json', 'utf8'))); console.log('PASS discovery valid')"
+          node --input-type=module -e "import { DiscoveryDocumentSchema } from '@agentage/extension/contracts'; import { readFileSync } from 'node:fs'; DiscoveryDocumentSchema.parse(JSON.parse(readFileSync('/tmp/discovery.json', 'utf8'))); console.log('PASS discovery valid')"
           npx playwright install chromium
           npm run test:e2e
 
