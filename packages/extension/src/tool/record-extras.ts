@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { z } from 'zod';
+import { createRouteRegistry, type ApiContext } from '../api/routes.js';
 import { scopeOf } from '../auth/token-check.js';
 import { createContext } from '../context/context.js';
 import { type RecordExtras } from '../discovery/discovery.js';
@@ -42,6 +43,16 @@ export const registeredTools = async (
   const registry = createToolRegistry();
   await create({ ...recordingContext(pkg, 'mcp'), tool: registry.tool });
   return registry.tools;
+};
+
+// What an api part's create(ctx) registers with ctx.route, and what it returns.
+export const registeredRoutes = async (
+  create: (ctx: ApiContext) => unknown,
+  pkg: ExtensionPackage
+) => {
+  const registry = createRouteRegistry();
+  const returned = await create({ ...recordingContext(pkg, 'api'), route: registry.route });
+  return { routes: registry.routes, returned };
 };
 
 export const toolsOf = async (dir: string, pkg: ExtensionPackage) => {

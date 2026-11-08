@@ -113,21 +113,21 @@ describe('problem paths', () => {
 });
 
 describe('stack', () => {
-  const stackOf = async (dependencies: Record<string, string>, agentage = '^0.5') => {
+  const stackOf = async (dependencies: Record<string, string>, agentage = '^0.6') => {
     const pkg = { ...SPEC_MANIFEST, engines: { agentage }, dependencies };
     const dir = await tempPackage({ 'package.json': json(pkg) });
     return (await check(dir, only('stack'))).problems.map((p) => p.problem);
   };
 
   it('needs express 5, zod 4, the MCP SDK 2 and a kit range inside engines.agentage', async () => {
-    const good = { express: '^5.1.0', zod: '^4.2.0', '@agentage/extension': '^0.5.1' };
+    const good = { express: '^5.1.0', zod: '^4.2.0', '@agentage/extension': '^0.6.0' };
     expect(await stackOf(good)).toEqual([]);
     const old = { express: '>=4', zod: '^3.23.0', '@modelcontextprotocol/server': '>=1' };
-    expect(await stackOf({ ...old, '@agentage/extension': '^0.6.0' })).toEqual([
+    expect(await stackOf({ ...old, '@agentage/extension': '^0.7.0' })).toEqual([
       'express >=4, needs ^5',
       'zod ^3.23.0, needs ^4',
       '@modelcontextprotocol/server >=1, needs ^2',
-      '@agentage/extension ^0.6.0, needs ^0.5',
+      '@agentage/extension ^0.7.0, needs ^0.6',
     ]);
   });
 
