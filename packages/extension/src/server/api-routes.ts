@@ -1,12 +1,11 @@
 import { Router, type RequestHandler } from 'express';
+import { inQuery } from '../api/openapi-doc.js';
 import { createRouteRegistry, type ApiContext, type RouteEntry } from '../api/routes.js';
 import { type WellKnownEntry } from '../api/well-known.js';
 import { type PartContext } from '../context/context.js';
 import { isReply, ok, reply } from '../envelope/envelope.js';
 import { parse } from '../envelope/parse.js';
 import { type ApiHandler } from './part.types.js';
-
-const inQuery = (method: string) => method === 'get' || method === 'delete';
 
 const inputOf = ({ method, spec }: RouteEntry, query: unknown, body: unknown) => {
   if (!spec.input) return {};
