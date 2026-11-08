@@ -60,9 +60,10 @@ export const startTestServer = async <C extends PartContext = PartContext>(
   options: TestServerOptions<C>
 ): Promise<TestServer> => {
   const ctx = options.ctx ?? (createTestContext() as unknown as C);
-  const { router } = await mountApi(ctx, (api) => options.create({ ...ctx, ...api }));
+  const { router, documents } = await mountApi(ctx, (api) => options.create({ ...ctx, ...api }));
   const pkg = testPackage(ctx, { api: true });
-  return startOn(createApiApp({ pkg, build: TEST_BUILD, router, log: ctx.log }));
+  const app = createApiApp({ pkg, build: TEST_BUILD, router, log: ctx.log, wellKnown: documents });
+  return startOn(app);
 };
 
 // Runs an mcp part's create(ctx) inside the kit's real /mcp app: tools named {id}__{name}.

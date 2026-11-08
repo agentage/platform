@@ -1,4 +1,5 @@
 import { createRouteRegistry, type RouteEntry, type RouteRegistrar } from '../api/routes.js';
+import { type WellKnownRegistrar } from '../api/well-known.js';
 import { type CliContext } from '../command/command.types.js';
 import { createOut } from '../command/out.js';
 import { messageOf, type Log, type LogFields, type LogLevel } from '../log/log.js';
@@ -28,6 +29,7 @@ export interface TestContext extends PartContext {
   readonly tools: ToolEntry[];
   readonly route: RouteRegistrar;
   readonly routes: RouteEntry[];
+  readonly wellKnown: WellKnownRegistrar;
   readonly jobs: ScheduledJob[];
   runJob(name: string): Promise<JobRun | undefined>;
 }

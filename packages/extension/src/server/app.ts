@@ -1,6 +1,7 @@
 import cors, { type CorsOptions } from 'cors';
 import express, { type Express, type Request, type RequestHandler } from 'express';
 import helmet, { type HelmetOptions } from 'helmet';
+import { type WellKnownEntry, type WellKnownRender } from '../api/well-known.js';
 import { agcidMiddleware } from '../agcid/scope.js';
 import { routeAccess } from '../auth/route-access.js';
 import { setCaller, type TokenCheck } from '../auth/token-check.js';
@@ -41,6 +42,7 @@ export interface PartAppOptions extends PartAppBase {
 export interface ApiAppOptions extends PartAppBase {
   router: ApiHandler;
   openapi?: Record<string, unknown> | null;
+  wellKnown?: WellKnownEntry[];
 }
 
 // api-standards section 6: CORS * without credentials on /.well-known/, /api/, /ui/ and /mcp.
@@ -104,6 +106,16 @@ const openapiHandler =
   (_req, res) =>
     void res.json(doc);
 
+// Public like discovery, cached briefly: crawlers and registries read these from the root.
+const wellKnownHandler =
+  (render: WellKnownRender): RequestHandler =>
+  async (_req, res) => {
+    const doc = await render();
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    if (typeof doc === 'string') res.type('text/plain').send(doc);
+    else res.json(doc);
+  };
+
 // Before the body is read: each request checked for the access its OpenAPI operation declares.
 const routeGuard =
   (options: ApiAppOptions): RequestHandler =>
@@ -122,6 +134,8 @@ export const createApiApp = (options: ApiAppOptions): Express =>
     part: 'api',
     mount: (app) => {
       app.use('/api/v1', cors(PUBLIC_CORS));
+      for (const { name, render } of options.wellKnown ?? [])
+        app.get(`/.well-known/${name}`, wellKnownHandler(render));
       if (options.openapi) app.get('/api/v1/openapi.json', openapiHandler(options.openapi));
       const json = express.json({ limit: BODY_LIMIT });
       app.use('/api/v1', routeGuard(options), json, options.router);

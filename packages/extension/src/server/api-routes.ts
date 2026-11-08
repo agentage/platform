@@ -1,5 +1,6 @@
 import { Router, type RequestHandler } from 'express';
 import { createRouteRegistry, type ApiContext, type RouteEntry } from '../api/routes.js';
+import { type WellKnownEntry } from '../api/well-known.js';
 import { type PartContext } from '../context/context.js';
 import { isReply, ok, reply } from '../envelope/envelope.js';
 import { parse } from '../envelope/parse.js';
@@ -48,8 +49,8 @@ const handlerFor = (ctx: PartContext, routes: RouteEntry[], returned: unknown): 
 export const mountApi = async (
   ctx: PartContext,
   create: (ctx: ApiContext) => unknown
-): Promise<{ router: ApiHandler; routes: RouteEntry[] }> => {
-  const { route, routes } = createRouteRegistry();
-  const returned = await create({ ...ctx, route });
-  return { router: handlerFor(ctx, routes, returned), routes };
+): Promise<{ router: ApiHandler; routes: RouteEntry[]; documents: WellKnownEntry[] }> => {
+  const { route, routes, wellKnown, documents } = createRouteRegistry();
+  const returned = await create({ ...ctx, route, wellKnown });
+  return { router: handlerFor(ctx, routes, returned), routes, documents };
 };

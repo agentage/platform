@@ -51,7 +51,8 @@ export const registeredRoutes = async (
   pkg: ExtensionPackage
 ) => {
   const registry = createRouteRegistry();
-  const returned = await create({ ...recordingContext(pkg, 'api'), route: registry.route });
+  const { route, wellKnown } = registry;
+  const returned = await create({ ...recordingContext(pkg, 'api'), route, wellKnown });
   return { routes: registry.routes, returned };
 };
 
