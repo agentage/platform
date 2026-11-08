@@ -11,6 +11,8 @@ security, backend); this file only adds what the tree does not say.
   test fails when the committed files drift
 - `node packages/extension/dist/tool/cli.js build [--push] [--dir <ext>] [--registry <host/owner>]`
 
+- Bump a package's version only when that package's files changed (`scripts/check-bumps.mjs` gates PRs)
+
 ## Layout (`packages/extension/src`)
 
 - `envelope/` ok, fail, parse, the closed error codes; `agcid/` UUIDv7, the request scope
