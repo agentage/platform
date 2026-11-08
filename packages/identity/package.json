@@ -1,6 +1,6 @@
 {
   "name": "@agentage/identity",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The agentage identity client for browser pages: sign in at auth, a one-day token for the parts, sign out",
   "type": "module",
   "license": "MIT",

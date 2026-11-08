@@ -1,5 +1,6 @@
 import { join } from 'node:path';
-import { type PartContext } from '../../context/context.js';
+import { generatedOpenapi, schemaOf } from '../../api/openapi-doc.js';
+import { type ApiContext, type RouteEntry } from '../../api/routes.js';
 import { OPENAPI_FILE, readOpenapi } from '../../discovery/openapi.js';
 import { loadCreate } from '../../manifest/entry.js';
 import { type ExtensionPackage } from '../../manifest/manifest.schema.js';
@@ -8,7 +9,7 @@ import { readJsonIfExists } from '../../manifest/read-manifest.js';
 import { canonical, type McpSnapshot } from '../../mcp/snapshot.js';
 import { prefixed, type McpContext, type ToolEntry } from '../../mcp/tools.js';
 import { type CheckInput, type CheckRule, type Finding } from '../check.js';
-import { recordingContext, registeredTools } from '../record-extras.js';
+import { registeredRoutes, registeredTools } from '../record-extras.js';
 
 type Json = Record<string, unknown>;
 type Route = { path: unknown; stack: { method?: string }[] };
@@ -45,6 +46,12 @@ const operations = (doc: Json): [string, Json][] =>
       .map(([method, op]): [string, Json] => [`${method.toUpperCase()} ${path}`, op as Json])
   );
 
+// One entry per operation and per top-level key, so a diff names what moved.
+const flat = (doc: Json): Json => {
+  const top = Object.entries(doc).filter(([key]) => key !== 'paths');
+  return Object.fromEntries([...top, ...operations(doc)]);
+};
+
 const declaresAccess = (security: unknown): boolean =>
   Array.isArray(security) &&
   (security.length === 0 ||
@@ -63,20 +70,36 @@ const apiProblems = (doc: Json, routes: string[], version: string): string[] => 
   ];
 };
 
-const apiSurface = async ({ dir, pkg }: CheckInput): Promise<Finding[]> => {
-  const create = await loadCreate<PartContext>(dir, pkg, 'api').catch(() => null);
-  if (!create) return [];
-  const doc = await readOpenapi(dir);
-  const found = doc
-    ? apiProblems(doc, servedRoutes(await create(recordingContext(pkg, 'api'))), pkg.version)
-    : ['is missing: the api part commits its contract'];
-  return found.map((problem) => ({ file: OPENAPI_FILE, problem }));
+type Doc = Json | null;
+
+const routeProblems = (
+  pkg: ExtensionPackage,
+  doc: Doc,
+  routes: RouteEntry[],
+  returned: unknown
+) => {
+  if (returned) return ['the api part registers ctx.route routes and returns a router: pick one'];
+  if (!doc) return ['is missing: check --write generates it from the ctx.route routes'];
+  const diff = differing(flat(generatedOpenapi(pkg, routes)), flat(doc));
+  return diff.length > 0 ? [`differs from the generated contract (${diff.join(', ')})`] : [];
 };
 
-type Listed = { '~standard': { jsonSchema: Record<'input' | 'output', (o: object) => Json> } };
+const routerProblems = (pkg: ExtensionPackage, doc: Doc, returned: unknown) =>
+  doc
+    ? apiProblems(doc, servedRoutes(returned), pkg.version)
+    : ['is missing: the api part commits its contract'];
 
-const schemaOf = (zod: object, io: 'input' | 'output') =>
-  (zod as Listed)['~standard'].jsonSchema[io]({ target: 'draft-2020-12' });
+const apiSurface = async ({ dir, pkg }: CheckInput): Promise<Finding[]> => {
+  const create = await loadCreate<ApiContext>(dir, pkg, 'api').catch(() => null);
+  if (!create) return [];
+  const { routes, returned } = await registeredRoutes(create, pkg);
+  const doc = await readOpenapi(dir);
+  const found =
+    routes.length > 0
+      ? routeProblems(pkg, doc, routes, returned)
+      : routerProblems(pkg, doc, returned);
+  return found.map((problem) => ({ file: OPENAPI_FILE, problem }));
+};
 
 const listed = (id: string, { name, spec }: ToolEntry): Json => ({
   name: prefixed(id, name),

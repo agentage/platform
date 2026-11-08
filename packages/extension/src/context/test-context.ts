@@ -1,3 +1,4 @@
+import { createRouteRegistry, type RouteEntry, type RouteRegistrar } from '../api/routes.js';
 import { type CliContext } from '../command/command.types.js';
 import { createOut } from '../command/out.js';
 import { messageOf, type Log, type LogFields, type LogLevel } from '../log/log.js';
@@ -8,6 +9,8 @@ import { type JobOptions } from '../worker/job-options.js';
 import { runLog } from '../worker/run-log.js';
 import { type JobRun, memoryRuns } from '../worker/runs.js';
 import { createScheduler, type Schedule } from '../worker/scheduler.js';
+import { type StoreKind } from '../manifest/primitives.schema.js';
+import { packageExtension } from './package-extension.js';
 import { NO_STORE, type ExtensionInfo, type PartContext, type SettingValue } from './context.js';
 import { type ArgValue } from '../command/args.js';
 
@@ -23,6 +26,8 @@ export interface TestContext extends PartContext {
   readonly schedule: Schedule;
   readonly tool: ToolRegistrar;
   readonly tools: ToolEntry[];
+  readonly route: RouteRegistrar;
+  readonly routes: RouteEntry[];
   readonly jobs: ScheduledJob[];
   runJob(name: string): Promise<JobRun | undefined>;
 }
@@ -42,7 +47,8 @@ export interface TestContextOptions {
   extension?: Partial<ExtensionInfo>;
   settings?: Record<string, SettingValue>;
   secrets?: Record<string, string>;
-  // A throwaway postgres with the package's migrations/ and seeds/ applied (dir: the package root).
+  // A throwaway postgres with the package's migrations/ and seeds/ applied (dir: the package root);
+  // on by default when ./package.json declares a postgres store, false turns it off.
   store?: boolean | { dir: string };
 }
 
@@ -85,15 +91,31 @@ const recorders = (log: Log) => {
     scheduler.schedule(name, cron, job, options);
     jobs.push({ name, cron, options });
   };
-  return { ...createToolRegistry(), schedule, jobs, runJob: scheduler.run };
+  return {
+    ...createToolRegistry(),
+    ...createRouteRegistry(),
+    schedule,
+    jobs,
+    runJob: scheduler.run,
+  };
+};
+
+// ./package.json's identity and store kind; its postgres store opens a test store unless store is false.
+const identityOf = (options: TestContextOptions) => {
+  const { store: kind, ...identity } = packageExtension();
+  const store = options.store ?? kind === 'postgres';
+  // An open test store is postgres; a closed one hides postgres but keeps a kind it cannot serve.
+  const closedKind = kind === 'postgres' ? undefined : kind;
+  const own: StoreKind | undefined = store ? 'postgres' : closedKind;
+  const extension = { ...TEST_EXTENSION, ...identity, ...(own && { store: own }) };
+  return { store, extension: { ...extension, ...options.extension } };
 };
 
 const serverContext = (options: TestContextOptions): TestContext => {
   const logs: LogEntry[] = [];
   const log = runLog(recordingLog(logs));
-  const store = testStore(options.store, recordingLog([]));
-  const kind = options.store ? { store: 'postgres' as const } : {};
-  const extension = { ...TEST_EXTENSION, ...kind, ...options.extension };
+  const { extension, ...open } = identityOf(options);
+  const store = testStore(open.store, recordingLog([]));
   const caller = { sub: 'usr_test', scopes: [`${extension.id}:read`] };
   return {
     extension,
@@ -119,7 +141,8 @@ const commandContext = (options: TestCommandOptions): TestCommandContext => {
     stdout: lines(output.stdout),
     stderr: lines(output.stderr),
   });
-  const extension = { id: 'test', version: '0.0.0', ...options.extension, part: 'cli' as const };
+  const { id = 'test', version = '0.0.0' } = packageExtension();
+  const extension = { id, version, ...options.extension, part: 'cli' as const };
   return {
     extension,
     args: { ...options.args },
@@ -131,7 +154,7 @@ const commandContext = (options: TestCommandOptions): TestCommandContext => {
   };
 };
 
-// A ctx for unit tests: fixed identity, recorded logs, jobs and tools; with `args`, a command ctx.
+// A ctx for unit tests: identity from ./package.json, recorded logs, jobs, tools and routes; with `args`, a command ctx.
 export function createTestContext(options: TestCommandOptions): TestCommandContext;
 export function createTestContext(options?: TestContextOptions): TestContext;
 export function createTestContext(options: TestContextOptions | TestCommandOptions = {}) {

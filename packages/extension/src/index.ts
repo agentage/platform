@@ -1,3 +1,12 @@
+export {
+  type ApiContext,
+  type ParamsOf,
+  type RouteHandler,
+  type RouteMethod,
+  type RouteRegistrar,
+  type RouteRequest,
+  type RouteSpec,
+} from './api/routes.js';
 export { type ArgValue } from './command/args.js';
 export {
   type CliContext,

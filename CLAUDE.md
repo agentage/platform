@@ -21,6 +21,8 @@ security, backend); this file only adds what the tree does not say.
 - `context/` ctx, settings from `AGENTAGE_SETTINGS`, `createTestContext` (parts and commands)
 - `server/` the kit app every part runs (`createPartApp`), errors, listen and shutdown
 - `runtime/` the image entry `dist/runtime/main.js <part>` and `RUNNERS`, one per part kind
+- `api/` `ctx.route` registry and the OpenAPI generator (no express import: the tool reads it);
+  `server/api-routes.ts` mounts the routes
 - `mcp/` tool registry, SDK v2 server factory, the `/mcp` app, the two-era snapshot client
 - `worker/` cron, scheduler (no overlap, run log capture), `agentage_job_runs`
 - `store/` the pg pool, migrations and seeds, the migrate entry `dist/store/migrate.js`, the

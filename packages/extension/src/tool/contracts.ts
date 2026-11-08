@@ -1,5 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { generatedOpenapi } from '../api/openapi-doc.js';
+import { type ApiContext } from '../api/routes.js';
 import { OPENAPI_FILE } from '../discovery/openapi.js';
 import { loadCreate } from '../manifest/entry.js';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
@@ -8,6 +10,7 @@ import { readManifest } from '../manifest/read-manifest.js';
 import { canonical } from '../mcp/snapshot.js';
 import { type McpContext } from '../mcp/tools.js';
 import { NOT_BUILT } from './check.js';
+import { registeredRoutes } from './record-extras.js';
 import { generatedMcp } from './rules/surface.js';
 import { exists } from './stage.js';
 
@@ -41,6 +44,17 @@ const writeOpenapiVersion = async (dir: string, version: string): Promise<string
   return [OPENAPI_FILE];
 };
 
+// A ctx.route api: the whole document from its routes; a router api: only info.version.
+const writeOpenapi = async (dir: string, pkg: ExtensionPackage): Promise<string[]> => {
+  const create = await loadCreate<ApiContext>(dir, pkg, 'api');
+  const { routes } = await registeredRoutes(create, pkg);
+  if (routes.length === 0) return writeOpenapiVersion(dir, pkg.version);
+  const doc = generatedOpenapi(pkg, routes);
+  if (sameJson(await readText(join(dir, OPENAPI_FILE)), doc)) return [];
+  await writeFile(join(dir, OPENAPI_FILE), json(doc));
+  return [OPENAPI_FILE];
+};
+
 // check --write: the committed contracts regenerated from the built code; returns the files it changed.
 export const writeContracts = async (at: string): Promise<string[]> => {
   const dir = resolve(at);
@@ -48,5 +62,5 @@ export const writeContracts = async (at: string): Promise<string[]> => {
   if (!(await exists(join(dir, 'dist')))) throw new Error(`dist ${NOT_BUILT}`);
   const { code } = normalizeParts(pkg.agentage.parts);
   const mcp = code.mcp ? await writeMcp(dir, pkg) : [];
-  return [...mcp, ...(code.api ? await writeOpenapiVersion(dir, pkg.version) : [])];
+  return [...mcp, ...(code.api ? await writeOpenapi(dir, pkg) : [])];
 };
