@@ -9,7 +9,7 @@ import {
 import { getJson, trimSlash } from './read-installation.js';
 
 export interface MountOptions {
-  host: Host;
+  host: (deployment: Deployment) => Host;
   container: Element;
   deployments: Deployment[];
   importModule?: (url: string) => Promise<unknown>;
@@ -23,6 +23,14 @@ interface Slot {
 type HostedElement = HTMLElement & { host?: Host };
 
 type ReadDiscovery = (url: string) => Promise<Discovery>;
+
+type HostFor = (deployment: Deployment) => Host;
+
+interface Mount {
+  options: MountOptions;
+  read: ReadDiscovery;
+  hostFor: HostFor;
+}
 
 const nativeImport = (url: string): Promise<unknown> => import(url);
 
@@ -50,22 +58,31 @@ const discoveryReader = (): ReadDiscovery => {
   };
 };
 
-const resolveWidget = async (node: WidgetNode, options: MountOptions, read: ReadDiscovery) => {
+const resolveWidget = async (node: WidgetNode, { options, read }: Mount) => {
   const deployment = options.deployments.find((d) => d.id === node.extension);
   if (!deployment) throw new Error(`no deployment for ${node.extension}`);
   const widget = (await read(deployment.url)).widgets?.find((w) => w.name === node.name);
   if (!widget) throw new Error(`${node.extension} serves no widget ${node.name}`);
-  return { ...widget, module: new URL(widget.module, deployment.url).href };
+  return { ...widget, deployment, module: new URL(widget.module, deployment.url).href };
+};
+
+// One host per deployment id for the whole mount, so its widgets share one bridge.
+const hostCache = (make: MountOptions['host']): HostFor => {
+  const hosts = new Map<string, Host>();
+  return (d) => {
+    if (!hosts.has(d.id)) hosts.set(d.id, make(d));
+    return hosts.get(d.id) as Host;
+  };
 };
 
 // Import first, then create and set host, then connect: an upgrade after .host would reset it.
-const mountOne = async ({ node, slot }: Slot, options: MountOptions, read: ReadDiscovery) => {
-  const widget = await resolveWidget(node, options, read);
-  await (options.importModule ?? nativeImport)(widget.module);
+const mountOne = async ({ node, slot }: Slot, mount: Mount) => {
+  const widget = await resolveWidget(node, mount);
+  await (mount.options.importModule ?? nativeImport)(widget.module);
   if (!customElements.get(widget.element))
     throw new Error(`${widget.module} defines no ${widget.element}`);
   const el: HostedElement = slot.ownerDocument.createElement(widget.element);
-  el.host = options.host;
+  el.host = mount.hostFor(widget.deployment);
   slot.replaceWith(el);
   return el;
 };
@@ -84,8 +101,6 @@ export const mountWidgets = async (layout: Layout, options: MountOptions): Promi
   const slots: Slot[] = [];
   options.container.replaceChildren();
   place(layout, options.container, slots);
-  const read = discoveryReader();
-  return Promise.all(
-    slots.map((s) => mountOne(s, options, read).catch((e: unknown) => showError(s, e)))
-  );
+  const mount = { options, read: discoveryReader(), hostFor: hostCache(options.host) };
+  return Promise.all(slots.map((s) => mountOne(s, mount).catch((e: unknown) => showError(s, e))));
 };

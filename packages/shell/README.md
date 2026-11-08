@@ -13,10 +13,9 @@ import { mountWidgets, readInstallation } from '@agentage/shell';
 import { createBridge } from '@agentage/widget';
 
 const doc = await readInstallation('https://agentage.io', target);
-const [deployment] = doc.deployments;
 const layout = doc.routes[location.pathname] ?? doc.routes['/'];
 await mountWidgets(layout, {
-  host: createBridge({ baseUrl: deployment.url, token }),
+  host: (deployment) => createBridge({ baseUrl: deployment.url, token }),
   container: document.getElementById('shell')!,
   deployments: doc.deployments,
 });
@@ -24,10 +23,10 @@ await mountWidgets(layout, {
 
 ## The calls
 
-| Call                                                     | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `readInstallation(rootUrl, target)`                      | `GET {rootUrl}/api/v1/installations/{target}`, reads the `{ success, data }` envelope, validates `data` and resolves it. Rejects on an HTTP error or a document outside the shape. Until root exists (2.1) a static document of the same shape serves.                                                                                                                                                                                                                                                |
-| `mountWidgets(layout, { host, container, deployments })` | Takes the layout of one route. Builds the layout boxes in `container` in layout order. For each widget node it reads `{deployment.url}/.well-known/agentage-extension.json` (once per deployment), finds the widget by `name`, imports its `module`, creates its `element`, sets `el.host = host` and puts it in its place. Resolves the placed elements; never rejects: a widget that fails becomes one `<p role="alert">` with the reason. `importModule(url)` is optional (default `import(url)`). |
+| Call                                                     | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `readInstallation(rootUrl, target)`                      | `GET {rootUrl}/api/v1/installations/{target}`, reads the `{ success, data }` envelope, validates `data` and resolves it. Rejects on an HTTP error or a document outside the shape. Until root exists (2.1) a static document of the same shape serves.                                                                                                                                                                                                                                                                                            |
+| `mountWidgets(layout, { host, container, deployments })` | Takes the layout of one route. Builds the layout boxes in `container` in layout order. For each widget node it reads `{deployment.url}/.well-known/agentage-extension.json` (once per deployment), finds the widget by `name`, imports its `module`, creates its `element`, sets `el.host` to `host(deployment)` (called once per deployment) and puts it in its place. Resolves the placed elements; never rejects: a widget that fails becomes one `<p role="alert">` with the reason. `importModule(url)` is optional (default `import(url)`). |
 
 ## The installation document
 
