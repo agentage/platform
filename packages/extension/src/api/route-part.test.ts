@@ -10,7 +10,7 @@ import { authEnv, startPart, STOP } from '../test-support/part-fixture.js';
 const MANIFEST = {
   name: '@agentage/extension-probe',
   version: '0.6.0',
-  engines: { agentage: '^0.7' },
+  engines: { agentage: '^0.8' },
   agentage: { id: 'probe', parts: { api: true } },
 };
 const API = `import { z } from 'zod';
