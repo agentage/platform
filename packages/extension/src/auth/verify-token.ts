@@ -69,7 +69,7 @@ const claimsOf = async (authorization: string, deps: TokenCheckDeps) => {
   return claims.data;
 };
 
-const grants = (scope: string, id: string, access: Access): boolean => {
+export const grants = (scope: string, id: string, access: Access): boolean => {
   const held = new Set(scope.split(' '));
   return (['read', 'write', 'admin'] as const).some(
     (verb) => RANK[verb] >= RANK[access] && held.has(`${id}:${verb}`)
