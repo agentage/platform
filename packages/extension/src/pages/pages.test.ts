@@ -3,7 +3,7 @@ import { ZodError } from 'zod';
 import { createTestContext } from '../context/test-context.js';
 import { recordedLog, serveApp, type Served } from '../test-support/http.js';
 import { API_MANIFEST, SHA } from '../test-support/packages.js';
-import { createPagesApp, NOT_FOUND_PAGE } from './pages-app.js';
+import { createPagesApp, NOT_FOUND_PAGE, platformSources } from './pages-app.js';
 import { versionPage } from './pages.js';
 
 const BUILD = { commit: SHA, buildTime: '2026-11-05T10:00:00Z' };
@@ -71,5 +71,39 @@ describe('pages app', () => {
     expect(codes({ 'about.html': '<p></p>' })).toEqual(['about.html invalid_key']);
     expect(codes({ '/a b': '<p></p>' })).toEqual(['/a b invalid_key']);
     expect(codes({ '/': 42 })).toEqual(['/ invalid_type']);
+  });
+
+  it('types an entry by its extension and lets a page reach the platform hosts only', async () => {
+    const site = { '/': '<p>shell</p>', '/shell.js': 'export {};' };
+    const platform = ['https://auth.agentage.io', 'https://*.agentage.io'];
+    const log = recordedLog().log;
+    served = await serveApp(createPagesApp({ pkg: PKG, build: BUILD, log, site, platform }));
+    const js = await fetch(`${served.url}/shell.js`);
+    expect(js.headers.get('content-type')).toMatch(/^text\/javascript/);
+    const csp = (await fetch(`${served.url}/`)).headers.get('content-security-policy') ?? '';
+    const allowed = "'self' https://auth.agentage.io https://*.agentage.io";
+    expect(csp).toContain(`script-src ${allowed}`);
+    expect(csp).toContain(`connect-src ${allowed}`);
+  });
+});
+
+describe('platformSources', () => {
+  it('is the issuer origin and the audience under the part origin scheme', () => {
+    const next = {
+      AGENTAGE_ISSUER: 'https://auth.agentage.io',
+      AGENTAGE_AUDIENCE: '*.agentage.io',
+      AGENTAGE_ORIGIN: 'https://fixture.next.agentage.io',
+    };
+    expect(platformSources(next)).toEqual(['https://auth.agentage.io', 'https://*.agentage.io']);
+    const up = { AGENTAGE_ISSUER: 'http://localhost:4281', AGENTAGE_AUDIENCE: 'localhost:4280' };
+    expect(platformSources({ ...up, AGENTAGE_ORIGIN: 'http://localhost:4280' })).toEqual([
+      'http://localhost:4281',
+      'http://localhost:4280',
+    ]);
+  });
+
+  it('drops what is missing or not a host, so nothing else enters the header', () => {
+    expect(platformSources({})).toEqual([]);
+    expect(platformSources({ AGENTAGE_AUDIENCE: "x; script-src 'unsafe-inline'" })).toEqual([]);
   });
 });

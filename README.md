@@ -51,7 +51,7 @@ export function create({ schedule, store, log }: WorkerContext) {
 export function create({ out, args }: CliContext) {
   return { ping: async () => (out.log('pong'), 0) };
 }
-// src/pages/index.ts: path -> HTML (a static page in kit 0.2)
+// src/pages/index.ts: path -> HTML, or JS, CSS, JSON by the extension of the path
 export const create = (ctx: PagesContext): PagesSite => ({ '/': versionPage(ctx) });
 ```
 
@@ -110,17 +110,18 @@ through `@agentage/extension/tool`, plus `runCommand` and `checkCli` for install
 
 ## Run a part image
 
-|                                                           |                                                                                                     |
-| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Entry                                                     | `node node_modules/@agentage/extension/dist/runtime/main.js <part>`; port `3000` (`PORT` overrides) |
-| `/health`                                                 | loopback only (the container `HEALTHCHECK`, an operator on the node); `404` from any other address  |
-| `/.well-known/agentage-extension.json`                    | the record at `/run/agentage/agentage-extension.json` (`AGENTAGE_RECORD_FILE`) plus the host        |
-| `AGENTAGE_ORIGIN`                                         | the deployment's origin; pages and ui take it from the request without it                           |
-| `AGENTAGE_SETTINGS`                                       | JSON of setting values over the manifest defaults                                                   |
-| `AGENTAGE_STORE_URL` / `_FILE`                            | the postgres connection (or a file holding it); else libpq `PG*` variables                          |
-| `AGENTAGE_ISSUER`, `AGENTAGE_AUDIENCE`, `AGENTAGE_ORIGIN` | required for api and mcp: without them, or with a host off the audience, the part does not start    |
-| `AGENTAGE_DEV_ISSUER`                                     | set by `up` for the ui part only: its CSP then lets the harness reach the dev issuer                |
-| `Cookie` request header                                   | dropped before any handler; a part sets no cookie and its CORS carries no credentials               |
+|                                                           |                                                                                                      |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Entry                                                     | `node node_modules/@agentage/extension/dist/runtime/main.js <part>`; port `3000` (`PORT` overrides)  |
+| `/health`                                                 | loopback only (the container `HEALTHCHECK`, an operator on the node); `404` from any other address   |
+| `/.well-known/agentage-extension.json`                    | the record at `/run/agentage/agentage-extension.json` (`AGENTAGE_RECORD_FILE`) plus the host         |
+| `AGENTAGE_ORIGIN`                                         | the deployment's origin; pages and ui take it from the request without it                            |
+| `AGENTAGE_SETTINGS`                                       | JSON of setting values over the manifest defaults                                                    |
+| `AGENTAGE_STORE_URL` / `_FILE`                            | the postgres connection (or a file holding it); else libpq `PG*` variables                           |
+| `AGENTAGE_ISSUER`, `AGENTAGE_AUDIENCE`, `AGENTAGE_ORIGIN` | required for api and mcp: without them, or with a host off the audience, the part does not start     |
+| `AGENTAGE_ISSUER`, `AGENTAGE_AUDIENCE` on pages           | the pages CSP lets a page load scripts from and call the issuer and the audience hosts, nothing else |
+| `AGENTAGE_DEV_ISSUER`                                     | set by `up` for the ui part only: its CSP then lets the harness reach the dev issuer                 |
+| `Cookie` request header                                   | dropped before any handler; a part sets no cookie and its CORS carries no credentials                |
 
 Schemas for the manifest, the build record, the discovery document, `/health` and the envelope are
 in [`packages/extension/schemas`](packages/extension/schemas), generated from the kit's Zod schemas
