@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AGCID_PATTERN } from '../agcid/agcid.js';
+import { AGCID_PATTERN } from '../agcid/header.js';
 import { ERROR_CODES } from './codes.js';
 
 const AgcidSchema = z.string().regex(AGCID_PATTERN);

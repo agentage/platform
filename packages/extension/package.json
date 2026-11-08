@@ -28,6 +28,10 @@
       "types": "./dist/tool/index.d.ts",
       "default": "./dist/tool/index.js"
     },
+    "./contracts": {
+      "types": "./dist/contracts/index.d.ts",
+      "default": "./dist/contracts/index.js"
+    },
     "./migrate": {
       "default": "./dist/store/migrate.js"
     },
