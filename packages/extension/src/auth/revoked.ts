@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { kitFetch } from '../agcid/fetch.js';
 import { type HealthCheck } from '../health/health.js';
 import { messageOf, type Log } from '../log/log.js';
 import { retryOnce } from './token-check.js';
@@ -12,7 +13,7 @@ const RevokedSchema = z.object({
 });
 
 const readList = async (url: string) => {
-  const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+  const res = await kitFetch(url, { signal: AbortSignal.timeout(5000) });
   if (!res.ok) throw new Error(`the issuer answered ${res.status}`);
   return new Set(RevokedSchema.parse(await res.json()).revoked.map((entry) => entry.jti));
 };

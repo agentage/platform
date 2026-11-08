@@ -1,3 +1,5 @@
+import { kitFetch } from '../agcid/fetch.js';
+
 export const PROTOCOL_VERSIONS = ['2025-11-25', '2026-07-28'] as const;
 
 export type ProtocolVersion = (typeof PROTOCOL_VERSIONS)[number];
@@ -54,7 +56,7 @@ const post = async (url: string, version: ProtocolVersion, method: string, param
     method,
     params: modern ? { ...params, _meta: META } : params,
   };
-  return payload(await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) }));
+  return payload(await kitFetch(url, { method: 'POST', headers, body: JSON.stringify(body) }));
 };
 
 const serverInfoOf = async (url: string, version: ProtocolVersion) => {

@@ -13,6 +13,9 @@ export interface Log {
 export interface LogTags {
   extension: string;
   part: string;
+  version?: string;
+  // Base fields on every line after the tags (a command's name).
+  base?: LogFields;
 }
 
 export type LogWrite = (line: string) => void;
@@ -29,16 +32,34 @@ const errorFields = (error: unknown): LogFields => {
 const line = (level: LogLevel, message: string, tags: LogTags, fields: LogFields): string => {
   const agcid = currentAgcid();
   const ids = { 'extension.id': tags.extension, 'extension.part': tags.part };
-  const own = { time: new Date().toISOString(), level, msg: message, ...ids };
+  const version = tags.version === undefined ? {} : { version: tags.version };
+  const own = { time: new Date().toISOString(), level, msg: message, ...ids, ...version };
   const fixed = agcid ? { ...own, agcid } : own;
-  return `${JSON.stringify({ ...fixed, ...fields, ...fixed })}\n`;
+  return `${JSON.stringify({ ...fixed, ...tags.base, ...fields, ...fixed })}\n`;
 };
 
 const stderrWrite: LogWrite = (text) => void process.stderr.write(text);
 
-export const createLog = (tags: LogTags, write: LogWrite = stderrWrite): Log => ({
-  info: (message, fields = {}) => write(line('info', message, tags, fields)),
-  warn: (message, fields = {}) => write(line('warn', message, tags, fields)),
-  error: (error, fields = {}) =>
-    write(line('error', messageOf(error), tags, { ...fields, ...errorFields(error) })),
-});
+type LineAt = (level: LogLevel, message: string, fields: LogFields) => void;
+
+const raw = new WeakMap<Log, LineAt>();
+
+export const createLog = (tags: LogTags, write: LogWrite = stderrWrite): Log => {
+  const at: LineAt = (level, message, fields) => write(line(level, message, tags, fields));
+  const log: Log = {
+    info: (message, fields = {}) => at('info', message, fields),
+    warn: (message, fields = {}) => at('warn', message, fields),
+    error: (error, fields = {}) =>
+      at('error', messageOf(error), { ...fields, ...errorFields(error) }),
+  };
+  raw.set(log, at);
+  return log;
+};
+
+// A line at any level with no err field (an error-level line that is not an error event).
+export const logAt = (log: Log, level: LogLevel, message: string, fields: LogFields): void => {
+  const at = raw.get(log);
+  if (at) at(level, message, fields);
+  else if (level === 'error') log.error(message, fields);
+  else log[level](message, fields);
+};

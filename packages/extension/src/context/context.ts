@@ -64,7 +64,7 @@ export const createContext = (input: ContextInput): PartContext => {
     commit,
     ...(kind && { store: kind }),
   });
-  const log = input.log ?? createLog({ extension: pkg.agentage.id, part });
+  const log = input.log ?? createLog({ extension: pkg.agentage.id, part, version: pkg.version });
   const settings = Object.freeze({ ...settingDefaults(pkg), ...input.settings });
   const auth = Object.freeze({ caller: callerOf });
   const secrets = input.secrets ?? {};

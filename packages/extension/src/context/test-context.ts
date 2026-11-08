@@ -1,8 +1,6 @@
 import { createRouteRegistry, type RouteEntry, type RouteRegistrar } from '../api/routes.js';
 import { type WellKnownRegistrar } from '../api/well-known.js';
-import { type CliContext } from '../command/command.types.js';
-import { createOut } from '../command/out.js';
-import { messageOf, type Log, type LogFields, type LogLevel } from '../log/log.js';
+import { type Log } from '../log/log.js';
 import { createToolRegistry, type ToolEntry, type ToolRegistrar } from '../mcp/tools.js';
 import { migrate } from '../store/migrations.js';
 import { createTestStore, type TestStore } from '../store/test-store.js';
@@ -11,15 +9,21 @@ import { runLog } from '../worker/run-log.js';
 import { type JobRun, memoryRuns } from '../worker/runs.js';
 import { createScheduler, type Schedule } from '../worker/scheduler.js';
 import { type StoreKind } from '../manifest/primitives.schema.js';
-import { packageExtension } from './package-extension.js';
 import { NO_STORE, type ExtensionInfo, type PartContext, type SettingValue } from './context.js';
-import { type ArgValue } from '../command/args.js';
+import { packageExtension } from './package-extension.js';
+import { recordingLog, type LogEntry } from './recording-log.js';
+import {
+  commandContext,
+  type TestCommandContext,
+  type TestCommandOptions,
+} from './test-command-context.js';
 
-export interface LogEntry {
-  level: LogLevel;
-  message: string;
-  fields: LogFields;
-}
+export { type LogEntry } from './recording-log.js';
+export {
+  type ClientCall,
+  type TestCommandContext,
+  type TestCommandOptions,
+} from './test-command-context.js';
 
 export interface TestContext extends PartContext {
   readonly logs: LogEntry[];
@@ -40,11 +44,6 @@ export interface ScheduledJob {
   options?: JobOptions;
 }
 
-export interface TestCommandContext extends CliContext {
-  readonly output: { stdout: string[]; stderr: string[] };
-  readonly exitCode: number | undefined;
-}
-
 export interface TestContextOptions {
   extension?: Partial<ExtensionInfo>;
   settings?: Record<string, SettingValue>;
@@ -53,23 +52,6 @@ export interface TestContextOptions {
   // on by default when ./package.json declares a postgres store, false turns it off.
   store?: boolean | { dir: string };
 }
-
-export interface TestCommandOptions {
-  args: Record<string, ArgValue>;
-  extension?: { id?: string; version?: string };
-  json?: boolean;
-}
-
-const recordingLog = (logs: LogEntry[]): Log => ({
-  info: (message, fields = {}) => void logs.push({ level: 'info', message, fields }),
-  warn: (message, fields = {}) => void logs.push({ level: 'warn', message, fields }),
-  error: (error, fields = {}) =>
-    void logs.push({
-      level: 'error',
-      message: messageOf(error),
-      fields: { ...fields, err: error },
-    }),
-});
 
 const testStore = (option: TestContextOptions['store'], log: Log): TestStore | undefined => {
   if (!option) return undefined;
@@ -129,30 +111,6 @@ const serverContext = (options: TestContextOptions): TestContext => {
     secrets: Object.freeze({ ...options.secrets }),
     close: async () => store?.close(),
     ...recorders(log),
-  };
-};
-
-// One recorded line per line written, the trailing newline dropped.
-const lines = (into: string[]) => (text: string) =>
-  void into.push(...text.replace(/\n$/, '').split('\n'));
-
-const commandContext = (options: TestCommandOptions): TestCommandContext => {
-  const output = { stdout: [] as string[], stderr: [] as string[] };
-  const out = createOut({
-    json: options.json ?? false,
-    stdout: lines(output.stdout),
-    stderr: lines(output.stderr),
-  });
-  const { id = 'test', version = '0.0.0' } = packageExtension();
-  const extension = { id, version, ...options.extension, part: 'cli' as const };
-  return {
-    extension,
-    args: { ...options.args },
-    out,
-    output,
-    get exitCode() {
-      return out.exitCode;
-    },
   };
 };
 

@@ -1,3 +1,4 @@
+import { statSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { tempPackage } from '../test-support/packages.js';
@@ -98,5 +99,22 @@ describe('createTestContext for a command', () => {
     cmd.out.json({ ok: true });
     expect(cmd.output.stdout).toEqual(['{', '  "ok": true', '}']);
     expect(cmd.output.stderr).toEqual(['progress']);
+  });
+
+  it('records ctx.log and ctx.client calls, with a fixed user and a throwaway dir', async () => {
+    const answers = { api: async () => ({ id: '7' }) };
+    const cmd = createTestContext({ args: {}, extension: { id: 'probe' }, client: answers });
+    cmd.log.info('syncing', { n: 2 });
+    expect(await cmd.client.api('post', '/items', { name: 'x' })).toEqual({ id: '7' });
+    expect(await cmd.client.tool('ping')).toBeUndefined();
+    expect(cmd.logs).toEqual([{ level: 'info', message: 'syncing', fields: { n: 2 } }]);
+    expect(cmd.calls).toEqual([
+      { kind: 'api', method: 'post', path: '/items', input: { name: 'x' } },
+      { kind: 'tool', name: 'ping' },
+    ]);
+    expect(cmd.user).toEqual({ sub: 'usr_test', scopes: ['probe:read'] });
+    expect(cmd.dir).toBe(cmd.dir);
+    expect((statSync(cmd.dir).mode & 0o777).toString(8)).toBe('700');
+    expect(createTestContext({ args: {}, user: null }).user).toBeNull();
   });
 });

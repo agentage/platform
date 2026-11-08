@@ -86,6 +86,7 @@ describe('scheduler', () => {
         endedAt: new Date('2026-11-05T10:00:31.500Z'),
         status: 'ok',
         log: 'info tick 1\nsecond line\nwarn slow\n',
+        agcid: expect.stringMatching(/^[0-9a-f-]{36}$/) as unknown,
       },
     ]);
     expect(runs.all('tick')[0]).toBe(run);

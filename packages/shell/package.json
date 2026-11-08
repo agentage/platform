@@ -43,7 +43,7 @@
     "@agentage/widget": "^0.3.0"
   },
   "devDependencies": {
-    "@agentage/extension": "^0.7.0",
+    "@agentage/extension": "*",
     "@agentage/widget": "^0.3.0"
   },
   "keywords": [
