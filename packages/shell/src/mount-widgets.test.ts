@@ -43,7 +43,7 @@ const importModule = vi.fn((url: string) => {
   return Promise.resolve({});
 });
 
-const fetchMock = vi.fn((url: string) => {
+const fetchMock = vi.fn((url: string, _init?: RequestInit) => {
   const origin = url.replace('/.well-known/agentage-extension.json', '');
   const body = widgets[origin];
   return Promise.resolve(
@@ -55,7 +55,6 @@ const widget = (extension: string, name: string): Layout => ({ kind: 'widget', e
 let container: HTMLElement;
 
 beforeEach(() => {
-  vi.stubGlobal('fetch', fetchMock);
   container = document.body.appendChild(document.createElement('main'));
   seen.clear();
   fetchMock.mockClear();
@@ -64,12 +63,11 @@ beforeEach(() => {
 });
 afterEach(() => {
   container.remove();
-  vi.unstubAllGlobals();
 });
 
 const hostFor = vi.fn(() => host);
 const mount = (layout: Layout) =>
-  mountWidgets(layout, { host: hostFor, container, deployments, importModule });
+  mountWidgets(layout, { host: hostFor, container, deployments, importModule, fetch: fetchMock });
 
 describe('mountWidgets', () => {
   it('places nested layouts in order, each widget element with the host set before connect', async () => {
@@ -106,7 +104,13 @@ describe('mountWidgets', () => {
         kind: 'row',
         children: [widget('probe', 'echo'), widget('memo', 'list'), widget('probe', 'clock')],
       },
-      { host: (d) => hosts.get(d.id) as Host, container, deployments, importModule }
+      {
+        host: (d) => hosts.get(d.id) as Host,
+        container,
+        deployments,
+        importModule,
+        fetch: fetchMock,
+      }
     );
     expect(placed.map((el) => (el as HTMLElement & { host?: Host }).host)).toEqual([
       hosts.get('probe'),
@@ -183,6 +187,7 @@ describe('mountWidgets', () => {
       container,
       deployments: offline,
       importModule,
+      fetch: fetchMock,
     });
     expect(placed[0]?.getAttribute('data-widget-error')).toBe('probe/echo');
     expect(placed[0]?.textContent).toContain('HTTP 404');

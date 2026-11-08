@@ -1,4 +1,4 @@
-import type { Host } from '@agentage/widget';
+import type { FetchLike, Host } from '@agentage/widget';
 import {
   DiscoverySchema,
   type Deployment,
@@ -13,6 +13,7 @@ export interface MountOptions {
   container: Element;
   deployments: Deployment[];
   importModule?: (url: string) => Promise<unknown>;
+  fetch?: FetchLike;
 }
 
 interface Slot {
@@ -50,11 +51,12 @@ const place = (layout: Layout, parent: Element, slots: Slot[]): void => {
   for (const child of layout.children) place(child, box, slots);
 };
 
-const discoveryReader = (): ReadDiscovery => {
+const discoveryReader = (fetchFn?: FetchLike): ReadDiscovery => {
   const cache = new Map<string, Promise<Discovery>>();
   return (url: string): Promise<Discovery> => {
     const wellKnown = `${trimSlash(url)}/.well-known/agentage-extension.json`;
-    if (!cache.has(wellKnown)) cache.set(wellKnown, getJson(wellKnown).then(DiscoverySchema.parse));
+    if (!cache.has(wellKnown))
+      cache.set(wellKnown, getJson(wellKnown, fetchFn).then(DiscoverySchema.parse));
     return cache.get(wellKnown) as Promise<Discovery>;
   };
 };
@@ -102,6 +104,6 @@ export const mountWidgets = async (layout: Layout, options: MountOptions): Promi
   const slots: Slot[] = [];
   options.container.replaceChildren();
   place(layout, options.container, slots);
-  const mount = { options, read: discoveryReader(), hostFor: hostCache(options.host) };
+  const mount = { options, read: discoveryReader(options.fetch), hostFor: hostCache(options.host) };
   return Promise.all(slots.map((s) => mountOne(s, mount).catch((e: unknown) => showError(s, e))));
 };
