@@ -5,8 +5,7 @@ export type Identity = ReturnType<typeof createIdentity>;
 type Nav = Pick<Location, 'href' | 'assign'>;
 export interface IdentityOptions {
   authUrl: string;
-  audience: string;
-  scopes?: string[];
+  scopes: string[];
   fetch?: FetchLike;
   location?: Nav;
 }
@@ -65,17 +64,24 @@ const signOut = async (auth: Auth, cache: ReturnType<typeof tokenCache>) => {
   }
 };
 
+export interface MintOptions {
+  label: string;
+  scopes: string[];
+  expiresInDays: number;
+}
+
 export const createIdentity = (options: IdentityOptions) => {
   const authUrl = options.authUrl.replace(/\/+$/, '');
   const auth = authCalls(authUrl, options.fetch ?? ((url, init) => fetch(url, init)));
-  const { scopes, audience } = options;
-  const body = { format: 'jwt', label: 'browser', expiresInDays: 1, scopes, audience };
+  const body = { format: 'jwt', label: 'browser', expiresInDays: 1, scopes: options.scopes };
   const cache = tokenCache(async () => ((await auth.account()) ? auth.mint(body) : undefined));
   return {
     account: auth.account,
     signIn: () => signIn(auth, authUrl, options.location),
     token: () => cache.current,
     tokens: auth.list,
+    mintToken: (mint: MintOptions) => auth.mint({ format: 'jwt', ...mint }),
+    revokeToken: async (id: string) => void (await auth.revoke(id)),
     signOut: () => signOut(auth, cache),
   };
 };

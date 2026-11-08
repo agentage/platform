@@ -66,7 +66,6 @@ const fakeAuth = (overrides: Record<string, Route> = {}) => {
 const identity = (auth: ReturnType<typeof fakeAuth>, extra: Partial<IdentityOptions> = {}) =>
   createIdentity({
     authUrl: `${AUTH}/`,
-    audience: 'next.example.test',
     scopes: ['probe:read'],
     fetch: auth.fetch,
     ...extra,
@@ -113,7 +112,6 @@ describe('token()', () => {
       label: 'browser',
       expiresInDays: 1,
       scopes: ['probe:read'],
-      audience: 'next.example.test',
     });
     expect(mints[0]?.init.headers).toMatchObject({ authorization: 'Bearer session-jwt' });
     expect(auth.calls.every((c) => c.init.credentials === 'include')).toBe(true);
@@ -199,6 +197,22 @@ describe('signOut()', () => {
   });
 });
 
+describe('mintToken() and revokeToken()', () => {
+  it('mints a JWT PAT with the label, scopes and lifetime given', async () => {
+    const auth = fakeAuth();
+    const mint = { label: 'cli', scopes: ['memory:read'], expiresInDays: 30 };
+    expect(await identity(auth).mintToken(mint)).toMatchObject({ id: 'tok_1', token: 'aga_1' });
+    const sent = auth.calls.find((c) => c.at === 'POST /account/pat');
+    expect(JSON.parse(String(sent?.init.body))).toEqual({ format: 'jwt', ...mint });
+  });
+
+  it('revokes a PAT by id', async () => {
+    const auth = fakeAuth();
+    await expect(identity(auth).revokeToken('tok_1')).resolves.toBeUndefined();
+    expect(auth.at()).toEqual(['GET /api/auth/token', 'DELETE /account/pat/tok_1']);
+  });
+});
+
 describe('tokens() and errors', () => {
   it('lists the account PATs through the session JWT', async () => {
     const auth = fakeAuth();
@@ -225,7 +239,7 @@ describe('tokens() and errors', () => {
   it('raises NETWORK when auth cannot be reached', async () => {
     const fetch = vi.fn(() => Promise.reject(new TypeError('failed')));
     await expect(
-      createIdentity({ authUrl: AUTH, audience: 'a', fetch }).account()
+      createIdentity({ authUrl: AUTH, scopes: ['probe:read'], fetch }).account()
     ).rejects.toMatchObject({ code: 'NETWORK' });
   });
 });
