@@ -50,7 +50,9 @@ security, backend); this file only adds what the tree does not say.
   the record extras, `up/` (compose, gateway,
   dev issuer, wait, down, token); exported as `@agentage/extension/tool`; it must not import the
   server stack (`tool-imports.test.ts` guards it, the cli loads it)
-- `index.test.ts` pins both public surfaces (sealing)
+- `contracts/` the wire schemas clients read (envelopes, discovery, health, agcid); exported as
+  `@agentage/extension/contracts`; it imports zod only (`contracts-imports.test.ts` guards it)
+- `index.test.ts` pins the three public surfaces (sealing): main keeps the author surface
 - `schemas/` JSON Schema generation; `test-support/` fixtures, excluded from the build
 
 ## Layout (`packages/widget`)
