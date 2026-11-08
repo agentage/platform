@@ -81,3 +81,10 @@ export const mcpSnapshot = async (url: string, version: ProtocolVersion): Promis
     tools: listed['tools'],
   }) as McpSnapshot;
 };
+
+// One tools/call as a stateless 2025-11-25 client sends it: the structured result, or a tool error thrown.
+export const callTool = async (url: string, name: string, args: Json): Promise<unknown> => {
+  const result = await post(url, '2025-11-25', 'tools/call', { name, arguments: args });
+  if (result['isError']) throw new Error(`tool ${name}: ${JSON.stringify(result['content'])}`);
+  return result['structuredContent'];
+};

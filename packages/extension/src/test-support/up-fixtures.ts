@@ -80,7 +80,11 @@ export interface FakeDockerOptions {
   migrate?: string;
   // The migrate job exits 1 with this on stderr.
   migrateFails?: string;
+  // What a part's /health answers inside its container; default ok with this build's commit.
+  bodies?: Record<string, string>;
 }
+
+const okBody = (part: string) => json({ success: true, data: { status: 'ok', commit: SHA, part } });
 
 // npm, docker build and inspect, and compose: ps answers from `health`, migrate prints its summary.
 export const fakeDocker = (health: Record<string, string> = {}, fake: FakeDockerOptions = {}) => {
@@ -94,6 +98,10 @@ export const fakeDocker = (health: Record<string, string> = {}, fake: FakeDocker
         JSON.stringify({ Service: s, State: 'running', Health: health[s] ?? 'healthy' })
       ).join('\n');
     if (args.includes('run')) return fake.migrate ?? MIGRATED;
+    if (args.includes('exec')) {
+      const part = args[args.indexOf('exec') + 2] ?? '';
+      return fake.bodies?.[part] ?? okBody(part);
+    }
     return '';
   };
   const run: Run = async (command, args, options) => {

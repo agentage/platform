@@ -49,6 +49,7 @@ describe('public surface', () => {
       'token',
       'up',
       'validateManifest',
+      'writeContracts',
     ]);
   });
 });

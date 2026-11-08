@@ -10,6 +10,7 @@ import { type ImagePartKind } from '../manifest/primitives.schema.js';
 import { formatIssues, readJsonIfExists } from '../manifest/read-manifest.js';
 import { runCommand, type Run } from './exec.js';
 import { problemLines } from './format.js';
+import { exportedPartCode } from './rules/folders.js';
 import { sealing } from './rules/sealing.js';
 import { store } from './rules/store.js';
 import { surface } from './rules/surface.js';
@@ -45,6 +46,8 @@ export interface CheckReport {
 }
 
 const RECIPE = /^(?:dockerfile|containerfile)(?:\..+)?$|^(?:docker-)?compose(?:\.[\w-]+)?\.ya?ml$/i;
+
+export const NOT_BUILT = 'is missing: build the package first (npm run build)';
 
 const NO_PACKAGE = 'is missing: run it in an extension package folder';
 
@@ -85,15 +88,17 @@ const partProblem = async ({ dir, pkg }: CheckInput, part: Part): Promise<string
   return part === 'ui' ? null : exportProblem(dir, pkg, part);
 };
 
-// Every part built where its image looks, exporting create and nothing else; cli handlers = commands.
+// Every part built and exporting only create; cli handlers = commands; exports hold no part code.
 const entries: CheckRule = {
   name: 'entries',
   run: async (input) => {
-    if (!(await exists(join(input.dir, 'dist'))))
-      return [{ file: 'dist', problem: 'is missing: build the package first (npm run build)' }];
+    if (!(await exists(join(input.dir, 'dist')))) return [{ file: 'dist', problem: NOT_BUILT }];
     const parts = Object.keys(normalizeParts(input.pkg.agentage.parts).code) as Part[];
     const found = parts.map((part) => partProblem(input, part).catch(messageOf));
-    return (await Promise.all(found)).flatMap((problem) => (problem ? [{ problem }] : []));
+    const problems = (await Promise.all(found)).flatMap((problem) =>
+      problem ? [{ problem }] : []
+    );
+    return [...problems, ...exportedPartCode(input.pkg)];
   },
 };
 
