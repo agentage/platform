@@ -1,5 +1,9 @@
 # @agentage/logs
 
+Private for now: not on npm until the owner bootstraps the package there (a trusted publisher for
+`release.yml`); then `"private": true` goes. Until then the kit builds this code into its own
+tarball and re-exports it, so import it as `@agentage/extension/logs` (same names as below).
+
 The agentage event line: one JSON line per unit of work (`http`, `mcp`, `job`, `span`, `error`,
 `event`, `log`), written to stderr by every part and shipped by the host.
 

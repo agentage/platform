@@ -12,7 +12,7 @@
     "npm": ">=10"
   },
   "scripts": {
-    "build": "npm run css && tsc -b",
+    "build": "npm run css && tsc -b && node scripts/inline-logs.mjs",
     "clean": "rm -rf packages/*/dist packages/*/*.tsbuildinfo coverage packages/widget/src/ds/styles.generated.ts packages/widget/src/test-support/fixture/dist",
     "css": "npm run css -w @agentage/widget",
     "type-check": "npm run css && tsc -b && tsc -p packages/logs/tsconfig.eslint.json --noEmit && tsc -p packages/extension/tsconfig.eslint.json --noEmit && tsc -p packages/widget/tsconfig.eslint.json --noEmit && tsc -p packages/identity/tsconfig.eslint.json --noEmit && tsc -p packages/shell/tsconfig.eslint.json --noEmit",

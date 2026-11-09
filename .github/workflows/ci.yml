@@ -67,8 +67,15 @@ jobs:
           grep -qx 'package/schemas/extension-discovery.schema.json' /tmp/pack/files.txt
           grep -qx 'package/dist/store/migrate.js' /tmp/pack/files.txt
           grep -qx 'package/dist/tool/up/dev-issuer.js' /tmp/pack/files.txt
+          grep -qx 'package/dist/logs/index.js' /tmp/pack/files.txt
+          grep -qx 'package/dist/vendor/logs/index.js' /tmp/pack/files.txt
           if grep -q '\.test\.' /tmp/pack/files.txt; then echo 'test files in the tarball'; exit 1; fi
           node packages/extension/dist/tool/cli.js --help
+          # The kit carries @agentage/logs inside: a clean install of the tarball alone resolves both entries.
+          mkdir -p /tmp/kit-alone && cd /tmp/kit-alone && npm init -y >/dev/null
+          npm install --no-audit --no-fund /tmp/pack/agentage-extension-*.tgz express zod
+          test ! -e node_modules/@agentage/logs
+          node --input-type=module -e "await import('@agentage/extension'); const l = await import('@agentage/extension/logs'); const e = l.parseLine('hello', { extension: 'smoke', part: 'ci' }); l.EventSchema.parse(e); console.log('PASS kit alone', e.kind, l.KINDS.length)"
 
       - name: Pack smoke - widget (bin and harness in, tests out)
         run: |
@@ -124,8 +131,7 @@ jobs:
           tarballs=()
           for tgz in /tmp/pack/agentage-*.tgz; do
             name="@agentage/$(basename "$tgz" | sed -E 's/^agentage-(.*)-[0-9]+\.[0-9]+\.[0-9]+\.tgz$/\1/')"
-            # @agentage/logs rides along: the kit depends on it before it is on npm.
-            if [ "$name" = "@agentage/logs" ] || jq -e --arg n "$name" '(.dependencies // {}) + (.devDependencies // {}) | has($n)' package.json >/dev/null; then
+            if jq -e --arg n "$name" '(.dependencies // {}) + (.devDependencies // {}) | has($n)' package.json >/dev/null; then
               cp "$tgz" .kit/ && tarballs+=("./.kit/$(basename "$tgz")")
             fi
           done
@@ -223,7 +229,7 @@ jobs:
           npm pack --workspaces --prefix platform --pack-destination "$PWD/probe"
           cd probe
           npm ci
-          npm install ./agentage-logs-*.tgz ./agentage-extension-*.tgz ./agentage-widget-*.tgz
+          npm install ./agentage-extension-*.tgz ./agentage-widget-*.tgz
           # Permanent: the probe's own range refuses every new kit minor; the gate proves the candidate runs the probe.
           npm pkg set engines.agentage=">=0.6"
           grep -E "\"@agentage/(extension|widget)\": \"file:" package.json
