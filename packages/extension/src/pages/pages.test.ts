@@ -72,7 +72,38 @@ describe('pages app', () => {
     expect(codes({ 'about.html': '<p></p>' })).toEqual(['about.html invalid_key']);
     expect(codes({ '/a b': '<p></p>' })).toEqual(['/a b invalid_key']);
     expect(codes({ '/a*': '<p></p>' })).toEqual(['/a* invalid_key']);
-    expect(codes({ '/': { redirect: '' } })).toEqual(['/.redirect too_small']);
+    expect(codes({ '/': { redirect: '' } })).toEqual(['/.redirect invalid_format']);
+  });
+
+  it('refuses a redirect key or target that lets the appended rest reach the host', () => {
+    const codes = (site: Record<string, unknown>): string[] => {
+      try {
+        createPagesApp({ pkg: PKG, build: BUILD, log: recordedLog().log, site: site as PagesSite });
+        return [];
+      } catch (err) {
+        return err instanceof ZodError
+          ? err.issues.map((i) => `${i.path.join('.')} ${i.code}`)
+          : [];
+      }
+    };
+    const to = (redirect: string) => ({ '/docs': { redirect } });
+    for (const target of [
+      'https://docs.agentage.io',
+      'https://docs.agentage.io@evil.com/',
+      'https://docs.agentage.io:1@evil.com/',
+      'https://docs.agentage.io\\evil.com/',
+      'https://docs.agentage.io/?x=1',
+      'https://docs.agentage.io/#x',
+      '//evil.com/',
+      'javascript:alert(1)//',
+    ])
+      expect(codes(to(target)), target).toEqual(['/docs.redirect invalid_format']);
+    expect(codes({ '/docs/*': { redirect: 'https://docs.agentage.io/a' } })).toEqual([
+      '/docs/*.redirect custom',
+    ]);
+    expect(codes({ '//*': '<p></p>' })).toEqual(['//* invalid_key']);
+    expect(codes({ '/a//*': '<p></p>' })).toEqual(['/a//* invalid_key']);
+    expect(codes({ '/': '<p></p>', '/a//b': '<p></p>', '/a/*': '<p></p>' })).toEqual([]);
     expect(codes({ '/': 42 })).toEqual(['/ invalid_union']);
     expect(codes({ '/': { type: '', body: 'x' } })).toEqual(['/.type too_small']);
   });
@@ -155,6 +186,10 @@ describe('inline script hashes', () => {
     expect(await go('/docs/connect?x=1')).toBe('308 https://docs.example.test/connect?x=1');
     expect(await go('/docs/old/a/b')).toBe('308 https://docs.example.test/new/a/b');
     expect(await go('/docsx')).toBe('404 ');
+    for (const rest of ['@evil.com', '.evil.com', ':1@evil.com', '/evil.com', '%5Cevil.com'])
+      expect(new URL(await go(`/docs/${rest}`).then((r) => r.slice(4))).host).toBe(
+        'docs.example.test'
+      );
     expect(await (await fetch(`${served.url}/app/a/b`)).text()).toBe('<p>shell</p>');
   });
 });

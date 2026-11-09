@@ -34,9 +34,17 @@ const BODY = z.union([z.string(), z.instanceof(Uint8Array)]);
 const ENTRY = z.union([
   BODY,
   z.object({ type: z.string().min(1), body: BODY }),
-  z.object({ redirect: z.string().min(1) }),
+  // A host then a path: no userinfo, query or fragment, so nothing appended reaches the host.
+  z.object({ redirect: z.string().regex(/^https?:\/\/[^/?#@\\]+\/[^?#]*$/) }),
 ]);
-const SiteSchema = z.record(z.string().regex(/^\/[A-Za-z0-9._~$/-]*(\/\*)?$/), ENTRY);
+const KEY = /^\/[A-Za-z0-9._~$/-]*$|^(?:\/[A-Za-z0-9._~$-]+)+\/\*$/;
+const SiteSchema = z.record(z.string().regex(KEY), ENTRY).superRefine((site, ctx) => {
+  for (const [key, entry] of Object.entries(site)) {
+    const to = typeof entry === 'object' && 'redirect' in entry ? entry.redirect : '/';
+    if (key.endsWith('/*') && !to.endsWith('/'))
+      ctx.addIssue({ code: 'custom', path: [key, 'redirect'], message: 'a /* redirect ends in /' });
+  }
+});
 
 const lookup = (site: PagesSite, path: string) => {
   if (site[path] !== undefined) return { entry: site[path], rest: '' };
