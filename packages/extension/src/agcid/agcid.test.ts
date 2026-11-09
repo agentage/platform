@@ -31,6 +31,12 @@ describe('agcid', () => {
     expect(agcidOf(undefined)).toMatch(HEX_V7);
   });
 
+  it('takes dashes only in the 8-4-4-4-12 places and never the all-zero id', () => {
+    expect(agcidOf('0194f2a87c1e-7b3a-9d40-5e2f6a1c-8b77')).toMatch(HEX_V7);
+    expect(agcidOf('0'.repeat(32))).toMatch(HEX_V7);
+    expect(agcidOf(undefined, `00-${'0'.repeat(32)}-b7ad6b7169203331-01`)).toMatch(HEX_V7);
+  });
+
   it('has no current agcid outside a request', () => {
     expect(currentAgcid()).toBeUndefined();
   });

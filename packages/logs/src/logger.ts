@@ -41,6 +41,8 @@ export interface LoggerOptions {
   host?: string;
   context?: () => RowContext | undefined;
   write?: (line: string) => void;
+  // Takes each row instead of writing a line (a wrapper, a test recorder).
+  sink?: (row: Row) => void;
   // Fields on every row (a command's name).
   base?: Fields;
 }
@@ -59,16 +61,9 @@ const timed = async <T>(fn: () => T | Promise<T>, end: (ms: number, err?: unknow
 };
 
 // Every method is a row; row is the one sink, so a wrapper replaces only it.
-// A log line that names an event.name is that event (a part on an older logger).
-const logRow = (level: 'info' | 'warn', msg: string, fields: Fields): Row => {
-  const name = fields['event.name'];
-  if (typeof name === 'string') return { ...eventRow(name, fields, msg), level };
-  return { kind: 'log', level, msg, fields };
-};
-
-export const loggerOf = (row: (r: Row) => void): Logger => ({
-  info: (msg, fields = {}) => row(logRow('info', msg, fields)),
-  warn: (msg, fields = {}) => row(logRow('warn', msg, fields)),
+const loggerOf = (row: (r: Row) => void): Logger => ({
+  info: (msg, fields = {}) => row({ kind: 'log', level: 'info', msg, fields }),
+  warn: (msg, fields = {}) => row({ kind: 'log', level: 'warn', msg, fields }),
   error: (err, where) => row(errorRow(err, where)),
   http: (o) => {
     const r = httpRow(o);
@@ -106,4 +101,4 @@ const stderr = (line: string): void => void process.stderr.write(line);
 
 // One JSON line per unit of work on stderr; the host ships it.
 export const createLogger = (o: LoggerOptions): Logger =>
-  loggerOf((r) => (o.write ?? stderr)(lineOf(o, r)));
+  loggerOf(o.sink ?? ((r) => (o.write ?? stderr)(lineOf(o, r))));

@@ -1,3 +1,4 @@
+import { requestScope } from '../agcid/current.js';
 import { callerOf, type Caller } from '../auth/token-check.js';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
 import { storeOf } from '../manifest/parts.js';
@@ -42,8 +43,8 @@ export interface PartContext {
   readonly store: Store;
   readonly secrets: Secrets;
   readonly platform: Readonly<PlatformInfo>;
-  // Ends the part after the current answer flushes; the orchestrator starts it again.
-  readonly exit: (code?: number) => void;
+  // Shuts the part down (SIGTERM drain) once the current answer is sent; the orchestrator restarts it.
+  readonly exit: () => void;
   // Adds a named check to /health (checks.clickhouse, say): ok, degraded or unavailable.
   readonly health: (name: string, check: HealthCheck) => void;
 }
@@ -58,9 +59,12 @@ export const healthRegistrar =
     checks[name] = check;
   };
 
-export const EXIT_DELAY_MS = 100;
-
-const exitSoon = (code = 0): void => void setTimeout(() => process.exit(code), EXIT_DELAY_MS);
+// Inside a request: after its answer (server/request-line.ts); outside one: now.
+const exitAfterAnswer = (): void => {
+  const scope = requestScope.getStore();
+  if (scope) scope.exit = true;
+  else process.kill(process.pid, 'SIGTERM');
+};
 
 // ctx.store is always there; without a store part in the manifest it says so on first use.
 export const NO_STORE: Store = {
@@ -114,7 +118,7 @@ export const createContext = (input: ContextInput): PartContext => {
     store: store ?? NO_STORE,
     secrets,
     platform,
-    exit: exitSoon,
+    exit: exitAfterAnswer,
     health: healthRegistrar(input.checks ?? {}),
   });
 };

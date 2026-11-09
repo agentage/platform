@@ -70,8 +70,17 @@ export const healthBody = async (options: ResolvedHealth): Promise<HealthBody> =
   };
 };
 
-const changed = (log: Log | undefined, from: HealthStatus, to: HealthStatus, checks: object) => {
-  const check = Object.entries(checks).find(([, status]) => status === to)?.[0] ?? '';
+type Checks = Record<string, HealthStatus>;
+
+// Names a check whose status moved, so a recovery names what recovered.
+const changed = (
+  log: Log | undefined,
+  from: HealthStatus,
+  to: HealthStatus,
+  was: Checks,
+  now: Checks
+) => {
+  const check = Object.keys(now).find((name) => was[name] !== now[name]) ?? '';
   const fields = {
     'agentage.health.from': from,
     'agentage.health.to': to,
@@ -88,12 +97,13 @@ export const createHealthHandler = (options: HealthOptions): RequestHandler => {
     startedAt: options.startedAt ?? Date.now(),
   };
   let last: HealthStatus | undefined;
+  let lastChecks: Checks = {};
   return async (req, res) => {
     if (!isLoopback(req.socket.localAddress)) throw fail('NOT_FOUND', 'Not found');
     const body = await healthBody(resolved);
     const { status: to, checks } = body.data;
-    if (last !== undefined && last !== to) changed(options.log, last, to, checks);
-    last = to;
+    if (last !== undefined && last !== to) changed(options.log, last, to, lastChecks, checks);
+    [last, lastChecks] = [to, checks];
     res.setHeader('Cache-Control', 'no-store');
     res.status(body.data.status === 'unavailable' ? 503 : 200).json(body);
   };

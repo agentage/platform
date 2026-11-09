@@ -15,14 +15,13 @@ export interface HttpRow {
   bytes?: number;
   reason?: string;
   errorType?: string;
-  fields?: Fields;
+  // The MCP clientInfo.name an initialize sent (Q14).
+  clientInfo?: string;
 }
 
 export interface McpRow {
   tool: string;
   ms: number;
-  results?: number;
-  code?: string;
   error?: unknown;
 }
 
@@ -54,30 +53,23 @@ export const httpRow = (o: HttpRow): Row | null => {
     'agentage.bytes': o.bytes ?? 0,
     ...(o.reason ? { 'agentage.auth.reason': o.reason } : {}),
     ...(o.status >= 500 ? { 'error.type': o.errorType ?? String(o.status) } : {}),
-    ...o.fields,
+    ...(o.clientInfo ? { 'agentage.client_info': o.clientInfo } : {}),
   };
-  return {
-    kind: 'http',
-    level: httpLevel(o.status, o.ms),
-    msg: `${o.method} ${route} ${o.status}`,
-    fields,
-  };
+  const msg = `${o.method} ${route} ${o.status}`;
+  return { kind: 'http', level: httpLevel(o.status, o.ms), msg, fields };
 };
 
-// A rejection (a code, no error) stays info; a failure is error; slow is warn.
-export const mcpRow = (o: McpRow): Row => {
-  const level = o.error !== undefined ? 'error' : o.ms > 5000 ? 'warn' : 'info';
-  const fields: Fields = {
+export const mcpRow = (o: McpRow): Row => ({
+  kind: 'mcp',
+  level: o.error !== undefined ? 'error' : o.ms > 5000 ? 'warn' : 'info',
+  msg: `${o.tool} ${o.error !== undefined ? 'failed' : 'ok'} ${o.ms}ms`,
+  fields: {
     'mcp.method.name': 'tools/call',
     'gen_ai.tool.name': o.tool,
     'agentage.duration_ms': o.ms,
-    ...(o.results === undefined ? {} : { 'agentage.results': o.results }),
-    ...(o.code ? { 'agentage.code': o.code } : {}),
     ...failed(o.error),
-  };
-  const outcome = o.error !== undefined ? 'failed' : (o.code ?? 'ok');
-  return { kind: 'mcp', level, msg: `${o.tool} ${outcome} ${o.ms}ms`, fields };
-};
+  },
+});
 
 export const jobRow = (o: JobRow): Row => ({
   kind: 'job',
@@ -98,9 +90,9 @@ export const spanRow = (name: string, ms: number, error?: unknown): Row => ({
   fields: { 'agentage.span.name': name, 'agentage.duration_ms': ms, ...failed(error) },
 });
 
-// An event whose status field is not ok is an error (backup.run, deploy.run).
-export const eventRow = (name: string, fields: Fields, msg = name): Row => {
-  const status = Object.entries(fields).find(([key]) => key.endsWith('.status'))?.[1];
-  const level = status !== undefined && status !== 'ok' ? 'error' : 'info';
-  return { kind: 'event', level, msg, fields: { 'event.name': name, ...fields } };
-};
+export const eventRow = (name: string, fields: Fields, msg = name): Row => ({
+  kind: 'event',
+  level: 'info',
+  msg,
+  fields: { 'event.name': name, ...fields },
+});

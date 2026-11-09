@@ -6,6 +6,8 @@ interface RequestScope extends RowContext {
   agcid: string;
   // The incoming W3C traceparent, kept only when well formed.
   traceparent?: string;
+  // Set by ctx.exit(): the part shuts down once this answer is sent.
+  exit?: boolean;
 }
 
 // Apart from the middleware, so code the cli loads (logs, the build tool) never imports express.

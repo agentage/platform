@@ -1,4 +1,5 @@
 import { type Request, type RequestHandler, type Response } from 'express';
+import { requestScope } from '../agcid/current.js';
 import { type Log } from '../log/log.js';
 
 const MOUNTS = ['/api/v1', '/mcp', '/.well-known', '/ui'];
@@ -19,32 +20,30 @@ export const routeOf = (req: Request, res?: Response): string => {
 const skipped = (req: Request, res: Response): boolean =>
   res.locals['toolCall'] === true || (res.statusCode < 400 && ASSET.test(req.path));
 
-const extraOf = (res: Response) => {
-  const clientInfo: unknown = res.locals['clientInfo'];
-  return typeof clientInfo === 'string' ? { 'agentage.client_info': clientInfo } : {};
+const localOf = (res: Response, key: string): string | undefined => {
+  const value: unknown = res.locals[key];
+  return typeof value === 'string' ? value : undefined;
 };
 
-// One http row per request on finish; a 5xx's error row is errors.ts's, never repeated here.
+// One http row per request on finish; a ctx.exit() asked for in it shuts the part down after.
 export const requestLine =
   (log: Log): RequestHandler =>
   (req, res, next) => {
     const start = performance.now();
+    const scope = requestScope.getStore();
     res.on('finish', () => {
-      if (skipped(req, res)) return;
-      log.http({
-        method: req.method,
-        route: routeOf(req, res),
-        status: res.statusCode,
-        ms: Math.round(performance.now() - start),
-        bytes: Number(res.getHeader('content-length') ?? 0),
-        ...(typeof res.locals['authReason'] === 'string'
-          ? { reason: res.locals['authReason'] }
-          : {}),
-        ...(typeof res.locals['errorType'] === 'string'
-          ? { errorType: res.locals['errorType'] }
-          : {}),
-        fields: extraOf(res),
-      });
+      if (!skipped(req, res))
+        log.http({
+          method: req.method,
+          route: routeOf(req, res),
+          status: res.statusCode,
+          ms: Math.round(performance.now() - start),
+          bytes: Number(res.getHeader('content-length') ?? 0),
+          reason: localOf(res, 'authReason'),
+          errorType: localOf(res, 'errorType'),
+          clientInfo: localOf(res, 'clientInfo'),
+        });
+      if (scope?.exit) process.kill(process.pid, 'SIGTERM');
     });
     next();
   };

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { createLogger, type RowContext } from './logger.js';
-import { frameOf } from './error-row.js';
 
 const capture = (context?: RowContext) => {
   const lines: Record<string, unknown>[] = [];
@@ -59,16 +58,15 @@ describe('createLogger', () => {
     });
   });
 
-  it('mcp, job, span and event rows, each with its level rule', async () => {
+  it('mcp, job, span and event rows, each with its level rule; no deferred fields', async () => {
     const { log, lines } = capture();
-    log.mcp({ tool: 'probe__echo', ms: 9, results: 1 });
-    log.mcp({ tool: 'probe__find', ms: 6000, code: 'ITEM_NOT_FOUND' });
+    log.mcp({ tool: 'probe__echo', ms: 9 });
+    log.mcp({ tool: 'probe__find', ms: 6000 });
     log.mcp({ tool: 'probe__crash', ms: 2, error: new RangeError('x') });
     log.job({ name: 'retention', runId: 'r1', ms: 310 });
     log.job({ name: 'retention', runId: 'r2', ms: 5, error: new Error('x') });
     await log.span('store.query', () => 1);
     log.event('startup', { 'agentage.startup.commit': 'abc' });
-    log.event('backup.run', { 'agentage.backup.status': 'failed' });
     expect(levels(lines)).toEqual([
       ...[
         ['mcp', 'info'],
@@ -80,28 +78,24 @@ describe('createLogger', () => {
       ...[
         ['span', 'info'],
         ['event', 'info'],
-        ['event', 'error'],
       ],
     ]);
-    expect(lines[0]?.['fields']).toMatchObject({
+    expect(lines[0]?.['fields']).toEqual({
+      'mcp.method.name': 'tools/call',
       'gen_ai.tool.name': 'probe__echo',
-      'agentage.results': 1,
+      'agentage.duration_ms': 9,
     });
+    expect(lines[2]?.['fields']).toMatchObject({ 'error.type': 'RangeError' });
     expect(lines[6]?.['fields']).toMatchObject({ 'event.name': 'startup' });
   });
 
-  it('error: cause, first in-app frame and a fingerprint unless the author gives one', () => {
+  it('error: type, message, stack and where; a fingerprint only when the author gives one', () => {
     const { log, lines } = capture();
     log.error(new Error('outer', { cause: new Error('root') }), '/api/v1/emit');
     log.error(new Error('grouped'), { 'agentage.fingerprint': 'mine' });
-    expect(lines[0]?.['fields']).toMatchObject({
-      'agentage.cause': 'root',
-      'agentage.where': '/api/v1/emit',
-      'agentage.fingerprint': expect.stringMatching(/^Error@.*logger\.test\.ts:\d+$/) as unknown,
-    });
+    const first = lines[0]?.['fields'] as Record<string, unknown>;
+    expect(first).toMatchObject({ 'exception.type': 'Error', 'agentage.where': '/api/v1/emit' });
+    expect(Object.keys(first).filter((k) => /cause|frame|fingerprint|code/.test(k))).toEqual([]);
     expect(lines[1]?.['fields']).toMatchObject({ 'agentage.fingerprint': 'mine' });
-    const stack =
-      'Error: x\n    at f (node:internal/x:1:1)\n    at g (/app/node_modules/y/i.js:2:3)\n    at h (/app/dist/api/fail.js:4:9)';
-    expect(frameOf(stack)).toBe('/app/dist/api/fail.js:4');
   });
 });

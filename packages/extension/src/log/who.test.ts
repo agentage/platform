@@ -31,6 +31,6 @@ describe('who', () => {
 
   it('session from agsid, sub filled later by the token check', () => {
     expect(whoOf(headers({ agsid: 'sit_9' }), '/')).toMatchObject({ session: 'sit_9', sub: null });
-    expect(whoOf(headers({}), '/')).toMatchObject({ session: null, user_type: 'automation' });
+    expect(whoOf(headers({}), '/')).toMatchObject({ session: null, user_type: 'user' });
   });
 });

@@ -13,13 +13,7 @@ export {
 } from './event.schema.js';
 export { parseLine, type LineSource } from './parse-line.js';
 export { redact } from './redact.js';
-export {
-  createLogger,
-  loggerOf,
-  type Logger,
-  type LoggerOptions,
-  type RowContext,
-} from './logger.js';
+export { createLogger, type Logger, type LoggerOptions, type RowContext } from './logger.js';
 export { type HttpRow, type JobRow, type McpRow, type Row } from './rows.js';
 export {
   createEventsClient,
@@ -27,4 +21,3 @@ export {
   type PostEvent,
   type PostResult,
 } from './events-client.js';
-export { uuidv7 } from './uuidv7.js';

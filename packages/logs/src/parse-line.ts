@@ -1,4 +1,5 @@
-import { EventSchema, type Event } from './event.schema.js';
+import { EventSchema, type Event, type Fields } from './event.schema.js';
+import { MAX_STRING, redact } from './redact.js';
 
 const RAW_ERROR = /\b(ERROR|FATAL)\b/;
 
@@ -15,18 +16,22 @@ export interface LineSource {
   part?: string;
 }
 
-// A line that is not a valid event is kept whole as a raw log row.
+const isObject = (value: unknown): value is Fields =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+// A line that is not a valid event is a raw log row; a JSON object keeps its keys, redacted.
 export const parseLine = (text: string, source: LineSource = {}): Event => {
   const line = text.trim();
-  const parsed = EventSchema.safeParse(jsonOf(line));
+  const json = jsonOf(line);
+  const parsed = EventSchema.safeParse(json);
   if (parsed.success) return parsed.data;
   return EventSchema.parse({
     ts: new Date().toISOString(),
     level: RAW_ERROR.test(line) ? 'error' : 'info',
     kind: 'log',
-    msg: line.slice(0, 2000),
+    msg: line.slice(0, MAX_STRING),
     extension: source.extension ?? 'unknown',
     part: source.part ?? 'unknown',
-    fields: { 'agentage.raw': true },
+    fields: { ...(isObject(json) ? redact(json) : {}), 'agentage.raw': true },
   });
 };

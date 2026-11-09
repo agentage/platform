@@ -9,6 +9,7 @@ import { createRouteRegistry, type ApiContext } from './routes.js';
 
 const Msg = z.object({ msg: z.string().min(1) });
 
+const AGCID = '29f9760cafafdefefde01844f7540d21';
 const create = ({ route }: ApiContext) => {
   route('get', '/echo', { summary: 'Echo', input: Msg, output: Msg }, ({ input }) => input);
   route('get', '/who', { summary: 'Scoped caller' }, ({ caller }) => caller.sub);
@@ -90,15 +91,13 @@ describe('ctx.route', () => {
 
   it('answers VALIDATION_ERROR with details, INTERNAL on a bad answer, NOT_FOUND off the routes', async () => {
     await start();
-    const query = await server!.fetch('/api/v1/echo?msg=', {
-      headers: { agcid: '29f9760cafafdefefde01844f7540d21' },
-    });
+    const query = await server!.fetch('/api/v1/echo?msg=', { headers: { agcid: AGCID } });
     expect([query.status, ErrorEnvelopeSchema.parse(await query.json()).error]).toEqual([
       400,
       {
         code: 'VALIDATION_ERROR',
         message: 'Invalid query',
-        agcid: '29f9760cafafdefefde01844f7540d21',
+        agcid: AGCID,
         details: [{ field: 'msg', message: expect.any(String) }],
       },
     ]);

@@ -39,12 +39,12 @@ describe('http row on a refusal', () => {
     ]);
   });
 
-  it('health writes a health.changed event on a transition only', async () => {
+  it('health writes a health.changed event on a transition only, naming the check that moved', async () => {
     const recorded = recordedLog();
     let status: 'ok' | 'degraded' = 'ok';
     const handler = createHealthHandler({
       ...{ extension: 'probe', part: 'api', version: '0.1.0', build: BUILD },
-      ...{ checks: { store: async () => status }, log: recorded.log },
+      ...{ checks: { auth: async () => 'ok', store: async () => status }, log: recorded.log },
     });
     const req = { socket: { localAddress: '127.0.0.1' } };
     const res = { setHeader: () => undefined, status: () => ({ json: () => undefined }) };
@@ -54,8 +54,19 @@ describe('http row on a refusal', () => {
     status = 'degraded';
     await probe();
     await probe();
+    status = 'ok';
+    await probe();
     expect(recorded.lines).toMatchObject([
-      { kind: 'event', 'event.name': 'health.changed', 'agentage.health.to': 'degraded' },
+      {
+        'event.name': 'health.changed',
+        'agentage.health.to': 'degraded',
+        'agentage.health.check': 'store',
+      },
+      {
+        'event.name': 'health.changed',
+        'agentage.health.to': 'ok',
+        'agentage.health.check': 'store',
+      },
     ]);
   });
 });

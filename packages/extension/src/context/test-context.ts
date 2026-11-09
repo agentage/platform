@@ -46,7 +46,7 @@ export interface TestContext extends PartContext {
   readonly wellKnown: WellKnownRegistrar;
   readonly jobs: ScheduledJob[];
   readonly spans: SpanRecord[];
-  // Each ctx.exit(code) call; a test context never exits.
+  // When each ctx.exit() was called; a test context never exits.
   readonly exits: number[];
   // Each ctx.health(name, check) registration.
   readonly checks: Record<string, HealthCheck>;
@@ -132,7 +132,7 @@ const serverContext = (options: TestContextOptions): TestContext => {
     secrets: Object.freeze({ ...options.secrets }),
     platform: Object.freeze({ ...(options.platform ?? NO_PLATFORM) }),
     exits,
-    exit: (code = 0) => void exits.push(code),
+    exit: () => void exits.push(Date.now()),
     checks,
     health: healthRegistrar(checks),
     close: async () => store?.close(),

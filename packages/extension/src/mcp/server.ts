@@ -32,25 +32,18 @@ const argsOf = (entry: ToolEntry, args: Record<string, unknown>) => {
   throw fail('VALIDATION_ERROR', `Invalid arguments: ${[...fields].join(', ')}`);
 };
 
-// agentage.results: the length of the first list in the output, else 1.
-const countOf = (output: Record<string, unknown>): number =>
-  (Object.values(output).find(Array.isArray) as unknown[] | undefined)?.length ?? 1;
-
-// A 4xx failure is a rejection (its code); anything else failed; one mcp row either way.
-const outcomeOf = (err: unknown) =>
-  isFailure(err) && err.status < 500 ? { code: err.code } : { error: err };
-
 const callback =
   (entry: ToolEntry, log: Log, tool: string) => async (args: Record<string, unknown>) => {
     const start = performance.now();
     const ms = () => Math.round(performance.now() - start);
     try {
       const output = entry.spec.output.parse(await entry.handler(argsOf(entry, args)));
-      log.mcp({ tool, ms: ms(), results: countOf(output) });
+      log.mcp({ tool, ms: ms() });
       const content = text(JSON.stringify(output));
       return { content, structuredContent: output as Record<string, unknown> };
     } catch (err) {
-      log.mcp({ tool, ms: ms(), ...outcomeOf(err) });
+      // A 4xx is a rejection, not a failure: the row stays info.
+      log.mcp({ tool, ms: ms(), ...(isFailure(err) && err.status < 500 ? {} : { error: err }) });
       return errorResult(err, log, tool);
     }
   };

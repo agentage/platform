@@ -68,10 +68,14 @@ const guard = async (options: McpAppOptions, req: Request, body: unknown): Promi
 };
 
 // A tools/call leaves its mcp row and no http row (Q1); initialize names the client (Q14).
-const markRow = (req: Request, res: Response, body: unknown): void => {
+const markRow = (options: McpAppOptions, req: Request, res: Response, body: unknown): void => {
   const messages = messagesOf(body);
   const scope = requestScope.getStore();
-  if (messages.some((message) => message?.method === 'tools/call')) {
+  const id = options.pkg.agentage.id;
+  const known = (m: Message | null) =>
+    options.tools.some((t) => prefixed(id, t.name) === m?.params?.name);
+  // An unknown tool never reaches a handler, so it keeps its http row.
+  if (messages.some((m) => m?.method === 'tools/call' && known(m))) {
     res.locals['toolCall'] = true;
     if (scope) scope.user_type = declaredType((name) => req.get(name)) ?? 'agent';
   }
@@ -110,7 +114,7 @@ const handle =
     // The SDK reads a body again when given none (a BOM, say): it must only run what guard read.
     if (message === undefined) return void res.status(400).json(PARSE_ERROR);
     const auth = await guard(options, req, message);
-    markRow(req, res, message);
+    markRow(options, req, res, message);
     await send(await handler.fetch(webRequest(req, body), { parsedBody: message }), res, auth);
   };
 

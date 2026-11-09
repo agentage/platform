@@ -78,7 +78,8 @@ const worker = async (input: RunnerInput): Promise<Running> => {
     span: createSpan(log),
     schedule: scheduler.schedule,
   });
-  const checks = { ...input.base.checks, ...scheduler.checks() };
+  // The same object ctx.health adds to, so a later registration still shows.
+  const checks = Object.assign(input.base.checks ?? {}, scheduler.checks());
   scheduler.start();
   return {
     app: createPartApp({ ...input.base, checks, part: 'worker', mount: () => undefined }),

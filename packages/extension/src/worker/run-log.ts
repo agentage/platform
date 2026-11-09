@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { loggerOf } from '@agentage/logs';
+import { createLogger } from '@agentage/logs';
 import { messageOf, type Log, type LogLevel } from '../log/log.js';
 
 export const LOG_CAP_BYTES = 64 * 1024;
@@ -35,9 +35,13 @@ const record = (level: LogLevel, message: string): void => {
 
 // ctx.log for a worker: the usual JSON line, and inside a run also the run's own log.
 export const runLog = (base: Log): Log => ({
-  ...loggerOf((row) => {
-    record(row.level, row.msg);
-    base.row(row);
+  ...createLogger({
+    extension: 'worker',
+    part: 'worker',
+    sink: (row) => {
+      record(row.level, row.msg);
+      base.row(row);
+    },
   }),
   error: (err, where) => {
     record('error', messageOf(err));

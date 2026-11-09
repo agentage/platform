@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { batchesOf, createEventsClient, MAX_BATCH_ITEMS } from './events-client.js';
 import { EventSchema } from './event.schema.js';
 
@@ -49,13 +49,18 @@ describe('createEventsClient', () => {
     });
   });
 
-  it('retries once, then gives up with the status', async () => {
+  it('retries a network error or 5xx once, never a 4xx, then gives up with the status', async () => {
     const once = fake(['throw', 200]);
     const client = (impl: typeof fetch) =>
       createEventsClient({ url: 'https://logs.test', token: 't', fetch: impl });
     expect(
       await client(once.impl).post([{ kind: 'log', msg: 'a', extension: 'x', part: 'y' }])
     ).toEqual({ accepted: 1, rejected: 0 });
+    const refused = fake([401, 200]);
+    await expect(
+      client(refused.impl).post([{ kind: 'log', msg: 'a', extension: 'x', part: 'y' }])
+    ).rejects.toThrow(/401/);
+    expect(refused.bodies).toHaveLength(1);
     const twice = fake([503, 503]);
     await expect(
       client(twice.impl).post([{ kind: 'log', msg: 'a', extension: 'x', part: 'y' }])
@@ -70,5 +75,29 @@ describe('createEventsClient', () => {
       fields: { blob: 'y'.repeat(200_000) },
     }));
     expect(batchesOf(big).map((b) => b.length)).toEqual([4, 2]);
+  });
+
+  it('redacts before sending and drops a row over the batch limit with a warning', async () => {
+    const { impl, bodies } = fake([200]);
+    const warn = vi.spyOn(process, 'emitWarning').mockImplementation(() => undefined);
+    const client = createEventsClient({ url: 'https://logs.test', token: 't', fetch: impl });
+    const big = {
+      kind: 'log' as const,
+      msg: 'big',
+      extension: 'x',
+      part: 'y',
+      fields: { list: Array(5000).fill('y'.repeat(190)) },
+    };
+    const small = {
+      kind: 'log' as const,
+      msg: 'small',
+      extension: 'x',
+      part: 'y',
+      fields: { password: 'p' },
+    };
+    await client.post([big, small]);
+    expect(warn).toHaveBeenCalledOnce();
+    expect(bodies[0]).toMatchObject([{ msg: 'small', fields: { password: '[redacted]' } }]);
+    warn.mockRestore();
   });
 });

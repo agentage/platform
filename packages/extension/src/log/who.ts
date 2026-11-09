@@ -35,10 +35,11 @@ export const clientOf = (header: Header): string | null => {
 export const userTypeOf = (header: Header, path: string): UserType => {
   const agent = header('user-agent') ?? '';
   const client = clientOf(header);
-  if (declaredType(header)) return declaredType(header) as UserType;
+  const declared = declaredType(header);
+  if (declared) return declared;
   if (client && AI.includes(client)) return 'agent';
   if (BOT.test(agent) || BOT_PATH.test(path)) return 'bot';
-  return MACHINE.test(agent) || agent === '' ? 'automation' : 'user';
+  return MACHINE.test(agent) ? 'automation' : 'user';
 };
 
 export const whoOf = (header: Header, path: string) => ({

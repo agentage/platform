@@ -6,7 +6,8 @@ import { recordedLog } from '../test-support/http.js';
 import { startTestServer } from '../testing/test-server.js';
 import { setCaller } from '../auth/token-check.js';
 import { platformOf } from '../auth/part-auth.js';
-import { createContext, EXIT_DELAY_MS, settingDefaults } from './context.js';
+import { requestScope } from '../agcid/current.js';
+import { createContext, settingDefaults } from './context.js';
 import { createTestContext } from './test-context.js';
 
 const BASE = {
@@ -151,18 +152,18 @@ describe('ctx.platform', () => {
     );
   });
 
-  it('ctx.exit ends the process after the answer flushes; a test context records it', () => {
-    vi.useFakeTimers();
-    const exit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
-    createContext({ ...BASE, pkg: validateManifest(API_MANIFEST) }).exit();
-    expect(exit).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(EXIT_DELAY_MS);
-    expect(exit).toHaveBeenCalledWith(0);
-    vi.useRealTimers();
-    exit.mockRestore();
-    const ctx = createTestContext();
-    ctx.exit(3);
-    expect(ctx.exits).toEqual([3]);
+  it('ctx.exit marks the request for shutdown after its answer, else sends SIGTERM now', () => {
+    const kill = vi.spyOn(process, 'kill').mockImplementation(() => true);
+    const ctx = createContext({ ...BASE, pkg: validateManifest(API_MANIFEST) });
+    const scope = { agcid: '0'.repeat(31) + '1' } as { agcid: string; exit?: boolean };
+    requestScope.run(scope, () => ctx.exit());
+    expect([scope.exit, kill.mock.calls.length]).toEqual([true, 0]);
+    ctx.exit();
+    expect(kill).toHaveBeenCalledWith(process.pid, 'SIGTERM');
+    kill.mockRestore();
+    const test = createTestContext();
+    test.exit();
+    expect(test.exits).toHaveLength(1);
   });
 
   it('ctx.health adds a named check to the checks /health reads; a bad or taken name throws', async () => {

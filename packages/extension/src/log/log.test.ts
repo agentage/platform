@@ -33,7 +33,7 @@ describe('log', () => {
     });
   });
 
-  it('writes an error row with type, message, stack, where and a fingerprint', () => {
+  it('writes an error row with type, message, stack, where and ', () => {
     const { log, lines } = capture();
     log.error(new TypeError('boom'), '/api/v1/x');
     log.error('plain', { job: 'tick' });
@@ -41,7 +41,6 @@ describe('log', () => {
     expect(lines[0]?.['fields']).toMatchObject({
       ...{ 'exception.type': 'TypeError', 'exception.message': 'boom' },
       'agentage.where': '/api/v1/x',
-      'agentage.fingerprint': expect.stringMatching(/^TypeError@.*log\.test\.ts:\d+$/) as unknown,
     });
     expect(lines[1]).toMatchObject({ msg: 'Error: plain', fields: { job: 'tick' } });
   });
@@ -56,12 +55,12 @@ describe('log', () => {
     });
   });
 
-  it('adds base fields under fields; a log line naming event.name is that event', () => {
+  it('adds base fields under fields; log.event writes an event row', () => {
     const lines: Record<string, unknown>[] = [];
     const tags = { extension: 'probe', part: 'cli', version: '1.2.3', base: { command: 'sync' } };
     const log = createLog(tags, (l) => void lines.push(JSON.parse(l) as Record<string, unknown>));
     log.info('x');
-    log.info('probe emitted', { 'event.name': 'probe.emitted', 'agentage.probe.n': 1 });
+    log.event('probe.emitted', { 'agentage.probe.n': 1 }, 'probe emitted');
     expect(lines[0]).toMatchObject({ kind: 'log', fields: { command: 'sync' } });
     expect(lines[1]).toMatchObject({ kind: 'event', level: 'info', msg: 'probe emitted' });
   });

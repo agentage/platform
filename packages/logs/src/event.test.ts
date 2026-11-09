@@ -77,7 +77,17 @@ describe('parseLine', () => {
       fields: { 'agentage.raw': true },
     });
     expect(parseLine('FATAL: the database system is shutting down').level).toBe('error');
-    expect(parseLine('{"old":"kit line"}')).toMatchObject({ kind: 'log', part: 'unknown' });
+    const json = parseLine(
+      JSON.stringify({ msg: 'old kit line', token: 'abc', note: 'x'.repeat(300) })
+    );
+    expect(json).toMatchObject({ kind: 'log', part: 'unknown' });
+    expect(json.fields).toEqual({
+      msg: 'old kit line',
+      token: '[redacted]',
+      note: 'x'.repeat(200),
+      'agentage.raw': true,
+    });
+    expect(json.msg.length).toBe(200);
   });
 });
 

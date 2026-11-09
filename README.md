@@ -80,8 +80,8 @@ The manifest is the `agentage` block of the extension's `package.json` (see
 (`agentage.span.name`, `agentage.duration_ms`; `error.type` at error on a throw) on the current
 agcid; the value and the throw pass through. Every request is one `http` row, every `tools/call`
 one `mcp` row, every job run one `job` row; the agcid is 32 hex, kept from the `agcid` header or
-`traceparent`, else minted. `ctx.exit(code?)` ends the part after the current answer flushes
-(the orchestrator restarts it); part code never touches `process`. `ctx.health(name, check)` adds a
+`traceparent`, else minted. `ctx.exit()` runs the normal SIGTERM shutdown once the current answer
+is sent (the orchestrator restarts it); part code never touches `process`. `ctx.health(name, check)` adds a
 check to `/health` (`checks.clickhouse`, say).
 
 Unit tests: `createTestContext()` (a recording log, `ctx.spans`, scheduled jobs you run with `runJob`, tools,
