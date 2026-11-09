@@ -50,7 +50,14 @@ export interface ApiAppOptions extends PartAppBase {
 export const PUBLIC_CORS: CorsOptions = {
   origin: '*',
   credentials: false,
-  allowedHeaders: ['Authorization', 'Content-Type', 'agcid', 'traceparent', 'If-Match'],
+  allowedHeaders: [
+    'Authorization',
+    'Content-Type',
+    'agcid',
+    'traceparent',
+    'If-Match',
+    'If-None-Match',
+  ],
   exposedHeaders: ['agcid', 'ETag', 'Retry-After', 'RateLimit', 'WWW-Authenticate'],
 };
 

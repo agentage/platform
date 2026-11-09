@@ -186,7 +186,7 @@ describe('api app: envelope and headers', () => {
     expect(res.headers.get('access-control-allow-origin')).toBe('*');
     expect(res.headers.get('access-control-allow-credentials')).toBeNull();
     expect(res.headers.get('access-control-allow-headers')).toBe(
-      'Authorization,Content-Type,agcid,traceparent,If-Match'
+      'Authorization,Content-Type,agcid,traceparent,If-Match,If-None-Match'
     );
   });
 });
