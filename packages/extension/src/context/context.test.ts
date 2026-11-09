@@ -164,4 +164,16 @@ describe('ctx.platform', () => {
     ctx.exit(3);
     expect(ctx.exits).toEqual([3]);
   });
+
+  it('ctx.health adds a named check to the checks /health reads; a bad or taken name throws', async () => {
+    const checks = {};
+    const ctx = createContext({ ...BASE, pkg: validateManifest(API_MANIFEST), checks });
+    ctx.health('clickhouse', async () => 'ok');
+    expect(Object.keys(checks)).toEqual(['clickhouse']);
+    expect(() => ctx.health('clickhouse', async () => 'ok')).toThrow(/taken/);
+    expect(() => ctx.health('Bad Name', async () => 'ok')).toThrow(/a-z0-9/);
+    const test = createTestContext();
+    test.health('clickhouse', async () => 'degraded');
+    expect(await test.checks['clickhouse']?.()).toBe('degraded');
+  });
 });

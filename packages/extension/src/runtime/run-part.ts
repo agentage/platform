@@ -8,6 +8,7 @@ import { type ExtensionRecord } from '../discovery/discovery.schema.js';
 import { declaredScopes, partAuth, platformOf } from '../auth/part-auth.js';
 import { readOpenapi } from '../discovery/openapi.js';
 import { createLog, type Log } from '../log/log.js';
+import { type HealthCheck } from '../health/health.js';
 import { type ImportModule } from '../manifest/entry.js';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
 import { hasStore, imageParts } from '../manifest/parts.js';
@@ -56,7 +57,12 @@ export const partOf = (pkg: ExtensionPackage, part: string): ImagePartKind => {
 const storeFor = ({ pkg, part, env, log }: Start) =>
   part !== 'ui' && hasStore(pkg, 'postgres') ? createStore(env, log) : undefined;
 
-const contextFor = (start: Start, part: ServerPartKind, store: Store | undefined) =>
+const contextFor = (
+  start: Start,
+  part: ServerPartKind,
+  store: Store | undefined,
+  checks: Record<string, HealthCheck>
+) =>
   createContext({
     pkg: start.pkg,
     part,
@@ -67,14 +73,19 @@ const contextFor = (start: Start, part: ServerPartKind, store: Store | undefined
     store,
     secrets: start.secrets,
     platform: platformOf(start.env),
+    checks,
   });
 
 // Built on first use, so the ui runner, which never asks, has no ctx at all.
-const lazyContext = (start: Start, store: Store | undefined): (() => PartContext) => {
+const lazyContext = (
+  start: Start,
+  store: Store | undefined,
+  checks: Record<string, HealthCheck>
+): (() => PartContext) => {
   let ctx: PartContext | undefined;
   return () => {
     if (start.part === 'ui') throw new Error('the ui part gets no ctx');
-    return (ctx ??= contextFor(start, start.part, store));
+    return (ctx ??= contextFor(start, start.part, store, checks));
   };
 };
 
@@ -103,12 +114,13 @@ const baseFor = async (start: Start, store: Store | undefined, openapi: Openapi)
 const inputFor = async (options: RunPartOptions, start: Start): Promise<RunnerInput> => {
   const store = storeFor(start);
   const openapi = await readOpenapi(options.dir);
+  const base = await baseFor(start, store, openapi);
   return {
     dir: options.dir,
     pkg: start.pkg,
     env: start.env,
-    ctx: lazyContext(start, store),
-    base: await baseFor(start, store, openapi),
+    ctx: lazyContext(start, store, base.checks),
+    base,
     openapi,
     importModule: options.importModule,
   };

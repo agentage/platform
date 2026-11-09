@@ -4,6 +4,7 @@ import { storeOf } from '../manifest/parts.js';
 import { type StoreKind } from '../manifest/primitives.schema.js';
 import { createLog, type Log } from '../log/log.js';
 import { createSpan, type Span } from '../log/span.js';
+import type { HealthCheck } from '../health/health.js';
 import { type Store } from '../store/store.types.js';
 import { type Secrets } from './secrets.js';
 
@@ -43,7 +44,19 @@ export interface PartContext {
   readonly platform: Readonly<PlatformInfo>;
   // Ends the part after the current answer flushes; the orchestrator starts it again.
   readonly exit: (code?: number) => void;
+  // Adds a named check to /health (checks.clickhouse, say): ok, degraded or unavailable.
+  readonly health: (name: string, check: HealthCheck) => void;
 }
+
+const CHECK_NAME = /^[a-z][a-z0-9-]*$/;
+
+export const healthRegistrar =
+  (checks: Record<string, HealthCheck>) =>
+  (name: string, check: HealthCheck): void => {
+    if (!CHECK_NAME.test(name) || name in checks)
+      throw new Error(`health check ${name}: taken or not a-z0-9-`);
+    checks[name] = check;
+  };
 
 export const EXIT_DELAY_MS = 100;
 
@@ -71,6 +84,8 @@ export interface ContextInput {
   store?: Store;
   secrets?: Secrets;
   platform?: PlatformInfo;
+  // The part's /health checks, the same object the health handler reads.
+  checks?: Record<string, HealthCheck>;
 }
 
 export const createContext = (input: ContextInput): PartContext => {
@@ -100,5 +115,6 @@ export const createContext = (input: ContextInput): PartContext => {
     secrets,
     platform,
     exit: exitSoon,
+    health: healthRegistrar(input.checks ?? {}),
   });
 };
