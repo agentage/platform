@@ -56,6 +56,7 @@ export function create({ out, args }: CliContext) {
 // src/pages/index.ts: path -> text or bytes typed by the extension (a bare path is HTML);
 // siteFromDir(dir, { origin: ctx.extension.origin }) serves a static export instead
 // { redirect: url } answers 308; a '/docs/*' key covers its subtree, the rest and query appended
+// a redirect is an http(s) URL with a path and no query; under a '/*' key it ends in '/'
 export const create = (ctx: PagesContext): PagesSite => ({ '/': versionPage(ctx) });
 ```
 
