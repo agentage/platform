@@ -12,7 +12,6 @@ export {
   type UserType,
 } from './event.schema.js';
 export { parseLine, type LineSource } from './parse-line.js';
-export { redact } from './redact.js';
 export { createLogger, type Logger, type LoggerOptions, type RowContext } from './logger.js';
 export { type HttpRow, type JobRow, type McpRow, type Row } from './rows.js';
 export {
