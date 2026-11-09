@@ -23,7 +23,10 @@ const content = (description: string, schema: Json) => ({ description, content: 
 
 const STRING = { type: 'string' };
 
-const okResponse = ({ output, etag }: RouteEntry['spec']) => ({
+const okResponse = (spec: RouteEntry['spec']) =>
+  spec.status === 204 ? { description: 'no content' } : okBody(spec);
+
+const okBody = ({ output, etag }: RouteEntry['spec']) => ({
   ...content('the envelope', {
     type: 'object',
     properties: {
@@ -52,16 +55,20 @@ const pathParameters = ({ path, spec }: RouteEntry): Json[] => {
   }));
 };
 
-const queryParameters = (entry: RouteEntry): Json[] => {
-  if (!entry.spec.input || !inQuery(entry.method)) return [];
-  const { properties = {}, required = [] } = fields(entry.spec.input);
-  return Object.entries(properties).map(([name, schema]) => ({
+const queryOf = (schema: object): Json[] => {
+  const { properties = {}, required = [] } = fields(schema);
+  return Object.entries(properties).map(([name, field]) => ({
     name,
     in: 'query',
     required: required.includes(name),
-    schema,
+    schema: field,
   }));
 };
+
+const queryParameters = ({ method, spec }: RouteEntry): Json[] => [
+  ...(spec.input && inQuery(method) ? queryOf(spec.input) : []),
+  ...(spec.query ? queryOf(spec.query) : []),
+];
 
 const IF_MATCH = { name: 'If-Match', in: 'header', required: false, schema: STRING };
 
@@ -74,7 +81,7 @@ const parameters = (entry: RouteEntry): Json[] => [
 const responses = (entry: RouteEntry): Json => {
   const { input, params, scope, etag } = entry.spec;
   return {
-    '200': okResponse(entry.spec),
+    [entry.spec.status ?? 200]: okResponse(entry.spec),
     ...((input || params) && { '400': refusal('VALIDATION_ERROR') }),
     ...(scope !== 'public' && { '401': refusal('UNAUTHORIZED'), '403': refusal('FORBIDDEN') }),
     ...(entry.path.includes('{') && { '404': refusal('NOT_FOUND') }),

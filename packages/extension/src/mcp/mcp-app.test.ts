@@ -131,7 +131,7 @@ describe('mcp wire per protocol era', () => {
     expect(res.headers.get('access-control-allow-origin')).toBe('*');
     expect(res.headers.get('access-control-allow-credentials')).toBeNull();
     expect(res.headers.get('access-control-allow-headers')).toBe(
-      'Authorization,Content-Type,agcid,traceparent,If-Match,Mcp-Protocol-Version,Mcp-Method,Mcp-Name,Accept'
+      'Authorization,Content-Type,agcid,traceparent,If-Match,If-None-Match,Mcp-Protocol-Version,Mcp-Method,Mcp-Name,Accept'
     );
   });
 });

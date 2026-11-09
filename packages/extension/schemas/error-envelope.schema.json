@@ -13,18 +13,7 @@
       "properties": {
         "code": {
           "type": "string",
-          "enum": [
-            "VALIDATION_ERROR",
-            "UNAUTHORIZED",
-            "FORBIDDEN",
-            "NOT_FOUND",
-            "CONFLICT",
-            "PRECONDITION_FAILED",
-            "PAYLOAD_TOO_LARGE",
-            "RATE_LIMITED",
-            "INTERNAL",
-            "UNAVAILABLE"
-          ]
+          "pattern": "^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$"
         },
         "message": {
           "type": "string",
@@ -35,23 +24,34 @@
           "pattern": "^[A-Za-z0-9._:-]{8,128}$"
         },
         "details": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "field": {
-                "type": "string"
-              },
-              "message": {
-                "type": "string"
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "field": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "field",
+                  "message"
+                ],
+                "additionalProperties": false
               }
             },
-            "required": [
-              "field",
-              "message"
-            ],
-            "additionalProperties": false
-          }
+            {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          ]
         }
       },
       "required": [

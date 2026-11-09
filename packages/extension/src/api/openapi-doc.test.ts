@@ -105,4 +105,28 @@ describe('generatedOpenapi', () => {
     expect(responses['200']?.['headers']).toEqual({ ETag: { schema: { type: 'string' } } });
     expect(Object.keys(generated.components.schemas)).toEqual(['Error']);
   });
+
+  it('documents the declared success status, 204 without a body', () => {
+    const { route, routes } = createRouteRegistry();
+    route('post', '/made', { summary: 'Made', scope: 'write', status: 201 }, () => null);
+    route('delete', '/gone', { summary: 'Gone', scope: 'write', status: 204 }, () => null);
+    const { paths } = generatedOpenapi(API_MANIFEST, routes) as {
+      paths: Record<string, Record<string, { responses: Record<string, unknown> }>>;
+    };
+    const made = paths['/api/v1/made']?.['post']?.responses ?? {};
+    const gone = paths['/api/v1/gone']?.['delete']?.responses ?? {};
+    expect([Object.keys(made).includes('201'), made['200']]).toEqual([true, undefined]);
+    expect(gone['204']).toEqual({ description: 'no content' });
+  });
+
+  it('lists a query schema as query parameters on a post', () => {
+    const { route, routes } = createRouteRegistry();
+    route('post', '/u', { summary: 'U', query: z.object({ email: z.string() }) }, () => null);
+    const { paths } = generatedOpenapi(API_MANIFEST, routes) as {
+      paths: Record<string, Record<string, { parameters: unknown[] }>>;
+    };
+    expect(paths['/api/v1/u']?.['post']?.parameters).toEqual([
+      { name: 'email', in: 'query', required: true, schema: { type: 'string' } },
+    ]);
+  });
 });

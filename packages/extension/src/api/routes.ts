@@ -15,6 +15,7 @@ export interface RouteSpec<
   O extends z.ZodType,
   S extends Access = Access,
   Q extends ObjectSchema = never,
+  Y extends ObjectSchema = never,
 > {
   summary: string;
   // What the route needs: {id}:{scope}, or public; read when left out.
@@ -24,8 +25,12 @@ export interface RouteSpec<
   output?: O;
   // The {name} segments parsed like input; strings when left out.
   params?: Q;
+  // The query string parsed on any method (a one-click link that posts); get and delete read input from it.
+  query?: Y;
   // The route sends an ETag and reads If-Match: the contract adds both headers and 412.
   etag?: true;
+  // The success status the contract documents; 200 when left out.
+  status?: 200 | 201 | 204;
 }
 
 // The {name} segments of a path, each a string.
@@ -34,11 +39,22 @@ export type ParamsOf<P extends string> = P extends `${string}{${infer N}}${infer
   : Record<never, string>;
 
 // The token check ran before a scoped route, so only a public or optional one can be anonymous.
-export interface RouteRequest<I, P extends string, S extends Access = Access, Q = never> {
+export interface RouteRequest<
+  I,
+  P extends string,
+  S extends Access = Access,
+  Q = never,
+  Y = never,
+> {
   input: I;
+  query: [Y] extends [never] ? Record<never, never> : Y;
+  // The client address behind the gateway (X-Forwarded-For from a private network).
+  ip: string;
   params: [Q] extends [never] ? ParamsOf<P> : Q;
   caller: S extends 'public' | 'optional' ? Caller | null : Caller;
   ifMatch?: string;
+  // A request header, case-insensitive.
+  header: (name: string) => string | undefined;
 }
 
 type Answer<T> = T | Reply<T>;
@@ -49,8 +65,15 @@ export type RouteHandler<
   P extends string,
   S extends Access = Access,
   Q extends ObjectSchema = never,
+  Y extends ObjectSchema = never,
 > = (
-  request: RouteRequest<z.output<I>, P, S, [Q] extends [never] ? never : z.output<Q>>
+  request: RouteRequest<
+    z.output<I>,
+    P,
+    S,
+    [Q] extends [never] ? never : z.output<Q>,
+    [Y] extends [never] ? never : z.output<Y>
+  >
 ) => Answer<z.input<O>> | Promise<Answer<z.input<O>>>;
 
 // Registers a route under /api/v1; the kit validates, wraps the envelope and writes openapi.json.
@@ -60,11 +83,12 @@ export type RouteRegistrar = <
   O extends z.ZodType = z.ZodUnknown,
   S extends Access = 'read',
   Q extends ObjectSchema = never,
+  Y extends ObjectSchema = never,
 >(
   method: RouteMethod,
   path: P,
-  spec: RouteSpec<I, O, S, Q>,
-  handler: RouteHandler<I, O, P, S, Q>
+  spec: RouteSpec<I, O, S, Q, Y>,
+  handler: RouteHandler<I, O, P, S, Q, Y>
 ) => void;
 
 export interface ApiContext extends PartContext {
@@ -77,8 +101,10 @@ type Params = Record<string, unknown>;
 export interface RouteEntry {
   method: RouteMethod;
   path: string;
-  spec: RouteSpec<ObjectSchema, z.ZodType, Access, ObjectSchema>;
-  handler: (request: RouteRequest<Record<string, unknown>, string, 'public', Params>) => unknown;
+  spec: RouteSpec<ObjectSchema, z.ZodType, Access, ObjectSchema, ObjectSchema>;
+  handler: (
+    request: RouteRequest<Record<string, unknown>, string, 'public', Params, Params>
+  ) => unknown;
 }
 
 const PATH = /^(\/([A-Za-z0-9._~-]+|\{[A-Za-z_][A-Za-z0-9_]*\}))+$/;

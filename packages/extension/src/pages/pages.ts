@@ -2,8 +2,11 @@ import { type PartContext } from '../context/context.js';
 
 export type PagesContext = PartContext;
 
-// The pages part: create(ctx) returns path -> HTML, or JS, CSS, JSON by the path's extension.
-export type PagesSite = Readonly<Record<string, string>>;
+// One file: text or bytes typed by the path's extension, or with its own content type.
+export type PagesEntry = string | Uint8Array | { type: string; body: string | Uint8Array };
+
+// The pages part: create(ctx) returns path -> entry; a path without a known extension is HTML.
+export type PagesSite = Readonly<Record<string, PagesEntry>>;
 
 const escape = (value: string): string => value.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 

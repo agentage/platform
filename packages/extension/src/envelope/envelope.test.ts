@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import apiError from '../test-support/fixtures/api-error.json' with { type: 'json' };
 import noAgcid from '../test-support/fixtures/neg-api-error-no-agcid.json' with { type: 'json' };
 import { ERROR_CODES, ERROR_STATUS } from './codes.js';
-import { errorEnvelope, fail, isFailure, ok, type Failure } from './envelope.js';
+import { errorEnvelope, fail, isFailure, ok, type ErrorDetail, type Failure } from './envelope.js';
 import { ErrorEnvelopeSchema, OkEnvelopeSchema } from './envelope.schema.js';
 import { parse } from './parse.js';
 import { z } from 'zod';
@@ -60,7 +60,7 @@ describe('envelope', () => {
   it('the schema takes the contract example and refuses one without agcid', () => {
     expect(ErrorEnvelopeSchema.safeParse(apiError).success).toBe(true);
     expect(ErrorEnvelopeSchema.safeParse(noAgcid).success).toBe(false);
-    const unknownCode = { ...apiError, error: { ...apiError.error, code: 'TEAPOT' } };
+    const unknownCode = { ...apiError, error: { ...apiError.error, code: 'teapot' } };
     expect(ErrorEnvelopeSchema.safeParse(unknownCode).success).toBe(false);
   });
 });
@@ -94,6 +94,12 @@ describe('parse', () => {
   it('names the root when the value itself is wrong, and takes a message', () => {
     const failure = failureOf(() => parse(z.string(), 1, 'Invalid body'));
     expect(failure.message).toBe('Invalid body');
-    expect(failure.details?.map((d) => d.field)).toEqual(['(root)']);
+    expect((failure.details as ErrorDetail[]).map((d) => d.field)).toEqual(['(root)']);
+  });
+
+  it('drops details from a 5xx envelope and keeps them on a 4xx', () => {
+    const details = { secret: 'row 7' };
+    expect(errorEnvelope(fail('INTERNAL', 'x', { details }), 'a').error.details).toBeUndefined();
+    expect(errorEnvelope(fail('CONFLICT', 'x', { details }), 'a').error.details).toEqual(details);
   });
 });

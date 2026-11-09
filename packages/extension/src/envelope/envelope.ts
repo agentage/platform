@@ -16,11 +16,13 @@ export interface OkEnvelope<T> {
   meta?: Record<string, unknown>;
 }
 
+export type ErrorDetails = ErrorDetail[] | Record<string, unknown>;
+
 export interface ErrorBody {
-  code: ErrorCode;
+  code: string;
   message: string;
   agcid: string;
-  details?: ErrorDetail[];
+  details?: ErrorDetails;
 }
 
 export interface ErrorEnvelope {
@@ -29,15 +31,18 @@ export interface ErrorEnvelope {
 }
 
 export interface Failure extends Error {
-  readonly code: ErrorCode;
+  readonly code: string;
   readonly status: number;
-  readonly details?: ErrorDetail[];
+  readonly details?: ErrorDetails;
   readonly retryAfter?: number;
   readonly headers?: Readonly<Record<string, string>>;
 }
 
 export interface FailOptions {
-  details?: ErrorDetail[];
+  // An array of field problems, or an object (a 412 carries { current, etag }).
+  details?: ErrorDetails;
+  // The wire code of a 4xx, UPPER_SNAKE (MACHINE_NOT_FOUND); the status stays the base code's.
+  code?: string;
   retryAfter?: number;
   // Sent with the refusal, as WWW-Authenticate on a 401 or 403 (api-standards section 5).
   headers?: Record<string, string>;
@@ -51,6 +56,8 @@ const REPLY = Symbol.for('agentage.extension.reply');
 export interface ReplyOptions {
   meta?: Record<string, unknown>;
   etag?: string;
+  // 204 sends no body; 200 when left out.
+  status?: 200 | 201 | 204;
 }
 
 export interface Reply<T> extends ReplyOptions {
@@ -76,11 +83,20 @@ const retryAfterOf = (code: ErrorCode, given?: number): number | undefined => {
   return RETRY_AFTER_CODES.includes(code) ? DEFAULT_RETRY_AFTER_SECONDS : undefined;
 };
 
+const UPPER_SNAKE = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$/;
+
+const wireCode = (code: ErrorCode, override?: string): string => {
+  if (override === undefined) return code;
+  if (ERROR_STATUS[code] >= 500 || !UPPER_SNAKE.test(override))
+    throw new Error(`fail code ${override}: UPPER_SNAKE on a 4xx only`);
+  return override;
+};
+
 // Returned, not thrown, so a route reads `throw fail(...)`; the kit turns it into the envelope.
 export const fail = (code: ErrorCode, message: string, options: FailOptions = {}): Failure =>
   Object.assign(new Error(message), {
     [FAILURE]: true,
-    code,
+    code: wireCode(code, options.code),
     status: ERROR_STATUS[code],
     details: options.details,
     retryAfter: retryAfterOf(code, options.retryAfter),
@@ -92,6 +108,10 @@ export const isFailure = (err: unknown): err is Failure =>
 
 export const errorEnvelope = (failure: Failure, agcid: string): ErrorEnvelope => {
   const error: ErrorBody = { code: failure.code, message: failure.message, agcid };
-  if (failure.details && failure.details.length > 0) error.details = failure.details;
+  const details = failure.status >= 500 ? undefined : failure.details;
+  const filled = Array.isArray(details)
+    ? details.length > 0
+    : details && Object.keys(details).length > 0;
+  if (details && filled) error.details = details;
   return { success: false, error };
 };

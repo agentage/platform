@@ -10,7 +10,14 @@ import { runLog } from '../worker/run-log.js';
 import { type JobRun, memoryRuns } from '../worker/runs.js';
 import { createScheduler, type Schedule } from '../worker/scheduler.js';
 import { type StoreKind } from '../manifest/primitives.schema.js';
-import { NO_STORE, type ExtensionInfo, type PartContext, type SettingValue } from './context.js';
+import {
+  NO_PLATFORM,
+  NO_STORE,
+  type ExtensionInfo,
+  type PlatformInfo,
+  type PartContext,
+  type SettingValue,
+} from './context.js';
 import { packageExtension } from './package-extension.js';
 import { recordingLog, type LogEntry } from './recording-log.js';
 import {
@@ -53,6 +60,7 @@ export interface TestContextOptions {
   // A throwaway postgres with the package's migrations/ and seeds/ applied (dir: the package root);
   // on by default when ./package.json declares a postgres store, false turns it off.
   store?: boolean | { dir: string };
+  platform?: PlatformInfo;
 }
 
 const testStore = (option: TestContextOptions['store'], log: Log): TestStore | undefined => {
@@ -114,6 +122,7 @@ const serverContext = (options: TestContextOptions): TestContext => {
     settings: { ...options.settings },
     store: store ?? NO_STORE,
     secrets: Object.freeze({ ...options.secrets }),
+    platform: Object.freeze({ ...(options.platform ?? NO_PLATFORM) }),
     close: async () => store?.close(),
     ...recorders(log),
   };

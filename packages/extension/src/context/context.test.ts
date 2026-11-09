@@ -5,6 +5,7 @@ import { API_MANIFEST, SHA, SPEC_MANIFEST } from '../test-support/packages.js';
 import { recordedLog } from '../test-support/http.js';
 import { startTestServer } from '../testing/test-server.js';
 import { setCaller } from '../auth/token-check.js';
+import { platformOf } from '../auth/part-auth.js';
 import { createContext, settingDefaults } from './context.js';
 import { createTestContext } from './test-context.js';
 
@@ -114,5 +115,39 @@ describe('ctx.auth (C6)', () => {
   it('the test context has a fixed caller with read on its own extension', () => {
     const ctx = createTestContext({ extension: { id: 'probe' } });
     expect(ctx.auth.caller({})).toEqual({ sub: 'usr_test', scopes: ['probe:read'] });
+  });
+});
+
+describe('ctx.platform', () => {
+  const env = {
+    AGENTAGE_ISSUER: 'https://auth.agentage.io',
+    AGENTAGE_AUDIENCE: '*.agentage.io',
+    AGENTAGE_TELEMETRY_URL: 'https://telemetry.agentage.io/v1',
+  };
+
+  it('reads the issuer, the audience and the telemetry URL, frozen', () => {
+    const ctx = createContext({ ...BASE, part: 'pages', platform: platformOf(env) });
+    expect(ctx.platform).toEqual({
+      issuer: 'https://auth.agentage.io',
+      audience: '*.agentage.io',
+      telemetry: 'https://telemetry.agentage.io/v1',
+    });
+    expect(Object.isFrozen(ctx.platform)).toBe(true);
+  });
+
+  it('leaves telemetry out when unset, and a missing or invalid value empty', () => {
+    const rest = { ...env, AGENTAGE_TELEMETRY_URL: '' };
+    expect(platformOf(rest)).toEqual({
+      issuer: 'https://auth.agentage.io',
+      audience: '*.agentage.io',
+    });
+    expect(platformOf({ AGENTAGE_ISSUER: 'https://auth.agentage.io/path' })).toEqual({
+      issuer: '',
+      audience: '',
+    });
+    expect(createContext(BASE).platform).toEqual({ issuer: '', audience: '' });
+    expect(createTestContext({ platform: platformOf(rest) }).platform.issuer).toBe(
+      'https://auth.agentage.io'
+    );
   });
 });
