@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { type RequestHandler } from 'express';
 import { type BuildInfo } from '../discovery/discovery.js';
 import { fail } from '../envelope/envelope.js';
+import { type Log } from '../log/log.js';
 import { type ImagePartKind } from '../manifest/primitives.schema.js';
 import { isoSeconds } from '../runtime/build-info.js';
 import { type HealthBody, type HealthStatus } from './health.schema.js';
@@ -17,6 +18,8 @@ export interface HealthOptions {
   instance?: string;
   startedAt?: number;
   now?: () => Date;
+  // Writes a health.changed event on a transition, never on every probe.
+  log?: Log;
 }
 
 const RANK: Record<HealthStatus, number> = { ok: 0, degraded: 1, unavailable: 2 };
@@ -67,6 +70,16 @@ export const healthBody = async (options: ResolvedHealth): Promise<HealthBody> =
   };
 };
 
+const changed = (log: Log | undefined, from: HealthStatus, to: HealthStatus, checks: object) => {
+  const check = Object.entries(checks).find(([, status]) => status === to)?.[0] ?? '';
+  const fields = {
+    'agentage.health.from': from,
+    'agentage.health.to': to,
+    'agentage.health.check': check,
+  };
+  log?.event('health.changed', fields, `health.changed ${from} to ${to}`);
+};
+
 // Answers only on loopback: the container HEALTHCHECK and an operator on the node, never the gateway.
 export const createHealthHandler = (options: HealthOptions): RequestHandler => {
   const resolved: ResolvedHealth = {
@@ -74,9 +87,13 @@ export const createHealthHandler = (options: HealthOptions): RequestHandler => {
     instance: options.instance ?? randomBytes(4).toString('hex'),
     startedAt: options.startedAt ?? Date.now(),
   };
+  let last: HealthStatus | undefined;
   return async (req, res) => {
     if (!isLoopback(req.socket.localAddress)) throw fail('NOT_FOUND', 'Not found');
     const body = await healthBody(resolved);
+    const { status: to, checks } = body.data;
+    if (last !== undefined && last !== to) changed(options.log, last, to, checks);
+    last = to;
     res.setHeader('Cache-Control', 'no-store');
     res.status(body.data.status === 'unavailable' ? 503 : 200).json(body);
   };

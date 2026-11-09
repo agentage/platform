@@ -52,14 +52,14 @@ const LIST = { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} };
 describe('mcp listing', () => {
   it('with listing token, tools/list is refused with 401, alone or in a batch', async () => {
     const s = await app('token');
-    const res = await post(s.url, LIST, { ...HEADERS, agcid: 'trace-list-check' });
+    const res = await post(s.url, LIST, { ...HEADERS, agcid: 'b1dd0194c682e07410904b0e4e9e811e' });
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({
       success: false,
       error: {
         code: 'UNAUTHORIZED',
         message: 'tools/list needs a token',
-        agcid: 'trace-list-check',
+        agcid: 'b1dd0194c682e07410904b0e4e9e811e',
       },
     });
     expect((await post(s.url, [{ jsonrpc: '2.0', method: 'notifications/x' }, LIST])).status).toBe(

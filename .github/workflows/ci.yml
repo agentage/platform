@@ -24,7 +24,7 @@ jobs:
         env:
           TITLE: ${{ github.event.pull_request.title }}
         run: |
-          scoped='^(feat|fix|refactor|test|chore|ci|docs|perf|build)\((extension|widget|identity|shell|release|ci|docs|deps)\)!?: .{1,60}$'
+          scoped='^(feat|fix|refactor|test|chore|ci|docs|perf|build)\((extension|logs|widget|identity|shell|release|ci|docs|deps)\)!?: .{1,60}$'
           bare='^(ci|docs|chore|build): '
           if [ "${#TITLE}" -le 72 ] && { [[ $TITLE =~ $scoped ]] || [[ $TITLE =~ $bare ]]; }; then exit 0; fi
           echo "::error::PR title '$TITLE' breaks the commit title rules in CLAUDE.md (type(scope): text, max 72)"; exit 1
@@ -81,6 +81,14 @@ jobs:
           if grep -Eq '\.test\.|test-support|/e2e/' /tmp/pack/widget-files.txt; then echo 'test files in the widget tarball'; exit 1; fi
           node packages/widget/dist/bundle/cli.js --help
 
+      - name: Pack smoke - logs (dist in, tests out)
+        run: |
+          set -euo pipefail
+          npm pack -w @agentage/logs --pack-destination /tmp/pack
+          tar -tzf /tmp/pack/agentage-logs-*.tgz > /tmp/pack/logs-files.txt
+          grep -qx 'package/dist/index.js' /tmp/pack/logs-files.txt
+          if grep -Eq '\.test\.' /tmp/pack/logs-files.txt; then echo 'test files in the logs tarball'; exit 1; fi
+
       - name: Pack smoke - identity (dist in, tests out)
         run: |
           set -euo pipefail
@@ -116,7 +124,8 @@ jobs:
           tarballs=()
           for tgz in /tmp/pack/agentage-*.tgz; do
             name="@agentage/$(basename "$tgz" | sed -E 's/^agentage-(.*)-[0-9]+\.[0-9]+\.[0-9]+\.tgz$/\1/')"
-            if jq -e --arg n "$name" '(.dependencies // {}) + (.devDependencies // {}) | has($n)' package.json >/dev/null; then
+            # @agentage/logs rides along: the kit depends on it before it is on npm.
+            if [ "$name" = "@agentage/logs" ] || jq -e --arg n "$name" '(.dependencies // {}) + (.devDependencies // {}) | has($n)' package.json >/dev/null; then
               cp "$tgz" .kit/ && tarballs+=("./.kit/$(basename "$tgz")")
             fi
           done
@@ -214,7 +223,7 @@ jobs:
           npm pack --workspaces --prefix platform --pack-destination "$PWD/probe"
           cd probe
           npm ci
-          npm install ./agentage-extension-*.tgz ./agentage-widget-*.tgz
+          npm install ./agentage-logs-*.tgz ./agentage-extension-*.tgz ./agentage-widget-*.tgz
           # Permanent: the probe's own range refuses every new kit minor; the gate proves the candidate runs the probe.
           npm pkg set engines.agentage=">=0.6"
           grep -E "\"@agentage/(extension|widget)\": \"file:" package.json

@@ -153,7 +153,8 @@
                   "enum": [
                     "postgres",
                     "signoz",
-                    "git"
+                    "git",
+                    "clickhouse"
                   ]
                 },
                 {
@@ -164,7 +165,8 @@
                       "enum": [
                         "postgres",
                         "signoz",
-                        "git"
+                        "git",
+                        "clickhouse"
                       ]
                     }
                   },

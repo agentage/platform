@@ -90,13 +90,15 @@ describe('ctx.route', () => {
 
   it('answers VALIDATION_ERROR with details, INTERNAL on a bad answer, NOT_FOUND off the routes', async () => {
     await start();
-    const query = await server!.fetch('/api/v1/echo?msg=', { headers: { agcid: 'route-test-1' } });
+    const query = await server!.fetch('/api/v1/echo?msg=', {
+      headers: { agcid: '29f9760cafafdefefde01844f7540d21' },
+    });
     expect([query.status, ErrorEnvelopeSchema.parse(await query.json()).error]).toEqual([
       400,
       {
         code: 'VALIDATION_ERROR',
         message: 'Invalid query',
-        agcid: 'route-test-1',
+        agcid: '29f9760cafafdefefde01844f7540d21',
         details: [{ field: 'msg', message: expect.any(String) }],
       },
     ]);
@@ -106,10 +108,12 @@ describe('ctx.route', () => {
     const body = await server!.fetch('/api/v1/items/i1', post('{}'));
     expect(ErrorEnvelopeSchema.parse(await body.json()).error.message).toBe('Invalid body');
     expect((await server!.fetch('/api/v1/broken')).status).toBe(500);
-    const off = await server!.fetch('/api/v1/nope', { headers: { agcid: 'route-test-2' } });
+    const off = await server!.fetch('/api/v1/nope', {
+      headers: { agcid: '0555843f506516e7bcbde1f38d7f19ab' },
+    });
     expect([off.status, ErrorEnvelopeSchema.parse(await off.json()).error]).toEqual([
       404,
-      { code: 'NOT_FOUND', message: 'Not found', agcid: 'route-test-2' },
+      { code: 'NOT_FOUND', message: 'Not found', agcid: '0555843f506516e7bcbde1f38d7f19ab' },
     ]);
   });
 

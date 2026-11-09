@@ -62,6 +62,10 @@ describe('runPart', () => {
       serve: { signals: [] },
     });
     const base = `http://127.0.0.1:${portOf(server)}`;
+    const written = vi.mocked(process.stderr.write).mock.calls.map(([line]) => String(line));
+    const startup = written.map((l) => JSON.parse(l) as Record<string, unknown>).at(-1);
+    expect(startup).toMatchObject({ kind: 'event', msg: 'startup', extension: 'probe' });
+    expect(startup?.['fields']).toMatchObject({ 'agentage.startup.commit': SHA });
     const health = (await (await fetch(`${base}/health`)).json()) as { data: { commit: string } };
     expect(health.data.commit).toBe(SHA);
     const echo = await (await fetch(`${base}/api/v1/echo?msg=hi`)).json();

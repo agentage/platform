@@ -88,6 +88,7 @@ const healthHandler = (options: PartAppOptions): RequestHandler =>
     version: options.pkg.version,
     build: options.build,
     checks: options.checks,
+    log: options.log,
   });
 
 // The kit app every part image runs: agcid, headers, /health, discovery, the part, the envelope.
@@ -132,12 +133,12 @@ const wellKnownHandler =
 const routeGuard =
   (options: ApiAppOptions): RequestHandler =>
   async (req, res, next) => {
-    if (!options.tokenCheck) return next();
     const { routes } = options;
-    const known = routes?.some(
+    const known = routes?.find(
       (r) => r.method === req.method.toLowerCase() && sameShape(r.path, req.path)
     );
-    if (routes?.length && !known) return next();
+    if (known) res.locals['route'] = `/api/v1${known.path}`;
+    if (!options.tokenCheck || (routes?.length && !known)) return next();
     const access = routeAccess(options.openapi, req.method, `/api/v1${req.path}`);
     const caller = await options.tokenCheck(req.get('authorization'), access);
     if (caller) res.setHeader('Cache-Control', 'no-store');

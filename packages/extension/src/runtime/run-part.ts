@@ -1,4 +1,5 @@
 import { type Server } from 'node:http';
+import { hostname } from 'node:os';
 import { createContext, type PartContext, type ServerPartKind } from '../context/context.js';
 import { readSecrets, SECRETS_DIR, type Secrets } from '../context/secrets.js';
 import { settingsFromEnv } from '../context/settings.js';
@@ -113,10 +114,16 @@ const inputFor = async (options: RunPartOptions, start: Start): Promise<RunnerIn
   };
 };
 
+let running: Log | undefined;
+
+// The running part's log, so a crash in the image entry is an error row of that part.
+export const partLog = (): Log | undefined => running;
+
 export const runPart = async (options: RunPartOptions): Promise<Server> => {
   const pkg = await readManifest(options.dir);
   const part = partOf(pkg, options.part);
   const log = createLog({ extension: pkg.agentage.id, part, version: pkg.version });
+  running = log;
   const names = part === 'ui' ? [] : (pkg.agentage.secrets ?? []);
   const secrets = await readSecrets(names, options.secretsDir ?? SECRETS_DIR, part);
   const start = { pkg, part, env: options.env, log, secrets };
@@ -124,5 +131,11 @@ export const runPart = async (options: RunPartOptions): Promise<Server> => {
   if (stop)
     for (const signal of options.serve?.signals ?? ['SIGTERM', 'SIGINT'])
       process.once(signal, stop);
-  return serve({ app, port: portFromEnv(options.env), log, ...options.serve });
+  const server = await serve({ app, port: portFromEnv(options.env), log, ...options.serve });
+  const { commit } = buildInfoFromEnv(options.env);
+  log.event('startup', {
+    'agentage.startup.commit': commit,
+    'agentage.startup.instance': hostname(),
+  });
+  return server;
 };

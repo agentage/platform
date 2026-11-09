@@ -1,4 +1,5 @@
 import { setTimeout as sleep } from 'node:timers/promises';
+import { requestScope } from '../agcid/current.js';
 
 // What a route or tool declares (api-standards section 5): public, optional (anonymous or a read bearer), or a verb.
 export const ACCESS = ['public', 'optional', 'read', 'write', 'admin'] as const;
@@ -17,6 +18,14 @@ export interface Caller {
   scopes: readonly string[];
 }
 
+// The token id beside a caller, never on it: the log's session when the client sends no agsid.
+const tokenIds = new WeakMap<Caller, string>();
+
+export const withJti = (caller: Caller, jti: string | undefined): Caller => {
+  if (jti !== undefined) tokenIds.set(caller, jti);
+  return caller;
+};
+
 // A caller, or a thrown UNAUTHORIZED, FORBIDDEN or UNAVAILABLE (verify-token.ts).
 export type TokenCheck = (
   authorization: string | undefined,
@@ -25,8 +34,14 @@ export type TokenCheck = (
 
 const callers = new WeakMap<object, Caller | null>();
 
-export const setCaller = (request: object, caller: Caller | null): void =>
-  void callers.set(request, caller);
+// Also the request scope's sub and session, so every row after the check says who.
+export const setCaller = (request: object, caller: Caller | null): void => {
+  callers.set(request, caller);
+  const scope = requestScope.getStore();
+  if (!scope || !caller) return;
+  scope.sub = caller.sub;
+  scope.session ??= tokenIds.get(caller) ?? null;
+};
 
 export const callerOf = (request: object): Caller | null => callers.get(request) ?? null;
 

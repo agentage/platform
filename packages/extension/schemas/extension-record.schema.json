@@ -103,7 +103,8 @@
               "enum": [
                 "postgres",
                 "signoz",
-                "git"
+                "git",
+                "clickhouse"
               ]
             },
             "migrations": {

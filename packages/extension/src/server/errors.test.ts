@@ -20,7 +20,7 @@ const coded = (code: string) => Object.assign(new Error(code), { code });
 describe('errorHandler', () => {
   it('on a started response logs the error and closes it, writing nothing', () => {
     const res = { headersSent: true, destroy: vi.fn(), status: vi.fn() };
-    expect(handle(new Error('boom'), res)).toEqual([['error', 'boom']]);
+    expect(handle(new Error('boom'), res)).toEqual([['error', 'Error: boom']]);
     expect([res.destroy.mock.calls.length, res.status.mock.calls.length]).toEqual([1, 0]);
   });
 

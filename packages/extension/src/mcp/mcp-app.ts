@@ -3,8 +3,10 @@ import { pipeline } from 'node:stream/promises';
 import cors from 'cors';
 import express, { type Express, type Request, type Response } from 'express';
 import { createMcpHandler, type McpHttpHandler } from '@modelcontextprotocol/server';
-import { strongest, type Access } from '../auth/token-check.js';
+import { requestScope } from '../agcid/current.js';
+import { setCaller, strongest, type Access } from '../auth/token-check.js';
 import { fail } from '../envelope/envelope.js';
+import { declaredType } from '../log/who.js';
 import { BODY_LIMIT, createPartApp, PUBLIC_CORS, type PartAppBase } from '../server/app.js';
 import { serverFactory } from './server.js';
 import { prefixed, type ToolEntry } from './tools.js';
@@ -32,7 +34,7 @@ const parsed = (body: Buffer): unknown => {
 
 interface Message {
   method?: unknown;
-  params?: { name?: unknown };
+  params?: { name?: unknown; clientInfo?: { name?: unknown } };
 }
 
 const messagesOf = (body: unknown): (Message | null)[] =>
@@ -60,7 +62,21 @@ const guard = async (options: McpAppOptions, req: Request, body: unknown): Promi
     return false;
   }
   if (needed.length === 0) return false;
-  return (await options.tokenCheck(req.get('authorization'), strongest(needed))) !== null;
+  const caller = await options.tokenCheck(req.get('authorization'), strongest(needed));
+  setCaller(req, caller);
+  return caller !== null;
+};
+
+// A tools/call leaves its mcp row and no http row (Q1); initialize names the client (Q14).
+const markRow = (req: Request, res: Response, body: unknown): void => {
+  const messages = messagesOf(body);
+  const scope = requestScope.getStore();
+  if (messages.some((message) => message?.method === 'tools/call')) {
+    res.locals['toolCall'] = true;
+    if (scope) scope.user_type = declaredType((name) => req.get(name)) ?? 'agent';
+  }
+  const name = messages.find((m) => m?.method === 'initialize')?.params?.clientInfo?.name;
+  if (typeof name === 'string') res.locals['clientInfo'] = name.slice(0, 64);
 };
 
 const webRequest = (req: Request, body: Buffer): globalThis.Request => {
@@ -94,6 +110,7 @@ const handle =
     // The SDK reads a body again when given none (a BOM, say): it must only run what guard read.
     if (message === undefined) return void res.status(400).json(PARSE_ERROR);
     const auth = await guard(options, req, message);
+    markRow(req, res, message);
     await send(await handler.fetch(webRequest(req, body), { parsedBody: message }), res, auth);
   };
 

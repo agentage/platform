@@ -5,6 +5,9 @@ Everything an agentage extension author imports or runs, and no product code. Th
 - [`@agentage/extension`](packages/extension): the extension kit (a part exports only
   `create(ctx)`; the kit owns servers, `/health`, discovery, the correlation id, the envelope, the
   store and the scheduler) and its tool (one image per part, `up` on a laptop, dev tokens).
+- [`@agentage/logs`](packages/logs): the event line. `EventSchema`, a stderr logger with one
+  JSON row per unit of work (`http`, `mcp`, `job`, `span`, `error`, `event`, `log`), `parseLine`
+  and the events client; the kit writes every part's rows through it.
 - [`@agentage/widget`](packages/widget): the ui part. React widgets as custom elements in a
   shadow root, the host bridge (`useHost`), design-system `Button` and `Card`, and the bundler
   with its harness page.
@@ -73,9 +76,11 @@ job; in memory without a store), and `/health` reports `job:{name}`. Commands an
 The manifest is the `agentage` block of the extension's `package.json` (see
 [extension-probe](https://github.com/agentage/extension-probe) for every part kind).
 
-`ctx.span(name, fn)` (server parts and the cli) runs `fn` and logs one line `{ msg: 'span', name,
-ms, ok }` (`ok: false` with `err` at error) on the current agcid; the value and the throw pass
-through.
+`ctx.span(name, fn)` (server parts and the cli) runs `fn` and writes one `span` row
+(`agentage.span.name`, `agentage.duration_ms`; `error.type` at error on a throw) on the current
+agcid; the value and the throw pass through. Every request is one `http` row, every `tools/call`
+one `mcp` row, every job run one `job` row; the agcid is 32 hex, kept from the `agcid` header or
+`traceparent`, else minted.
 
 Unit tests: `createTestContext()` (a recording log, `ctx.spans`, scheduled jobs you run with `runJob`, tools,
 `{ store: true }` for a throwaway in-process postgres with the package's migrations and seeds,

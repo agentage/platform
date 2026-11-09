@@ -7,6 +7,7 @@
     "sourceMap": false,
     "declarationMap": false
   },
+  "references": [{ "path": "../logs" }],
   "include": ["src"],
   "exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/test-support"]
 }

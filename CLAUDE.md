@@ -23,7 +23,7 @@ security, backend); this file only adds what the tree does not say.
 
 ## Commits
 
-- Scopes: `extension, widget, identity, shell, release, ci, docs, deps`; repo-level `ci`, `docs`, `chore`
+- Scopes: `extension, logs, widget, identity, shell, release, ci, docs, deps`; repo-level `ci`, `docs`, `chore`
   and `build` commits may go scopeless. Titles are conventional commits, 72 characters at most; CI
   checks the PR title.
 - A release bump commit touches one package, or uses the `release` scope.
@@ -68,6 +68,15 @@ security, backend); this file only adds what the tree does not say.
   WCAG A/AA sweep (it reaches into the shadow root) and screenshots in light and dark;
   `src/test-support/fixture` is the probe's echo widget (C7 text); widget `.tsx` lints with
   jsx-a11y and react-hooks (`overrides` lets jsx-a11y run on ESLint 10)
+
+## Layout (`packages/logs`)
+
+- `event.schema.ts` the line (`EventSchema`, seven kinds), `rows.ts` and `error-row.ts` one row per unit
+  of work with its level rule, `logger.ts` (`loggerOf` over one `row` sink, `createLogger` to
+  stderr), `redact.ts`, `parse-line.ts` (a non-event line is a raw `log` row), `events-client.ts`
+  (batches under 1 MB, 5 s timeout, one retry), `uuidv7.ts` (the agcid, 32 hex). zod and node only:
+  the kit and the cli load it, so no express. The kit feeds the request context
+  (`agcid/current.ts`, `log/who.ts`).
 
 ## Layout (`packages/identity`, `packages/shell`)
 

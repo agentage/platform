@@ -71,10 +71,19 @@ jobs:
       - name: Publish to npm (skips a version already published)
         run: |
           set -euo pipefail
-          for manifest in packages/*/package.json; do
+          # Dependencies first: logs before the kit that depends on it.
+          for manifest in packages/logs/package.json $(ls packages/*/package.json | grep -v '^packages/logs/'); do
             name=$(node -p "require('./${manifest}').name")
             version=$(node -p "require('./${manifest}').version")
             if [ "$(node -p "require('./${manifest}').private === true")" = "true" ]; then continue; fi
+            # A package whose @agentage dependency is not on npm yet (staged, say) waits for a re-run.
+            missing=$(node -p "Object.entries(require('./${manifest}').dependencies ?? {}).filter(([d]) => d.startsWith('@agentage/')).map(([d, r]) => d + '@' + r).join(' ')")
+            for dep in $missing; do
+              if [ -z "$(npm view "$dep" version 2>/dev/null)" ]; then
+                echo "::warning::${name}@${version} waits: ${dep} is not on npm yet; re-run this workflow once it is"
+                continue 2
+              fi
+            done
             if npm view "${name}@${version}" version >/dev/null 2>&1; then
               echo "${name}@${version} is already on npm"
               continue

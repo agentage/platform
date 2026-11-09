@@ -12,37 +12,41 @@ const capture = () => {
   return { span: createSpan(log), lines };
 };
 
+const AGCID = '0193a1f27c4e7b2a9f103c5d8e2a4b61';
+
 describe('span', () => {
-  it('passes the value through and logs one ok line', async () => {
+  it('passes the value through and writes one span row', async () => {
     const { span, lines } = capture();
     expect(await span('sum', () => 1 + 2)).toBe(3);
-    expect(lines).toEqual([expect.objectContaining({ level: 'info', msg: 'span', name: 'sum' })]);
-    expect(lines[0]).toMatchObject({ ok: true, ms: expect.any(Number) });
-    expect(lines[0]).not.toHaveProperty('err');
+    expect(lines).toEqual([expect.objectContaining({ kind: 'span', level: 'info' })]);
+    expect(lines[0]?.['fields']).toEqual({
+      'agentage.span.name': 'sum',
+      'agentage.duration_ms': expect.any(Number) as unknown,
+    });
   });
 
-  it('passes the throw through and logs ok false with err at error', async () => {
+  it('passes the throw through and writes the span row at error with error.type', async () => {
     const { span, lines } = capture();
     const boom = new TypeError('boom');
     await expect(span('fetch', async () => Promise.reject(boom))).rejects.toBe(boom);
-    expect(lines[0]).toMatchObject({ level: 'error', msg: 'span', name: 'fetch', ok: false });
-    expect(lines[0]?.['err']).toEqual({ type: 'TypeError', message: 'boom', stack: boom.stack });
+    expect(lines[0]).toMatchObject({ kind: 'span', level: 'error' });
+    expect(lines[0]?.['fields']).toMatchObject({ 'error.type': 'TypeError' });
   });
 
   it('carries the current agcid, inner and outer alike', async () => {
     const { span, lines } = capture();
-    const agcid = 'agcid-0001';
-    const value = await requestScope.run({ agcid }, () =>
+    const value = await requestScope.run({ agcid: AGCID }, () =>
       span('outer', () => span('inner', async () => 'x'))
     );
     expect(value).toBe('x');
-    expect(lines.map((line) => [line['name'], line['agcid']])).toEqual([
-      ['inner', agcid],
-      ['outer', agcid],
+    const rows = lines.map((line) => line as { agcid: string; fields: Record<string, unknown> });
+    expect(rows.map((row) => [row.fields['agentage.span.name'], row.agcid])).toEqual([
+      ['inner', AGCID],
+      ['outer', AGCID],
     ]);
   });
 
-  it('createTestContext records spans and their log lines', async () => {
+  it('createTestContext records spans and their rows', async () => {
     const ctx = createTestContext({ store: false });
     const boom = new Error('no');
     await ctx.span('ok', () => 1);
@@ -51,9 +55,9 @@ describe('span', () => {
       { name: 'ok', ok: true },
       { name: 'bad', ok: false, err: boom },
     ]);
-    expect(ctx.logs.map((l) => [l.level, l.message, l.fields['ok']])).toEqual([
-      ['info', 'span', true],
-      ['error', 'span', false],
+    expect(ctx.logs.map((l) => [l.level, l.fields['agentage.span.name']])).toEqual([
+      ['info', 'ok'],
+      ['error', 'bad'],
     ]);
   });
 

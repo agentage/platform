@@ -1,83 +1,68 @@
 import { describe, expect, it } from 'vitest';
 import { agcidMiddleware } from '../agcid/scope.js';
-import { createLog, logAt, type Log } from './log.js';
+import { createLog } from './log.js';
 
 const capture = () => {
   const lines: Record<string, unknown>[] = [];
-  const log = createLog({ extension: 'probe', part: 'api' }, (line) => {
+  const log = createLog({ extension: 'probe', part: 'api', version: '0.6.0' }, (line) => {
     expect(line.endsWith('\n')).toBe(true);
     lines.push(JSON.parse(line) as Record<string, unknown>);
   });
   return { log, lines };
 };
 
+const AGCID = '825f5fe46cf881ced6bd9a89f6be790b';
+
+const inRequest = (headers: Record<string, string>, fn: () => void) => {
+  const res = { locals: {}, setHeader: () => undefined };
+  const req = { get: (name: string) => headers[name], path: '/api/v1/x' };
+  agcidMiddleware(req as never, res as never, fn);
+};
+
 describe('log', () => {
-  it('writes JSON lines tagged with extension.id and extension.part', () => {
+  it('writes the event line: the 13 columns in order, author fields inside fields', () => {
     const { log, lines } = capture();
     log.info('listening', { port: 3000 });
-    log.warn('careful');
-    expect(lines[0]).toMatchObject({
-      level: 'info',
-      msg: 'listening',
-      'extension.id': 'probe',
-      'extension.part': 'api',
-      port: 3000,
-    });
-    expect(lines[1]).toMatchObject({ level: 'warn', msg: 'careful' });
-    expect(lines[0]).not.toHaveProperty('agcid');
-  });
-
-  it('passes an error whole under err', () => {
-    const { log, lines } = capture();
-    const error = new TypeError('boom');
-    log.error(error, { route: '/x', err: 'not the error' });
-    log.error('plain');
-    expect(lines[0]).toMatchObject({ level: 'error', msg: 'boom', route: '/x' });
-    expect(lines[0]?.['err']).toEqual({ type: 'TypeError', message: 'boom', stack: error.stack });
-    expect(lines[1]).toMatchObject({ msg: 'plain', err: { message: 'plain' } });
-  });
-
-  it('a field never overwrites time, level, msg or the tags', () => {
-    const { log, lines } = capture();
-    const tags = { 'extension.id': 'x', 'extension.part': 'x' };
-    log.warn('kept', { time: 'x', level: 'debug', msg: 'x', ...tags, n: 1 });
-    const kept = { 'extension.id': 'probe', 'extension.part': 'api' };
-    expect(lines[0]).toMatchObject({ level: 'warn', msg: 'kept', ...kept });
-    expect(lines[0]?.['time']).toMatch(/^\d{4}-\d\d-\d\dT/);
     expect(Object.keys(lines[0] ?? {})).toEqual([
-      ...['time', 'level', 'msg', 'extension.id', 'extension.part', 'n'],
+      ...['ts', 'level', 'kind', 'msg', 'extension', 'part', 'version'],
+      ...['agcid', 'sub', 'session', 'user_type', 'client', 'fields'],
     ]);
+    expect(lines[0]).toMatchObject({
+      ...{ level: 'info', kind: 'log', msg: 'listening', extension: 'probe', part: 'api' },
+      ...{ agcid: null, sub: null, user_type: 'service', fields: { port: 3000 } },
+    });
   });
 
-  it('tags a line written inside a request with its agcid', () => {
+  it('writes an error row with type, message, stack, where and a fingerprint', () => {
     const { log, lines } = capture();
-    const res = { locals: {}, setHeader: () => undefined };
-    const req = { get: () => 'caller-chosen-id' };
-    agcidMiddleware(req as never, res as never, () => log.info('in a request'));
-    expect(lines[0]).toMatchObject({ msg: 'in a request', agcid: 'caller-chosen-id' });
+    log.error(new TypeError('boom'), '/api/v1/x');
+    log.error('plain', { job: 'tick' });
+    expect(lines[0]).toMatchObject({ level: 'error', kind: 'error', msg: 'TypeError: boom' });
+    expect(lines[0]?.['fields']).toMatchObject({
+      ...{ 'exception.type': 'TypeError', 'exception.message': 'boom' },
+      'agentage.where': '/api/v1/x',
+      'agentage.fingerprint': expect.stringMatching(/^TypeError@.*log\.test\.ts:\d+$/) as unknown,
+    });
+    expect(lines[1]).toMatchObject({ msg: 'Error: plain', fields: { job: 'tick' } });
   });
 
-  it('adds version and base fields after the tags', () => {
+  it('takes agcid, session, user_type and client from the request it runs in', () => {
+    const { log, lines } = capture();
+    const headers = { agcid: AGCID, agsid: 'sit_1', 'user-agent': 'curl/8.5.0' };
+    inRequest(headers, () => log.info('in a request'));
+    expect(lines[0]).toMatchObject({
+      ...{ agcid: AGCID, session: 'sit_1', sub: null },
+      ...{ user_type: 'automation', client: 'curl' },
+    });
+  });
+
+  it('adds base fields under fields; a log line naming event.name is that event', () => {
     const lines: Record<string, unknown>[] = [];
     const tags = { extension: 'probe', part: 'cli', version: '1.2.3', base: { command: 'sync' } };
-    createLog(tags, (l) => void lines.push(JSON.parse(l) as Record<string, unknown>)).info('x');
-    expect(Object.keys(lines[0] ?? {})).toEqual([
-      ...['time', 'level', 'msg', 'extension.id', 'extension.part', 'version', 'command'],
-    ]);
-  });
-
-  it('logAt writes an error-level line without err, and falls back on another Log', () => {
-    const { log, lines } = capture();
-    logAt(log, 'error', 'request', { status: 500 });
-    expect(lines[0]).toEqual(expect.not.objectContaining({ err: expect.anything() }));
-    const seen: string[] = [];
-    const other: Log = {
-      info: (m) => void seen.push(`info ${m}`),
-      warn: (m) => void seen.push(`warn ${m}`),
-      error: (e) => void seen.push(`error ${String(e)}`),
-    };
-    logAt(other, 'warn', 'a', {});
-    logAt(other, 'error', 'b', {});
-    expect(seen).toEqual(['warn a', 'error b']);
+    const log = createLog(tags, (l) => void lines.push(JSON.parse(l) as Record<string, unknown>));
+    log.info('x');
+    log.info('probe emitted', { 'event.name': 'probe.emitted', 'agentage.probe.n': 1 });
+    expect(lines[0]).toMatchObject({ kind: 'log', fields: { command: 'sync' } });
+    expect(lines[1]).toMatchObject({ kind: 'event', level: 'info', msg: 'probe emitted' });
   });
 });

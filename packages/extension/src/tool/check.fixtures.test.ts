@@ -21,8 +21,8 @@ const REFUSED: Record<string, string> = {
 
 // Store kind refusals: one overlay each, beside the per-rule ones.
 const KINDS: Record<string, string> = {
-  'bad-store-kind': 'manifest: agentage.parts.store: one of postgres, signoz, git',
-  'bad-store-served': 'store: kind git is not served yet; served: postgres, signoz',
+  'bad-store-kind': 'manifest: agentage.parts.store: one of postgres, signoz, git, clickhouse',
+  'bad-store-served': 'store: kind git is not served yet; served: postgres, signoz, clickhouse',
 };
 
 // Folder rules: one overlay each, inside the entries and sealing rules.

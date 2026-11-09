@@ -4,7 +4,7 @@ import { createTestStore } from '../store/test-store.js';
 import { storeRuns } from './runs.js';
 import { createScheduler } from './scheduler.js';
 
-const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const UUID_V7 = /^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$/;
 
 describe('a job run carries an agcid', () => {
   const store = createTestStore(async () => undefined);
@@ -22,7 +22,8 @@ describe('a job run carries an agcid', () => {
     await scheduler.run('tick');
     const saved = await runs.last('tick');
     expect(saved?.agcid).toMatch(UUID_V7);
-    expect(lines.map((line) => line['agcid'])).toEqual([lines[0]?.['agcid'], saved?.agcid]);
+    const first = lines[0]?.['agcid'];
+    expect(lines.map((line) => line['agcid'])).toEqual([first, first, saved?.agcid, saved?.agcid]);
     expect(lines[0]?.['agcid']).not.toBe(saved?.agcid);
     await scheduler.run('crash');
     expect(lines.at(-1)?.['agcid']).toBe((await runs.last('crash'))?.agcid);

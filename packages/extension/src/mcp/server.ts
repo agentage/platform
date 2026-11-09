@@ -13,9 +13,9 @@ export interface ServerIdentity {
 const text = (value: string) => [{ type: 'text' as const, text: value }];
 
 // A failed tool: isError, the REST error shape, an agcid (minted outside a request); else INTERNAL.
-const errorResult = (err: unknown, log: Log) => {
+const errorResult = (err: unknown, log: Log, tool: string) => {
   const failure: Failure = isFailure(err) ? err : fail('INTERNAL', 'Internal error');
-  if (failure.status >= 500) log.error(err);
+  if (failure.status >= 500) log.error(err, tool);
   const error = { code: failure.code, message: failure.message, agcid: agcidOf(currentAgcid()) };
   return { isError: true, content: text(error.message), structuredContent: { error } };
 };
@@ -32,15 +32,28 @@ const argsOf = (entry: ToolEntry, args: Record<string, unknown>) => {
   throw fail('VALIDATION_ERROR', `Invalid arguments: ${[...fields].join(', ')}`);
 };
 
-const callback = (entry: ToolEntry, log: Log) => async (args: Record<string, unknown>) => {
-  try {
-    const output = entry.spec.output.parse(await entry.handler(argsOf(entry, args)));
-    const content = text(JSON.stringify(output));
-    return { content, structuredContent: output as Record<string, unknown> };
-  } catch (err) {
-    return errorResult(err, log);
-  }
-};
+// agentage.results: the length of the first list in the output, else 1.
+const countOf = (output: Record<string, unknown>): number =>
+  (Object.values(output).find(Array.isArray) as unknown[] | undefined)?.length ?? 1;
+
+// A 4xx failure is a rejection (its code); anything else failed; one mcp row either way.
+const outcomeOf = (err: unknown) =>
+  isFailure(err) && err.status < 500 ? { code: err.code } : { error: err };
+
+const callback =
+  (entry: ToolEntry, log: Log, tool: string) => async (args: Record<string, unknown>) => {
+    const start = performance.now();
+    const ms = () => Math.round(performance.now() - start);
+    try {
+      const output = entry.spec.output.parse(await entry.handler(argsOf(entry, args)));
+      log.mcp({ tool, ms: ms(), results: countOf(output) });
+      const content = text(JSON.stringify(output));
+      return { content, structuredContent: output as Record<string, unknown> };
+    } catch (err) {
+      log.mcp({ tool, ms: ms(), ...outcomeOf(err) });
+      return errorResult(err, log, tool);
+    }
+  };
 
 // One fresh server per request (stateless); serverInfo agentage-{id} at the package version.
 export const serverFactory = (identity: ServerIdentity, tools: ToolEntry[], log: Log) => () => {
@@ -51,7 +64,8 @@ export const serverFactory = (identity: ServerIdentity, tools: ToolEntry[], log:
       inputSchema: listedOnly(entry.spec.input),
       outputSchema: entry.spec.output,
     };
-    server.registerTool(prefixed(identity.id, entry.name), config, callback(entry, log));
+    const tool = prefixed(identity.id, entry.name);
+    server.registerTool(tool, config, callback(entry, log, tool));
   }
   return server;
 };

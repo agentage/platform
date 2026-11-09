@@ -97,13 +97,17 @@ describe('a ctx.route api part behind the token check', () => {
     // An undeclared path needs read, as before: the bearer first, then NOT_FOUND.
     const authorization = await issuer.bearer({ scope: 'probe:read' });
     const off = await fetch(`${url}/api/v1/nope`, {
-      headers: { agcid: 'route-part-404', authorization },
+      headers: { agcid: 'ad15a1b29af002980eb6e0274d622d42', authorization },
     });
     expect([off.status, await off.json()]).toEqual([
       404,
       {
         success: false,
-        error: { code: 'NOT_FOUND', message: 'Not found', agcid: 'route-part-404' },
+        error: {
+          code: 'NOT_FOUND',
+          message: 'Not found',
+          agcid: 'ad15a1b29af002980eb6e0274d622d42',
+        },
       },
     ]);
   });

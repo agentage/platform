@@ -1,7 +1,15 @@
 import { createRemoteJWKSet, errors, jwtVerify, type JWTVerifyGetKey } from 'jose';
 import { z } from 'zod';
 import { fail, isFailure } from '../envelope/envelope.js';
-import { rank, retryOnce, scopeOf, VERBS, type Access, type TokenCheck } from './token-check.js';
+import {
+  rank,
+  retryOnce,
+  scopeOf,
+  VERBS,
+  withJti,
+  type Access,
+  type TokenCheck,
+} from './token-check.js';
 
 export interface TokenCheckDeps {
   issuer: string;
@@ -84,5 +92,5 @@ export const createTokenCheck =
     if (jti !== undefined && !deps.revoked.loaded()) throw unavailable('Revoked list unavailable');
     if (jti !== undefined && deps.revoked.has(jti)) throw invalid(deps.origin, 'Token revoked');
     if (!grants(scope, deps.id, access)) throw forbidden(scopeOf(deps.id, access));
-    return { sub, scopes: scope.split(' ') };
+    return withJti({ sub, scopes: scope.split(' ') }, jti);
   };

@@ -7,7 +7,7 @@ import { ErrorEnvelopeSchema, OkEnvelopeSchema } from './envelope.schema.js';
 import { parse } from './parse.js';
 import { z } from 'zod';
 
-const AGCID = '0193a1f2-7c4e-7b2a-9f10-3c5d8e2a4b61';
+const AGCID = '0193a1f27c4e7b2a9f103c5d8e2a4b61';
 
 describe('envelope', () => {
   it('ok wraps data, with meta only when given', () => {

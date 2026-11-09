@@ -1,4 +1,5 @@
-import { messageOf, withLineAt, type Log, type LogFields, type LogLevel } from '../log/log.js';
+import { loggerOf } from '@agentage/logs';
+import { messageOf, type Log, type LogFields, type LogLevel } from '../log/log.js';
 
 export interface LogEntry {
   level: LogLevel;
@@ -6,17 +7,12 @@ export interface LogEntry {
   fields: LogFields;
 }
 
-export const recordingLog = (logs: LogEntry[]): Log =>
-  withLineAt(
-    {
-      info: (message, fields = {}) => void logs.push({ level: 'info', message, fields }),
-      warn: (message, fields = {}) => void logs.push({ level: 'warn', message, fields }),
-      error: (error, fields = {}) =>
-        void logs.push({
-          level: 'error',
-          message: messageOf(error),
-          fields: { ...fields, err: error },
-        }),
-    },
-    (level, message, fields) => void logs.push({ level, message, fields })
-  );
+// The test context's log: every row as an entry; error keeps the thrown value under err.
+export const recordingLog = (logs: LogEntry[]): Log => {
+  const log = loggerOf(({ level, msg, fields }) => void logs.push({ level, message: msg, fields }));
+  const error: Log['error'] = (err, where = {}) => {
+    const fields = typeof where === 'string' ? { 'agentage.where': where } : where;
+    logs.push({ level: 'error', message: messageOf(err), fields: { ...fields, err } });
+  };
+  return { ...log, error };
+};
