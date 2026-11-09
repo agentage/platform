@@ -1,6 +1,7 @@
 {
   "name": "@agentage/logs",
   "version": "0.1.0",
+  "private": true,
   "description": "The agentage event line: the schema, a stderr logger with one JSON line per unit of work, and the events client",
   "type": "module",
   "sideEffects": false,

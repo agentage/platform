@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as contracts from './contracts/index.js';
 import * as kit from './index.js';
+import * as logs from './logs/index.js';
 import * as tool from './tool/index.js';
 
 // Sealing: an author gets the envelope and test helpers, never the server, port or record.
@@ -63,6 +64,18 @@ describe('public surface', () => {
       'HealthSchema',
       'OkEnvelopeSchema',
       'isAgcid',
+    ]);
+  });
+
+  it('the logs subpath exports the event line', () => {
+    expect(Object.keys(logs).sort()).toEqual([
+      'EventSchema',
+      'KINDS',
+      'LEVELS',
+      'USER_TYPES',
+      'createEventsClient',
+      'createLogger',
+      'parseLine',
     ]);
   });
 });

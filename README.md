@@ -7,7 +7,8 @@ Everything an agentage extension author imports or runs, and no product code. Th
   store and the scheduler) and its tool (one image per part, `up` on a laptop, dev tokens).
 - [`@agentage/logs`](packages/logs): the event line. `EventSchema`, a stderr logger with one
   JSON row per unit of work (`http`, `mcp`, `job`, `span`, `error`, `event`, `log`), `parseLine`
-  and the events client; the kit writes every part's rows through it.
+  and the events client; the kit writes every part's rows through it. Private for now: the kit
+  ships it inside its own tarball, import it from `@agentage/extension/logs`.
 - [`@agentage/widget`](packages/widget): the ui part. React widgets as custom elements in a
   shadow root, the host bridge (`useHost`), design-system `Button` and `Card`, and the bundler
   with its harness page.

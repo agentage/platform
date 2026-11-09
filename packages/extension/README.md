@@ -4,6 +4,8 @@ The agentage extension kit. Each part module (pages, api, mcp, worker, cli) expo
 `create(ctx)`; the kit owns the server, port, `/health`, the discovery document, the `agcid`
 correlation id, the response envelope, the store pool, the scheduler and argument parsing.
 `@agentage/extension/tool` is the tool behind `agentage extension build | up | down | token`.
+`@agentage/extension/logs` is the event line (`EventSchema`, `parseLine`, `createLogger`,
+`createEventsClient`, `KINDS`, `LEVELS`, `USER_TYPES`), built into the kit's own tarball.
 
 ```bash
 npm install @agentage/extension express zod
