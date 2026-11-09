@@ -47,11 +47,13 @@ const SiteSchema = z.record(z.string().regex(KEY), ENTRY).superRefine((site, ctx
 });
 
 const lookup = (site: PagesSite, path: string) => {
-  if (site[path] !== undefined) return { entry: site[path], rest: '' };
+  if (site[path] !== undefined) return { entry: site[path], rest: '', key: path };
   const key = Object.keys(site)
     .filter((k) => k.endsWith('/*') && path.startsWith(k.slice(0, -1)))
     .sort((a, b) => b.length - a.length)[0];
-  return key ? { entry: site[key] as PagesEntry, rest: path.slice(key.length - 1) } : undefined;
+  return key
+    ? { entry: site[key] as PagesEntry, rest: path.slice(key.length - 1), key }
+    : undefined;
 };
 
 export const NOT_FOUND_PAGE =
@@ -62,7 +64,8 @@ const serve =
   (req, res, next) => {
     const found = lookup(site, req.path);
     if (!found) return next();
-    const { entry, rest } = found;
+    const { entry, rest, key } = found;
+    res.locals['route'] = key;
     const query = req.originalUrl.indexOf('?');
     if (typeof entry === 'object' && 'redirect' in entry)
       return res.redirect(

@@ -192,6 +192,19 @@ describe('inline script hashes', () => {
       );
     expect(await (await fetch(`${served.url}/app/a/b`)).text()).toBe('<p>shell</p>');
   });
+
+  it('logs the site key as the route, so page views split per page', async () => {
+    const recorded = recordedLog();
+    const site = { '/': '<p>home</p>', '/app/*': '<p>shell</p>' };
+    served = await serveApp(createPagesApp({ pkg: PKG, build: BUILD, log: recorded.log, site }));
+    for (const path of ['/', '/app/a/b', '/nope']) await fetch(`${served.url}${path}`);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(recorded.lines.map((line) => line['http.route'])).toEqual([
+      '/',
+      '/app/*',
+      '(unmatched)',
+    ]);
+  });
 });
 
 const NEXT = {

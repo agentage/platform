@@ -30,8 +30,9 @@ const start = async () => {
   });
   served = await serveApp(app);
   const { url } = served;
-  const get = (path: string) => fetch(`${url}${path}`, { headers: { agcid: 'trace-line-check' } });
-  const requests = () => recorded.lines.filter((line) => line['msg'] === 'request');
+  const get = (path: string) =>
+    fetch(`${url}${path}`, { headers: { agcid: '128f1c5b806b5e5f05e49675aa8a9a10' } });
+  const requests = () => recorded.lines.filter((line) => line['kind'] === 'http');
   return { get, requests, lines: recorded.lines };
 };
 
@@ -46,17 +47,22 @@ describe('request line', () => {
     await get('/api/v1/boom');
     await get('/api/v1/users/9/nope');
     await settle();
-    const fields = requests().map(({ level, route, status, method }) => ({
-      ...{ level, route, status, method },
-    }));
-    expect(fields).toEqual([
-      { level: 'info', route: '/api/v1/items/:id', status: 200, method: 'GET' },
-      { level: 'warn', route: '/api/v1/missing/:id', status: 404, method: 'GET' },
-      { level: 'error', route: '/api/v1/boom', status: 500, method: 'GET' },
-      { level: 'warn', route: '/api/v1', status: 404, method: 'GET' },
+    const fields = requests().map((line) => [
+      ...[line['level'], line['http.route'], line['http.response.status_code']],
+      ...[line['http.request.method'], line['error.type']],
     ]);
-    expect(requests()[0]).toMatchObject({ agcid: 'trace-line-check', 'extension.id': 'probe' });
-    expect(typeof requests()[0]?.['ms']).toBe('number');
+    expect(fields).toEqual([
+      ['info', '/api/v1/items/:id', 200, 'GET', undefined],
+      ['warn', '/api/v1/missing/:id', 404, 'GET', undefined],
+      ['error', '/api/v1/boom', 500, 'GET', 'Error'],
+      ['warn', '(unmatched)', 404, 'GET', undefined],
+    ]);
+    expect(requests()[0]).toMatchObject({
+      agcid: '128f1c5b806b5e5f05e49675aa8a9a10',
+      extension: 'probe',
+      msg: 'GET /api/v1/items/:id 200',
+    });
+    expect(typeof requests()[0]?.['agentage.duration_ms']).toBe('number');
   });
 
   it('never logs the raw URL, a query string or an id, and carries no err', async () => {
@@ -66,9 +72,10 @@ describe('request line', () => {
     await settle();
     const text = JSON.stringify(requests());
     expect(text).not.toMatch(/secret-query|usr_42|token/);
-    expect(requests().every((line) => !('err' in line))).toBe(true);
-    expect(lines.filter((line) => 'err' in line).map((line) => line['msg'])).toEqual([
-      'driver down',
+    expect(requests().every((line) => !('exception.stacktrace' in line))).toBe(true);
+    const errors = lines.filter((line) => line['kind'] === 'error');
+    expect(errors.map((line) => [line['msg'], line['agentage.where']])).toEqual([
+      ['Error: driver down', '/api/v1/boom'],
     ]);
   });
 

@@ -141,7 +141,10 @@ describe('store', () => {
         rules: [store],
       });
     expect((await at('git')).problems).toEqual([
-      { rule: 'store', problem: 'kind git is not served yet; served: postgres, signoz' },
+      {
+        rule: 'store',
+        problem: 'kind git is not served yet; served: postgres, signoz, clickhouse',
+      },
     ]);
     expect((await at('signoz')).skipped).toEqual({ store: 'kind signoz has no migrations' });
     expect(docker.calls).toEqual([]);

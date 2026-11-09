@@ -89,22 +89,32 @@ describe('token check on api routes', () => {
     const s = await api(recorder(() => fail('UNAUTHORIZED', 'No token')).check);
     const res = await fetch(`${s.url}/api/v1/body`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', agcid: 'trace-401-check' },
+      headers: { 'content-type': 'application/json', agcid: '3fd6a48e2afa49f5f130b533e39c1d61' },
       body: '{nope',
     });
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({
       success: false,
-      error: { code: 'UNAUTHORIZED', message: 'No token', agcid: 'trace-401-check' },
+      error: {
+        code: 'UNAUTHORIZED',
+        message: 'No token',
+        agcid: '3fd6a48e2afa49f5f130b533e39c1d61',
+      },
     });
     await served?.close();
     const down = await api(recorder(() => fail('UNAVAILABLE', 'JWKS unreachable')).check);
-    const busy = await fetch(`${down.url}/api/v1/echo`, { headers: { agcid: 'trace-503-check' } });
+    const busy = await fetch(`${down.url}/api/v1/echo`, {
+      headers: { agcid: 'df7e0c6818e2daa20eee8903cd16f2d6' },
+    });
     expect(busy.status).toBe(503);
     expect(busy.headers.get('retry-after')).toBe('30');
     expect(await busy.json()).toEqual({
       success: false,
-      error: { code: 'UNAVAILABLE', message: 'JWKS unreachable', agcid: 'trace-503-check' },
+      error: {
+        code: 'UNAVAILABLE',
+        message: 'JWKS unreachable',
+        agcid: 'df7e0c6818e2daa20eee8903cd16f2d6',
+      },
     });
   });
 

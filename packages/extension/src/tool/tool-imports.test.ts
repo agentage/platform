@@ -6,6 +6,10 @@ import { externalImports } from '../test-support/import-graph.js';
 describe('tool entry', () => {
   it('loads no server dependency', () => {
     const external = externalImports(join(resolve(import.meta.dirname), 'index.ts'));
-    expect(external.filter((spec) => !spec.startsWith('node:'))).toEqual(['semver', 'zod']);
+    expect(external.filter((spec) => !spec.startsWith('node:'))).toEqual([
+      '@agentage/logs',
+      'semver',
+      'zod',
+    ]);
   });
 });

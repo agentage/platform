@@ -85,10 +85,10 @@ const newEntry = (
 const runJob = async (entry: Entry, log: Log, buffer: RunBuffer) => {
   try {
     await withRunBuffer(buffer, async () => entry.job());
-    return 'ok' as const;
+    return { status: 'ok' as const };
   } catch (err) {
-    await withRunBuffer(buffer, async () => log.error(err, { job: entry.name }));
-    return 'failed' as const;
+    await withRunBuffer(buffer, async () => log.error(err, { 'agentage.where': entry.name }));
+    return { status: 'failed' as const, error: err };
   }
 };
 
@@ -101,10 +101,17 @@ const executeScoped = async (s: State, entry: Entry): Promise<JobRun> => {
   const startedAt = s.now();
   Object.assign(entry, { running: true, runningSince: startedAt, overran: false });
   const buffer: RunBuffer = { text: '', truncated: false };
-  const status = await runJob(entry, s.deps.log, buffer);
+  const { status, error } = await runJob(entry, s.deps.log, buffer);
   entry.running = false;
   entry.last = status;
   const agcid = requestScope.getStore()?.agcid;
+  const ms = s.now().getTime() - startedAt.getTime();
+  s.deps.log.job({
+    name: entry.name,
+    runId: agcid ?? '',
+    ms,
+    ...(error === undefined ? {} : { error }),
+  });
   const run: JobRun = { job: entry.name, startedAt, endedAt: s.now(), status, log: buffer.text };
   if (agcid) run.agcid = agcid;
   if (entry.timeoutMs !== undefined) run.timeoutMs = entry.timeoutMs;

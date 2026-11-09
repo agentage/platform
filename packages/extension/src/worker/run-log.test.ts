@@ -43,8 +43,8 @@ describe('run log', () => {
       ['info', 'outside'],
       ['info', 'one'],
       ['warn', 'two'],
-      ['error', 'not an Error'],
-      ['error', 'three'],
+      ['error', 'Error: not an Error'],
+      ['error', 'Error: three'],
     ]);
     expect(lines[1]).toMatchObject({ n: 1 });
   });

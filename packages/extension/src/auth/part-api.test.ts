@@ -29,11 +29,17 @@ const start = () => startPart(dir, 'api', authEnv(issuer, dir));
 describe('an api part checks tokens (C5, C6)', () => {
   it('401 without a token, 403 naming the scope, 200 no-store with the caller; public stays open', async () => {
     const url = await start();
-    const none = await fetch(`${url}/api/v1/echo`, { headers: { agcid: 'trace-401-m3' } });
+    const none = await fetch(`${url}/api/v1/echo`, {
+      headers: { agcid: 'a256f13a2f60fa2869e39488f5974e70' },
+    });
     expect([none.status, none.headers.get('www-authenticate')]).toEqual([401, RESOURCE]);
     expect(await none.json()).toEqual({
       success: false,
-      error: { code: 'UNAUTHORIZED', message: 'Missing token', agcid: 'trace-401-m3' },
+      error: {
+        code: 'UNAUTHORIZED',
+        message: 'Missing token',
+        agcid: 'a256f13a2f60fa2869e39488f5974e70',
+      },
     });
     const memory = await issuer.bearer({ scope: 'memory:read' });
     const refused = await fetch(`${url}/api/v1/echo`, { headers: { authorization: memory } });

@@ -1,0 +1,47 @@
+{
+  "name": "@agentage/logs",
+  "version": "0.1.0",
+  "description": "The agentage event line: the schema, a stderr logger with one JSON line per unit of work, and the events client",
+  "type": "module",
+  "sideEffects": false,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/agentage/platform.git",
+    "directory": "packages/logs"
+  },
+  "homepage": "https://agentage.io",
+  "bugs": {
+    "url": "https://github.com/agentage/platform/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "!dist/**/*.test.*"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "verify": "npm run verify --prefix ../..",
+    "prepublishOnly": "npm run verify"
+  },
+  "dependencies": {
+    "zod": "^4.2.0"
+  },
+  "keywords": [
+    "agentage",
+    "logs",
+    "telemetry"
+  ]
+}

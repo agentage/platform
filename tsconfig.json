@@ -23,6 +23,7 @@
   },
   "files": [],
   "references": [
+    { "path": "packages/logs" },
     { "path": "packages/extension" },
     { "path": "packages/widget" },
     { "path": "packages/identity" },

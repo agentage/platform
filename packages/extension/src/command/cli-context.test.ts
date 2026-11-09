@@ -6,7 +6,7 @@ import { API_MANIFEST, json, tempPackage } from '../test-support/packages.js';
 import { type CliClient } from './command.types.js';
 import { runCommand, type RunCommandOptions } from './run-command.js';
 
-const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const UUID_V7 = /^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$/;
 
 const CLI = `export const create = (ctx) => ({
   whoami: async () => {
@@ -58,13 +58,13 @@ describe('cli ctx', () => {
     expect(((await stat(join(dataDir, 'probe'))).mode & 0o777).toString(8)).toBe('700');
     const lines = stderr.map((line) => JSON.parse(line) as Record<string, unknown>);
     expect(lines[0]).toMatchObject({
-      ...{ msg: 'who', 'extension.id': 'probe', 'extension.part': 'cli', version: '1.4.2' },
-      ...{ command: 'whoami', user },
+      ...{ msg: 'who', extension: 'probe', part: 'cli', version: '1.4.2', kind: 'log' },
+      fields: { command: 'whoami', user },
     });
     expect(lines[0]?.['agcid']).toMatch(UUID_V7);
     expect(lines[1]?.['agcid']).toBe(lines[0]?.['agcid']);
     const second = await run('whoami', { dataDir, client });
-    expect(JSON.parse(second.stderr[0] ?? '{}')).toMatchObject({ user: null });
+    expect(JSON.parse(second.stderr[0] ?? '{}')).toMatchObject({ fields: { user: null } });
     expect(JSON.parse(second.stderr[0] ?? '{}')['agcid']).not.toBe(lines[0]?.['agcid']);
   });
 

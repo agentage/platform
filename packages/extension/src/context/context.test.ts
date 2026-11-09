@@ -1,11 +1,12 @@
 import { Router } from 'express';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { validateManifest } from '../manifest/read-manifest.js';
 import { API_MANIFEST, SHA, SPEC_MANIFEST } from '../test-support/packages.js';
 import { recordedLog } from '../test-support/http.js';
 import { startTestServer } from '../testing/test-server.js';
 import { setCaller } from '../auth/token-check.js';
 import { platformOf } from '../auth/part-auth.js';
+import { requestScope } from '../agcid/current.js';
 import { createContext, settingDefaults } from './context.js';
 import { createTestContext } from './test-context.js';
 
@@ -149,5 +150,31 @@ describe('ctx.platform', () => {
     expect(createTestContext({ platform: platformOf(rest) }).platform.issuer).toBe(
       'https://auth.agentage.io'
     );
+  });
+
+  it('ctx.exit marks the request for shutdown after its answer, else sends SIGTERM now', () => {
+    const kill = vi.spyOn(process, 'kill').mockImplementation(() => true);
+    const ctx = createContext({ ...BASE, pkg: validateManifest(API_MANIFEST) });
+    const scope = { agcid: '0'.repeat(31) + '1' } as { agcid: string; exit?: boolean };
+    requestScope.run(scope, () => ctx.exit());
+    expect([scope.exit, kill.mock.calls.length]).toEqual([true, 0]);
+    ctx.exit();
+    expect(kill).toHaveBeenCalledWith(process.pid, 'SIGTERM');
+    kill.mockRestore();
+    const test = createTestContext();
+    test.exit();
+    expect(test.exits).toHaveLength(1);
+  });
+
+  it('ctx.health adds a named check to the checks /health reads; a bad or taken name throws', async () => {
+    const checks = {};
+    const ctx = createContext({ ...BASE, pkg: validateManifest(API_MANIFEST), checks });
+    ctx.health('clickhouse', async () => 'ok');
+    expect(Object.keys(checks)).toEqual(['clickhouse']);
+    expect(() => ctx.health('clickhouse', async () => 'ok')).toThrow(/taken/);
+    expect(() => ctx.health('Bad Name', async () => 'ok')).toThrow(/a-z0-9/);
+    const test = createTestContext();
+    test.health('clickhouse', async () => 'degraded');
+    expect(await test.checks['clickhouse']?.()).toBe('degraded');
   });
 });

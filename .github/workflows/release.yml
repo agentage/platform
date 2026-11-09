@@ -71,17 +71,32 @@ jobs:
       - name: Publish to npm (skips a version already published)
         run: |
           set -euo pipefail
-          for manifest in packages/*/package.json; do
+          held=()
+          # Dependencies first: logs before the kit that depends on it.
+          for manifest in packages/logs/package.json $(ls packages/*/package.json | grep -v '^packages/logs/'); do
             name=$(node -p "require('./${manifest}').name")
             version=$(node -p "require('./${manifest}').version")
             if [ "$(node -p "require('./${manifest}').private === true")" = "true" ]; then continue; fi
+            # A package whose @agentage dependency is not on npm yet (staged, say) waits for a re-run of this tag run.
+            missing=$(node -p "Object.entries(require('./${manifest}').dependencies ?? {}).filter(([d]) => d.startsWith('@agentage/')).map(([d, r]) => d + '@' + r).join(' ')")
+            for dep in $missing; do
+              if [ -z "$(npm view "$dep" version 2>/dev/null)" ]; then
+                held+=("${name}@${version} waits: ${dep} is not on npm yet")
+                continue 2
+              fi
+            done
             if npm view "${name}@${version}" version >/dev/null 2>&1; then
               echo "${name}@${version} is already on npm"
               continue
             fi
+            # No validated trusted publisher: stage it once for approval, no GitHub release.
             if ! npm publish -w "${name}" --access public --provenance; then
-              echo "direct publish of ${name}@${version} not authorized (no validated trusted publisher): staging it for approval"
-              npm stage publish -w "${name}" --access public --provenance
+              if npm stage publish -w "${name}" --access public --provenance; then
+                held+=("${name}@${version} STAGED for approval on npmjs.com, not published")
+              else
+                held+=("${name}@${version} not published and not staged (already staged? approve it on npmjs.com)")
+              fi
+              continue
             fi
             echo "published ${name}@${version}" >> "$GITHUB_STEP_SUMMARY"
             # The extension kit keeps the pushed v<version> tag; every other package gets <name>@<version>.
@@ -97,3 +112,12 @@ jobs:
             notes=$(git log --oneline "$range" -- "$dir")
             gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --target "$GITHUB_SHA" --title "${name}@${version}" --notes "${notes:-No changes under ${dir}}"
           done
+          # A green run means everything shipped; anything held turns it red with the reason.
+          for line in "${held[@]}"; do
+            echo "::error::${line}"
+            echo "HELD: ${line}" >> "$GITHUB_STEP_SUMMARY"
+          done
+          if [ ${#held[@]} -gt 0 ]; then
+            echo "Approve or publish what is held, then re-run this tag run (a dispatch runs master HEAD, not the tag)." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi

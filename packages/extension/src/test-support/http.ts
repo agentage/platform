@@ -28,7 +28,11 @@ export interface RecordedLog {
 
 export const recordedLog = (): RecordedLog => {
   const lines: Record<string, unknown>[] = [];
-  const write = (line: string) => void lines.push(JSON.parse(line) as Record<string, unknown>);
+  // The row with its fields lifted to the top, so a test reads line['reason'] as before.
+  const write = (line: string) => {
+    const row = JSON.parse(line) as Record<string, unknown>;
+    lines.push({ ...row, ...(row['fields'] as Record<string, unknown>) });
+  };
   return { log: createLog({ extension: 'probe', part: 'test' }, write), lines };
 };
 

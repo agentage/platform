@@ -1,5 +1,6 @@
 import { createRouteRegistry, type RouteEntry, type RouteRegistrar } from '../api/routes.js';
 import { type WellKnownRegistrar } from '../api/well-known.js';
+import type { HealthCheck } from '../health/health.js';
 import { type Log } from '../log/log.js';
 import { createSpan, type SpanRecord } from '../log/span.js';
 import { createToolRegistry, type ToolEntry, type ToolRegistrar } from '../mcp/tools.js';
@@ -12,6 +13,7 @@ import { createScheduler, type Schedule } from '../worker/scheduler.js';
 import { type StoreKind } from '../manifest/primitives.schema.js';
 import {
   NO_PLATFORM,
+  healthRegistrar,
   NO_STORE,
   type ExtensionInfo,
   type PlatformInfo,
@@ -44,6 +46,10 @@ export interface TestContext extends PartContext {
   readonly wellKnown: WellKnownRegistrar;
   readonly jobs: ScheduledJob[];
   readonly spans: SpanRecord[];
+  // When each ctx.exit() was called; a test context never exits.
+  readonly exits: number[];
+  // Each ctx.health(name, check) registration.
+  readonly checks: Record<string, HealthCheck>;
   runJob(name: string): Promise<JobRun | undefined>;
 }
 
@@ -112,6 +118,8 @@ const serverContext = (options: TestContextOptions): TestContext => {
   const { extension, ...open } = identityOf(options);
   const store = testStore(open.store, recordingLog([]));
   const caller = { sub: 'usr_test', scopes: [`${extension.id}:read`] };
+  const exits: number[] = [];
+  const checks: Record<string, HealthCheck> = {};
   return {
     extension,
     auth: { caller: () => caller },
@@ -123,6 +131,10 @@ const serverContext = (options: TestContextOptions): TestContext => {
     store: store ?? NO_STORE,
     secrets: Object.freeze({ ...options.secrets }),
     platform: Object.freeze({ ...(options.platform ?? NO_PLATFORM) }),
+    exits,
+    exit: () => void exits.push(Date.now()),
+    checks,
+    health: healthRegistrar(checks),
     close: async () => store?.close(),
     ...recorders(log),
   };

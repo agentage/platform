@@ -56,6 +56,14 @@ export { ErrorEnvelopeSchema, OkEnvelopeSchema } from './envelope/envelope.schem
 export { parse, type ParseSchema } from './envelope/parse.js';
 export { type HealthBody, type HealthStatus } from './health/health.schema.js';
 export { type Log, type LogFields } from './log/log.js';
+export {
+  createEventsClient,
+  EventSchema,
+  parseLine,
+  type Event,
+  type EventsClientOptions,
+  type PostEvent,
+} from '@agentage/logs';
 export { type Span, type SpanRecord } from './log/span.js';
 export {
   type McpContext,

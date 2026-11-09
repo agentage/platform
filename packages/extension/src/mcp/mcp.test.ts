@@ -43,14 +43,19 @@ const start = async () => {
   return { server, ctx };
 };
 
-const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const UUID_V7 = /^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$/;
 const HEADERS = {
   'content-type': 'application/json',
   accept: 'application/json, text/event-stream',
   'mcp-protocol-version': '2025-11-25',
 };
 
-const call = async (s: TestServer, name: string, args: object, agcid = 'trace-mcp-check') => {
+const call = async (
+  s: TestServer,
+  name: string,
+  args: object,
+  agcid = '996898428ea33f8e0a9ba8b4e1eac9c0'
+) => {
   const res = await s.fetch('/mcp', {
     method: 'POST',
     headers: { ...HEADERS, agcid },
@@ -84,15 +89,23 @@ describe('mcp part', () => {
     const { server: s, ctx } = await start();
     const refused = await call(s, 'probe__refuse', {});
     expect(refused['isError']).toBe(true);
-    const error = { code: 'FORBIDDEN', message: 'not for you', agcid: 'trace-mcp-check' };
+    const error = {
+      code: 'FORBIDDEN',
+      message: 'not for you',
+      agcid: '996898428ea33f8e0a9ba8b4e1eac9c0',
+    };
     expect(refused['structuredContent']).toEqual({ error });
     expect(refused['content']).toEqual([{ type: 'text', text: 'not for you' }]);
-    const crashed = await call(s, 'probe__crash', {}, 'trace-crash-check');
+    const crashed = await call(s, 'probe__crash', {}, '0ddd251eb290efb0df7f43b54c8a463b');
     expect(crashed['structuredContent']).toEqual({
-      error: { code: 'INTERNAL', message: 'Internal error', agcid: 'trace-crash-check' },
+      error: {
+        code: 'INTERNAL',
+        message: 'Internal error',
+        agcid: '0ddd251eb290efb0df7f43b54c8a463b',
+      },
     });
     expect(JSON.stringify(crashed)).not.toContain('secret detail');
-    expect(ctx.logs.find((entry) => entry.level === 'error')?.message).toBe('secret detail');
+    expect(ctx.logs.find((entry) => 'err' in entry.fields)?.message).toBe('secret detail');
   });
 
   it('a bad argument is VALIDATION_ERROR naming the fields, before the tool runs (C7)', async () => {
@@ -101,10 +114,10 @@ describe('mcp part', () => {
       const error = {
         code: 'VALIDATION_ERROR',
         message: 'Invalid arguments: msg',
-        agcid: 'trace-bad-args',
+        agcid: '8f095a1766c7b42b7c7d9b001e03eb7e',
       };
       expect(
-        await call(s, 'probe__echo', args, 'trace-bad-args'),
+        await call(s, 'probe__echo', args, '8f095a1766c7b42b7c7d9b001e03eb7e'),
         JSON.stringify(args).slice(0, 20)
       ).toEqual({
         isError: true,

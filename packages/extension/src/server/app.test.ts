@@ -13,7 +13,7 @@ import { listen } from './serve.js';
 
 const BUILD = { commit: SHA, buildTime: '2026-11-03T20:00:00Z' };
 const JSON_TYPE = { 'content-type': 'application/json' };
-const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const UUID_V7 = /^[0-9a-f]{12}7[0-9a-f]{3}[89ab][0-9a-f]{15}$/;
 
 const routes = (): Router => {
   const router = Router();
@@ -101,18 +101,24 @@ describe('api app: envelope and headers', () => {
 
   it('keeps a valid incoming agcid and replaces an invalid one', async () => {
     const { get } = await start();
-    const kept = await get('/api/v1/echo', { headers: { agcid: 'caller-chosen-id' } });
-    expect(kept.headers.get('agcid')).toBe('caller-chosen-id');
+    const kept = await get('/api/v1/echo', {
+      headers: { agcid: '825f5fe46cf881ced6bd9a89f6be790b' },
+    });
+    expect(kept.headers.get('agcid')).toBe('825f5fe46cf881ced6bd9a89f6be790b');
     const replaced = await get('/api/v1/echo', { headers: { agcid: 'bad id' } });
     expect(replaced.headers.get('agcid')).toMatch(UUID_V7);
   });
 
   it('answers a miss with a 404 envelope carrying the agcid', async () => {
     const { get } = await start();
-    const error = { code: 'NOT_FOUND', message: 'Not found', agcid: 'trace-404-check' };
+    const error = {
+      code: 'NOT_FOUND',
+      message: 'Not found',
+      agcid: '70e5b2b0a2b83a9784363bba1d4be286',
+    };
     const miss = { success: false, error };
     for (const path of ['/api/v1/nope', '/api/', '/mcp/x', '/']) {
-      const res = await get(path, { headers: { agcid: 'trace-404-check' } });
+      const res = await get(path, { headers: { agcid: '70e5b2b0a2b83a9784363bba1d4be286' } });
       expect(res.status).toBe(404);
       expect(await res.json()).toEqual(miss);
     }
@@ -122,23 +128,30 @@ describe('api app: envelope and headers', () => {
     const lines: Record<string, unknown>[] = [];
     const log = createLog({ extension: 'probe', part: 'api' }, (line) => {
       const parsed = JSON.parse(line) as Record<string, unknown>;
-      if (parsed['msg'] !== 'request') lines.push(parsed);
+      if (parsed['kind'] !== 'http') lines.push(parsed);
     });
     const { get } = await start({ log });
-    const res = await get('/api/v1/boom', { headers: { agcid: 'trace-500-check' } });
+    const res = await get('/api/v1/boom', {
+      headers: { agcid: '98544b79a4abe846d98f7c5e8ce03567' },
+    });
     expect(res.status).toBe(500);
     const text = await res.text();
     expect(text).not.toContain('secret driver message');
     expect(JSON.parse(text)).toEqual({
       success: false,
-      error: { code: 'INTERNAL', message: 'Internal error', agcid: 'trace-500-check' },
+      error: {
+        code: 'INTERNAL',
+        message: 'Internal error',
+        agcid: '98544b79a4abe846d98f7c5e8ce03567',
+      },
     });
     expect(lines).toHaveLength(1);
     expect(lines[0]).toMatchObject({
       level: 'error',
-      msg: 'secret driver message',
-      agcid: 'trace-500-check',
-      err: { type: 'Error', message: 'secret driver message' },
+      kind: 'error',
+      msg: 'Error: secret driver message',
+      agcid: '98544b79a4abe846d98f7c5e8ce03567',
+      fields: { 'exception.type': 'Error', 'exception.message': 'secret driver message' },
     });
   });
 
@@ -146,7 +159,7 @@ describe('api app: envelope and headers', () => {
     const { get, ctx } = await start();
     await get('/api/v1/nope');
     await get('/api/v1/body', { method: 'POST', body: '{bad', headers: JSON_TYPE });
-    const errors = () => ctx.logs.filter((entry) => entry.message !== 'request');
+    const errors = () => ctx.logs.filter((entry) => !('http.route' in entry.fields));
     expect(errors()).toEqual([]);
     await get('/api/v1/busy');
     expect(errors().map((entry) => entry.message)).toEqual(['Try later']);
@@ -154,12 +167,18 @@ describe('api app: envelope and headers', () => {
 
   it('sends Retry-After with 503', async () => {
     const { get } = await start();
-    const res = await get('/api/v1/busy', { headers: { agcid: 'trace-503-check' } });
+    const res = await get('/api/v1/busy', {
+      headers: { agcid: 'df7e0c6818e2daa20eee8903cd16f2d6' },
+    });
     expect(res.status).toBe(503);
     expect(res.headers.get('retry-after')).toBe('30');
     expect(await res.json()).toEqual({
       success: false,
-      error: { code: 'UNAVAILABLE', message: 'Try later', agcid: 'trace-503-check' },
+      error: {
+        code: 'UNAVAILABLE',
+        message: 'Try later',
+        agcid: 'df7e0c6818e2daa20eee8903cd16f2d6',
+      },
     });
   });
 

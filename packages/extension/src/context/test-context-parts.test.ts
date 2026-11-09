@@ -64,7 +64,10 @@ describe('createTestContext', () => {
     ctx.schedule('tick', '* * * * *', () => log.info('ticked'));
     const run = await ctx.runJob('tick');
     expect(run).toMatchObject({ job: 'tick', status: 'ok', log: 'info ticked\n' });
-    expect(ctx.logs.map((entry) => entry.message)).toEqual(['ticked']);
+    expect(ctx.logs.map((entry) => entry.message)).toEqual([
+      'ticked',
+      expect.stringMatching(/^tick ok \d+ms$/),
+    ]);
     expect(await ctx.runJob('nope')).toBeUndefined();
   });
 

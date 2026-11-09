@@ -86,11 +86,15 @@ describe('scheduler', () => {
         endedAt: new Date('2026-11-05T10:00:31.500Z'),
         status: 'ok',
         log: 'info tick 1\nsecond line\nwarn slow\n',
-        agcid: expect.stringMatching(/^[0-9a-f-]{36}$/) as unknown,
+        agcid: expect.stringMatching(/^[0-9a-f]{32}$/) as unknown,
       },
     ]);
     expect(runs.all('tick')[0]).toBe(run);
-    expect(logged.lines.map((line) => line['msg'])).toEqual(['tick 1\nsecond line', 'slow']);
+    expect(logged.lines.map((line) => line['msg'])).toEqual([
+      'tick 1\nsecond line',
+      'slow',
+      'tick ok 1500ms',
+    ]);
     expect(await scheduler.run('nope')).toBeUndefined();
   });
 
@@ -102,7 +106,13 @@ describe('scheduler', () => {
     const check = scheduler.checks()['job:tick'];
     expect(await check?.()).toBe('ok');
     expect(await scheduler.run('tick')).toMatchObject({ status: 'failed', log: 'error boom\n' });
-    expect(logged.lines.at(-1)).toMatchObject({ level: 'error', msg: 'boom', job: 'tick' });
+    const where = { 'agentage.where': 'tick' };
+    expect(logged.lines.at(-2)).toMatchObject({ kind: 'error', msg: 'Error: boom', ...where });
+    expect(logged.lines.at(-1)).toMatchObject({
+      kind: 'job',
+      level: 'error',
+      'error.type': 'Error',
+    });
     expect(await check?.()).toBe('degraded');
     fails = false;
     await scheduler.run('tick');
@@ -133,7 +143,11 @@ describe('scheduler', () => {
     const s = createScheduler({ runs: failing, log: logged.log });
     s.schedule('tick', '* * * * *', () => undefined);
     expect(await s.run('tick')).toMatchObject({ status: 'ok' });
-    expect(logged.lines.at(-1)).toMatchObject({ level: 'error', msg: 'store down', job: 'tick' });
+    expect(logged.lines.at(-1)).toMatchObject({
+      level: 'error',
+      msg: 'Error: store down',
+      job: 'tick',
+    });
   });
 
   it('refuses a duplicate name, a bad name, a bad cron and unknown options', () => {
