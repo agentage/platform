@@ -3,7 +3,7 @@ import express, { type Express, type Request, type RequestHandler } from 'expres
 import helmet, { type HelmetOptions } from 'helmet';
 import { type WellKnownEntry, type WellKnownRender } from '../api/well-known.js';
 import { agcidMiddleware } from '../agcid/scope.js';
-import { routeAccess } from '../auth/route-access.js';
+import { routeAccess, sameShape } from '../auth/route-access.js';
 import { setCaller, type TokenCheck } from '../auth/token-check.js';
 import {
   discoveryDocument,
@@ -44,6 +44,8 @@ export interface ApiAppOptions extends PartAppBase {
   router: ApiHandler;
   openapi?: Record<string, unknown> | null;
   wellKnown?: WellKnownEntry[];
+  // Registered ctx.route routes: a request none of them matches is 404 before any token check.
+  routes?: { method: string; path: string }[];
 }
 
 // api-standards section 6: CORS * without credentials on /.well-known/, /api/, /ui/ and /mcp.
@@ -131,6 +133,11 @@ const routeGuard =
   (options: ApiAppOptions): RequestHandler =>
   async (req, res, next) => {
     if (!options.tokenCheck) return next();
+    const { routes } = options;
+    const known = routes?.some(
+      (r) => r.method === req.method.toLowerCase() && sameShape(r.path, req.path)
+    );
+    if (routes?.length && !known) return next();
     const access = routeAccess(options.openapi, req.method, `/api/v1${req.path}`);
     const caller = await options.tokenCheck(req.get('authorization'), access);
     if (caller) res.setHeader('Cache-Control', 'no-store');

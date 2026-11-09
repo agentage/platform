@@ -118,4 +118,15 @@ describe('generatedOpenapi', () => {
     expect([Object.keys(made).includes('201'), made['200']]).toEqual([true, undefined]);
     expect(gone['204']).toEqual({ description: 'no content' });
   });
+
+  it('lists a query schema as query parameters on a post', () => {
+    const { route, routes } = createRouteRegistry();
+    route('post', '/u', { summary: 'U', query: z.object({ email: z.string() }) }, () => null);
+    const { paths } = generatedOpenapi(API_MANIFEST, routes) as {
+      paths: Record<string, Record<string, { parameters: unknown[] }>>;
+    };
+    expect(paths['/api/v1/u']?.['post']?.parameters).toEqual([
+      { name: 'email', in: 'query', required: true, schema: { type: 'string' } },
+    ]);
+  });
 });

@@ -96,4 +96,10 @@ describe('parse', () => {
     expect(failure.message).toBe('Invalid body');
     expect((failure.details as ErrorDetail[]).map((d) => d.field)).toEqual(['(root)']);
   });
+
+  it('drops details from a 5xx envelope and keeps them on a 4xx', () => {
+    const details = { secret: 'row 7' };
+    expect(errorEnvelope(fail('INTERNAL', 'x', { details }), 'a').error.details).toBeUndefined();
+    expect(errorEnvelope(fail('CONFLICT', 'x', { details }), 'a').error.details).toEqual(details);
+  });
 });

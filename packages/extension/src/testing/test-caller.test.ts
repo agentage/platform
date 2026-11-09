@@ -42,4 +42,10 @@ describe('startTestServer({ caller })', () => {
       data: null,
     });
   });
+
+  it('answers an unmatched path 404 before any token check, anonymous too', async () => {
+    server = await startTestServer({ create, caller: null });
+    expect((await server.fetch('/api/v1/machines')).status).toBe(404);
+    expect((await server.fetch('/api/v1/read')).status).toBe(401);
+  });
 });

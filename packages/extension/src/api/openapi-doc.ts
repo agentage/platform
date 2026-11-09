@@ -55,16 +55,20 @@ const pathParameters = ({ path, spec }: RouteEntry): Json[] => {
   }));
 };
 
-const queryParameters = (entry: RouteEntry): Json[] => {
-  if (!entry.spec.input || !inQuery(entry.method)) return [];
-  const { properties = {}, required = [] } = fields(entry.spec.input);
-  return Object.entries(properties).map(([name, schema]) => ({
+const queryOf = (schema: object): Json[] => {
+  const { properties = {}, required = [] } = fields(schema);
+  return Object.entries(properties).map(([name, field]) => ({
     name,
     in: 'query',
     required: required.includes(name),
-    schema,
+    schema: field,
   }));
 };
+
+const queryParameters = ({ method, spec }: RouteEntry): Json[] => [
+  ...(spec.input && inQuery(method) ? queryOf(spec.input) : []),
+  ...(spec.query ? queryOf(spec.query) : []),
+];
 
 const IF_MATCH = { name: 'If-Match', in: 'header', required: false, schema: STRING };
 

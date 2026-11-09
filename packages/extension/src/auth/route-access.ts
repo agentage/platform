@@ -5,7 +5,7 @@ type Operations = Record<string, { security?: unknown } | undefined>;
 const PARAM = /^\{.+\}$/;
 
 // As Express routes: without case, and one trailing slash ignored.
-const sameShape = (template: string, path: string): boolean => {
+export const sameShape = (template: string, path: string): boolean => {
   const want = template.toLowerCase().split('/');
   const got = path
     .toLowerCase()

@@ -108,7 +108,7 @@ export const isFailure = (err: unknown): err is Failure =>
 
 export const errorEnvelope = (failure: Failure, agcid: string): ErrorEnvelope => {
   const error: ErrorBody = { code: failure.code, message: failure.message, agcid };
-  const { details } = failure;
+  const details = failure.status >= 500 ? undefined : failure.details;
   const filled = Array.isArray(details)
     ? details.length > 0
     : details && Object.keys(details).length > 0;

@@ -18,15 +18,19 @@ const handlerOf =
   (ctx: PartContext, entry: RouteEntry): RequestHandler =>
   async (req, res) => {
     const input = inputOf(entry, req.query, req.body);
+    const { query: shape } = entry.spec;
+    const query = shape ? parse(shape, req.query, 'Invalid query') : {};
     const caller = ctx.auth.caller(req);
     const { params: schema } = entry.spec;
     const params = schema ? parse(schema, req.params, 'Invalid path') : req.params;
     const ifMatch = req.get('if-match');
     const answer = await entry.handler({
       input,
+      query,
       params,
       caller,
       ifMatch,
+      ip: req.ip ?? '',
       header: (name) => req.get(name),
     });
     const { data, meta, etag, status = 200 } = isReply(answer) ? answer : reply(answer);

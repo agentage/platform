@@ -1,8 +1,10 @@
+import { type IncomingMessage } from 'node:http';
 import { type Express, type RequestHandler } from 'express';
 import { z } from 'zod';
 import { isAudience } from '../auth/part-auth.js';
 import { type Env } from '../runtime/build-info.js';
 import { createPartApp, type PartAppBase } from '../server/app.js';
+import { siteScriptHashes } from './inline-hashes.js';
 import { type PagesSite } from './pages.js';
 import { typeOf } from './types.js';
 
@@ -30,7 +32,7 @@ export const platformSources = (env: Env): string[] => {
 
 const BODY = z.union([z.string(), z.instanceof(Uint8Array)]);
 const ENTRY = z.union([BODY, z.object({ type: z.string().min(1), body: BODY })]);
-const SiteSchema = z.record(z.string().regex(/^\/[A-Za-z0-9._~/-]*$/), ENTRY);
+const SiteSchema = z.record(z.string().regex(/^\/[A-Za-z0-9._~$/-]*$/), ENTRY);
 
 export const NOT_FOUND_PAGE =
   '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>Not found</title></head><body><p>Not found</p></body></html>\n';
@@ -55,13 +57,21 @@ const missing: RequestHandler = (_req, res) => {
 // Everything the gateway does not reserve comes here: a site map entry (typed by its extension), or an HTML 404.
 export const createPagesApp = (options: PagesAppOptions): Express => {
   const site = SiteSchema.parse(options.site);
+  const hashes = siteScriptHashes(site);
+  const platform = options.platform ?? [];
+  const scripts = (req: IncomingMessage) =>
+    [
+      "'self'",
+      ...platform,
+      ...(hashes.get(new URL(req.url ?? '/', 'http://x').pathname) ?? []),
+    ].join(' ');
   return createPartApp({
     ...options,
     part: 'pages',
     helmet: {
       contentSecurityPolicy: {
         directives: {
-          scriptSrc: ["'self'", ...(options.platform ?? [])],
+          scriptSrc: [scripts],
           connectSrc: ["'self'", ...(options.platform ?? [])],
           upgradeInsecureRequests: null,
         },

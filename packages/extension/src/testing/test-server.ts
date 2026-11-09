@@ -75,7 +75,9 @@ export const startTestServer = async <C extends PartContext = PartContext>(
     openapi: generatedOpenapi(pkg, mounted.routes),
   };
   const base = { pkg, build: TEST_BUILD, log: ctx.log, wellKnown: mounted.documents };
-  return startOn(createApiApp({ ...base, router: mounted.router, ...guard }));
+  return startOn(
+    createApiApp({ ...base, router: mounted.router, routes: mounted.routes, ...guard })
+  );
 };
 
 // Runs an mcp part's create(ctx) inside the kit's real /mcp app: tools named {id}__{name}.

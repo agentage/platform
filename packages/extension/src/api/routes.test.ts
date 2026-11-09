@@ -35,6 +35,11 @@ const create = ({ route }: ApiContext) => {
   route('get', '/m', { summary: 'Missing' }, () => {
     throw fail('NOT_FOUND', 'No machine', { code: 'MACHINE_NOT_FOUND' });
   });
+  const Tok = z.object({ email: z.string().min(1) });
+  route('post', '/unsub', { summary: 'Unsub', scope: 'public', query: Tok }, ({ query, ip }) => ({
+    email: query.email,
+    ip,
+  }));
   route('get', '/broken', { summary: 'Breaks', output: Msg }, () => ({ msg: 1 }) as never);
 };
 
@@ -179,5 +184,15 @@ describe('the route registry', () => {
   it('refuses a lower-case or 5xx code override', () => {
     expect(() => fail('NOT_FOUND', 'x', { code: 'machine' })).toThrow(/UPPER_SNAKE/);
     expect(() => fail('INTERNAL', 'x', { code: 'BOOM' })).toThrow(/4xx/);
+  });
+
+  it('parses the query on a post and hands the client ip', async () => {
+    await start();
+    const res = await server!.fetch('/api/v1/unsub?email=a%40b.c', {
+      method: 'POST',
+      headers: { 'x-forwarded-for': '203.0.113.7' },
+    });
+    expect(await res.json()).toEqual(ok({ email: 'a@b.c', ip: '203.0.113.7' }));
+    expect((await server!.fetch('/api/v1/unsub', { method: 'POST' })).status).toBe(400);
   });
 });

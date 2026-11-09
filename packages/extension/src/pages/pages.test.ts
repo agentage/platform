@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ZodError } from 'zod';
 import { createTestContext } from '../context/test-context.js';
@@ -99,6 +100,38 @@ describe('pages app', () => {
       ])
     );
     expect(csp).not.toContain('unsafe-eval');
+  });
+});
+
+describe('inline script hashes', () => {
+  const hash = (text: string) => `'sha256-${createHash('sha256').update(text).digest('base64')}'`;
+  const policy = async (path: string, site: PagesSite) => {
+    served = await serveApp(
+      createPagesApp({ pkg: PKG, build: BUILD, log: recordedLog().log, site })
+    );
+    const csp = (await fetch(`${served.url}${path}`)).headers.get('content-security-policy') ?? '';
+    return csp.split(';').find((d) => d.startsWith('script-src'));
+  };
+
+  it('allows exactly the inline scripts of an HTML page, not src or data scripts', async () => {
+    const html =
+      '<script>self.a=1</script><script src="/x.js"></script>' +
+      '<script type="application/json">{}</script><script async>self.b=2</script>';
+    expect(await policy('/', { '/': html, '/plain': '<p>no scripts</p>' })).toBe(
+      `script-src 'self' ${hash('self.a=1')} ${hash('self.b=2')}`
+    );
+  });
+
+  it('keeps the plain policy for a page without inline scripts', async () => {
+    expect(await policy('/plain', { '/': '<script>x</script>', '/plain': '<p>hi</p>' })).toBe(
+      "script-src 'self'"
+    );
+  });
+
+  it('accepts $ in a path', () => {
+    expect(() =>
+      createPagesApp({ pkg: PKG, build: BUILD, log: recordedLog().log, site: { '/a/$x': 'y' } })
+    ).not.toThrow();
   });
 });
 
