@@ -1,12 +1,12 @@
 import { Router } from 'express';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { validateManifest } from '../manifest/read-manifest.js';
 import { API_MANIFEST, SHA, SPEC_MANIFEST } from '../test-support/packages.js';
 import { recordedLog } from '../test-support/http.js';
 import { startTestServer } from '../testing/test-server.js';
 import { setCaller } from '../auth/token-check.js';
 import { platformOf } from '../auth/part-auth.js';
-import { createContext, settingDefaults } from './context.js';
+import { createContext, EXIT_DELAY_MS, settingDefaults } from './context.js';
 import { createTestContext } from './test-context.js';
 
 const BASE = {
@@ -149,5 +149,19 @@ describe('ctx.platform', () => {
     expect(createTestContext({ platform: platformOf(rest) }).platform.issuer).toBe(
       'https://auth.agentage.io'
     );
+  });
+
+  it('ctx.exit ends the process after the answer flushes; a test context records it', () => {
+    vi.useFakeTimers();
+    const exit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+    createContext({ ...BASE, pkg: validateManifest(API_MANIFEST) }).exit();
+    expect(exit).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(EXIT_DELAY_MS);
+    expect(exit).toHaveBeenCalledWith(0);
+    vi.useRealTimers();
+    exit.mockRestore();
+    const ctx = createTestContext();
+    ctx.exit(3);
+    expect(ctx.exits).toEqual([3]);
   });
 });

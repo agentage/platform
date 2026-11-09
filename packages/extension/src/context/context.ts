@@ -41,7 +41,13 @@ export interface PartContext {
   readonly store: Store;
   readonly secrets: Secrets;
   readonly platform: Readonly<PlatformInfo>;
+  // Ends the part after the current answer flushes; the orchestrator starts it again.
+  readonly exit: (code?: number) => void;
 }
+
+export const EXIT_DELAY_MS = 100;
+
+const exitSoon = (code = 0): void => void setTimeout(() => process.exit(code), EXIT_DELAY_MS);
 
 // ctx.store is always there; without a store part in the manifest it says so on first use.
 export const NO_STORE: Store = {
@@ -93,5 +99,6 @@ export const createContext = (input: ContextInput): PartContext => {
     store: store ?? NO_STORE,
     secrets,
     platform,
+    exit: exitSoon,
   });
 };

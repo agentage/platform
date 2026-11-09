@@ -44,6 +44,8 @@ export interface TestContext extends PartContext {
   readonly wellKnown: WellKnownRegistrar;
   readonly jobs: ScheduledJob[];
   readonly spans: SpanRecord[];
+  // Each ctx.exit(code) call; a test context never exits.
+  readonly exits: number[];
   runJob(name: string): Promise<JobRun | undefined>;
 }
 
@@ -112,6 +114,7 @@ const serverContext = (options: TestContextOptions): TestContext => {
   const { extension, ...open } = identityOf(options);
   const store = testStore(open.store, recordingLog([]));
   const caller = { sub: 'usr_test', scopes: [`${extension.id}:read`] };
+  const exits: number[] = [];
   return {
     extension,
     auth: { caller: () => caller },
@@ -123,6 +126,8 @@ const serverContext = (options: TestContextOptions): TestContext => {
     store: store ?? NO_STORE,
     secrets: Object.freeze({ ...options.secrets }),
     platform: Object.freeze({ ...(options.platform ?? NO_PLATFORM) }),
+    exits,
+    exit: (code = 0) => void exits.push(code),
     close: async () => store?.close(),
     ...recorders(log),
   };
