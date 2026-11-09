@@ -2,10 +2,12 @@ import { type PartContext } from '../context/context.js';
 
 export type PagesContext = PartContext;
 
-// One file: text or bytes typed by the path's extension, or with its own content type.
-export type PagesEntry = string | Uint8Array | { type: string; body: string | Uint8Array };
+// One file: text or bytes typed by the path's extension, with its own content type, or a 308 away.
+export type PagesEntry =
+  string | Uint8Array | { type: string; body: string | Uint8Array } | { redirect: string };
 
 // The pages part: create(ctx) returns path -> entry; a path without a known extension is HTML.
+// A key ending in /* covers the paths under it (longest wins); a redirect there appends the rest.
 export type PagesSite = Readonly<Record<string, PagesEntry>>;
 
 const escape = (value: string): string => value.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
