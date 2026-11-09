@@ -71,6 +71,8 @@ describe('pages app', () => {
     };
     expect(codes({ 'about.html': '<p></p>' })).toEqual(['about.html invalid_key']);
     expect(codes({ '/a b': '<p></p>' })).toEqual(['/a b invalid_key']);
+    expect(codes({ '/a*': '<p></p>' })).toEqual(['/a* invalid_key']);
+    expect(codes({ '/': { redirect: '' } })).toEqual(['/.redirect too_small']);
     expect(codes({ '/': 42 })).toEqual(['/ invalid_union']);
     expect(codes({ '/': { type: '', body: 'x' } })).toEqual(['/.type too_small']);
   });
@@ -132,6 +134,28 @@ describe('inline script hashes', () => {
     expect(() =>
       createPagesApp({ pkg: PKG, build: BUILD, log: recordedLog().log, site: { '/a/$x': 'y' } })
     ).not.toThrow();
+  });
+
+  it('answers a redirect with 308, a /* key by longest prefix plus the rest and the query', async () => {
+    const site = {
+      '/docs': { redirect: 'https://docs.example.test/' },
+      '/docs/*': { redirect: 'https://docs.example.test/' },
+      '/docs/old/*': { redirect: 'https://docs.example.test/new/' },
+      '/app/*': '<p>shell</p>',
+    };
+    served = await serveApp(
+      createPagesApp({ pkg: PKG, build: BUILD, log: recordedLog().log, site })
+    );
+    const go = async (path: string) => {
+      const res = await fetch(`${served?.url}${path}`, { redirect: 'manual' });
+      return `${res.status} ${res.headers.get('location') ?? ''}`;
+    };
+    expect(await go('/docs')).toBe('308 https://docs.example.test/');
+    expect(await go('/docs/')).toBe('308 https://docs.example.test/');
+    expect(await go('/docs/connect?x=1')).toBe('308 https://docs.example.test/connect?x=1');
+    expect(await go('/docs/old/a/b')).toBe('308 https://docs.example.test/new/a/b');
+    expect(await go('/docsx')).toBe('404 ');
+    expect(await (await fetch(`${served.url}/app/a/b`)).text()).toBe('<p>shell</p>');
   });
 });
 

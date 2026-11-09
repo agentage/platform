@@ -5,7 +5,7 @@ import { isAudience } from '../auth/part-auth.js';
 import { type Env } from '../runtime/build-info.js';
 import { createPartApp, type PartAppBase } from '../server/app.js';
 import { siteScriptHashes } from './inline-hashes.js';
-import { type PagesSite } from './pages.js';
+import { type PagesEntry, type PagesSite } from './pages.js';
 import { typeOf } from './types.js';
 
 export interface PagesAppOptions extends PartAppBase {
@@ -31,8 +31,20 @@ export const platformSources = (env: Env): string[] => {
 };
 
 const BODY = z.union([z.string(), z.instanceof(Uint8Array)]);
-const ENTRY = z.union([BODY, z.object({ type: z.string().min(1), body: BODY })]);
-const SiteSchema = z.record(z.string().regex(/^\/[A-Za-z0-9._~$/-]*$/), ENTRY);
+const ENTRY = z.union([
+  BODY,
+  z.object({ type: z.string().min(1), body: BODY }),
+  z.object({ redirect: z.string().min(1) }),
+]);
+const SiteSchema = z.record(z.string().regex(/^\/[A-Za-z0-9._~$/-]*(\/\*)?$/), ENTRY);
+
+const lookup = (site: PagesSite, path: string) => {
+  if (site[path] !== undefined) return { entry: site[path], rest: '' };
+  const key = Object.keys(site)
+    .filter((k) => k.endsWith('/*') && path.startsWith(k.slice(0, -1)))
+    .sort((a, b) => b.length - a.length)[0];
+  return key ? { entry: site[key] as PagesEntry, rest: path.slice(key.length - 1) } : undefined;
+};
 
 export const NOT_FOUND_PAGE =
   '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>Not found</title></head><body><p>Not found</p></body></html>\n';
@@ -40,8 +52,15 @@ export const NOT_FOUND_PAGE =
 const serve =
   (site: PagesSite): RequestHandler =>
   (req, res, next) => {
-    const entry = site[req.path];
-    if (entry === undefined) return next();
+    const found = lookup(site, req.path);
+    if (!found) return next();
+    const { entry, rest } = found;
+    const query = req.originalUrl.indexOf('?');
+    if (typeof entry === 'object' && 'redirect' in entry)
+      return res.redirect(
+        308,
+        entry.redirect + rest + (query < 0 ? '' : req.originalUrl.slice(query))
+      );
     const { type, body } = typeof entry === 'object' && 'type' in entry ? entry : { body: entry };
     res.type(type ?? typeOf(req.path)).setHeader('Cache-Control', 'no-cache');
     // express sends a Buffer as bytes but a plain Uint8Array as JSON.
