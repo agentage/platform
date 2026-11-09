@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { createTestContext } from '../context/test-context.js';
-import { ok, reply } from '../envelope/envelope.js';
+import { fail, ok, reply } from '../envelope/envelope.js';
 import { ErrorEnvelopeSchema } from '../envelope/envelope.schema.js';
 import { startTestServer, type TestServer } from '../testing/test-server.js';
 import { createRouteRegistry, type ApiContext } from './routes.js';
@@ -22,6 +22,19 @@ const create = ({ route }: ApiContext) => {
   );
   const Num = z.object({ n: z.string().regex(/^[0-9]+$/) });
   route('get', '/n/{n}', { summary: 'N', params: Num }, ({ params }) => params.n);
+  route('post', '/made', { summary: 'Made', scope: 'write', status: 201 }, () =>
+    reply({ made: true }, { status: 201 })
+  );
+  route('delete', '/gone', { summary: 'Gone', scope: 'write', status: 204 }, () =>
+    reply(null, { status: 204 })
+  );
+  route('get', '/hdr', { summary: 'Header' }, ({ header }) => header('x-agentage-cli-version'));
+  route('put', '/stale', { summary: 'Stale', scope: 'write' }, () => {
+    throw fail('PRECONDITION_FAILED', 'Stale', { details: { current: 1, etag: '"v1"' } });
+  });
+  route('get', '/m', { summary: 'Missing' }, () => {
+    throw fail('NOT_FOUND', 'No machine', { code: 'MACHINE_NOT_FOUND' });
+  });
   route('get', '/broken', { summary: 'Breaks', output: Msg }, () => ({ msg: 1 }) as never);
 };
 
@@ -128,5 +141,43 @@ describe('the route registry', () => {
   ])('refuses %s %s', (method, path, spec, message) => {
     const register = route as (...args: unknown[]) => void;
     expect(() => register(method, path, { summary: 'S', ...spec }, () => 1)).toThrow(message);
+  });
+
+  it('sends 201, and 204 without a body', async () => {
+    await start();
+    const made = await server!.fetch('/api/v1/made', { method: 'POST' });
+    expect([made.status, await made.json()]).toEqual([201, ok({ made: true })]);
+    const gone = await server!.fetch('/api/v1/gone', { method: 'DELETE' });
+    expect([gone.status, await gone.text()]).toEqual([204, '']);
+  });
+
+  it('hands the handler a case-insensitive header', async () => {
+    await start();
+    const res = await server!.fetch('/api/v1/hdr', {
+      headers: { 'X-Agentage-CLI-Version': '1.2' },
+    });
+    expect((await res.json()) as unknown).toEqual(ok('1.2'));
+  });
+
+  it('carries object details and a 4xx code override', async () => {
+    await start();
+    const stale = await server!.fetch('/api/v1/stale', { method: 'PUT' });
+    expect([stale.status, ((await stale.json()) as { error: unknown }).error]).toEqual([
+      412,
+      expect.objectContaining({
+        code: 'PRECONDITION_FAILED',
+        details: { current: 1, etag: '"v1"' },
+      }),
+    ]);
+    const missing = await server!.fetch('/api/v1/m');
+    expect([missing.status, ((await missing.json()) as { error: unknown }).error]).toEqual([
+      404,
+      expect.objectContaining({ code: 'MACHINE_NOT_FOUND' }),
+    ]);
+  });
+
+  it('refuses a lower-case or 5xx code override', () => {
+    expect(() => fail('NOT_FOUND', 'x', { code: 'machine' })).toThrow(/UPPER_SNAKE/);
+    expect(() => fail('INTERNAL', 'x', { code: 'BOOM' })).toThrow(/4xx/);
   });
 });

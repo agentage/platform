@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { recordedLog, serveApp, type Served } from '../test-support/http.js';
 import { API_MANIFEST, SHA } from '../test-support/packages.js';
+import { isText } from './types.js';
 import { createPagesApp } from './pages-app.js';
 import { type PagesSite } from './pages.js';
 import { siteFromDir } from './site-from-dir.js';
@@ -84,5 +85,36 @@ describe('siteFromDir', () => {
     expect([...new Uint8Array(await font.arrayBuffer())]).toEqual([0, 1, 2, 255]);
     const manifest = await fetch(`${url}/m.webmanifest`);
     expect(manifest.headers.get('content-type')).toMatch(/^application\/manifest\+json/);
+  });
+
+  it('keeps an unknown-extension binary byte-identical as octet-stream', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'site-'));
+    const bytes = Buffer.from([0xff, 0xfe, 0x00, 0x80, 0xc3, 0x28]);
+    await writeFile(join(dir, 'data.bin'), bytes);
+    const site = siteFromDir(dir, { origin: ORIGIN });
+    expect(Buffer.from(site['/data.bin'] as Uint8Array).equals(bytes)).toBe(true);
+    const res = await fetch(`${(await serve(site)).url}/data.bin`);
+    expect(res.headers.get('content-type')).toBe('application/octet-stream');
+    expect(Buffer.from(await res.arrayBuffer()).equals(bytes)).toBe(true);
+  });
+
+  it('refuses two files that map to one path, naming both', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'site-'));
+    await mkdir(join(dir, 'a'));
+    await writeFile(join(dir, 'a.html'), 'x');
+    await writeFile(join(dir, 'a', 'index.html'), 'y');
+    expect(() => siteFromDir(dir, { origin: ORIGIN })).toThrow(/a\.html.*a.index\.html.*\/a/);
+  });
+
+  it('reads text by media type, ignoring parameters', () => {
+    expect(isText('text/plain; charset=utf-8')).toBe(true);
+    expect(
+      ['application/json', 'text/javascript', 'application/xml', 'image/svg+xml'].every(isText)
+    ).toBe(true);
+    expect(['application/manifest+json', 'image/png', 'font/woff2'].map(isText)).toEqual([
+      true,
+      false,
+      false,
+    ]);
   });
 });

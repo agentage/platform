@@ -22,9 +22,17 @@ const handlerOf =
     const { params: schema } = entry.spec;
     const params = schema ? parse(schema, req.params, 'Invalid path') : req.params;
     const ifMatch = req.get('if-match');
-    const answer = await entry.handler({ input, params, caller, ifMatch });
-    const { data, meta, etag } = isReply(answer) ? answer : reply(answer);
+    const answer = await entry.handler({
+      input,
+      params,
+      caller,
+      ifMatch,
+      header: (name) => req.get(name),
+    });
+    const { data, meta, etag, status = 200 } = isReply(answer) ? answer : reply(answer);
     if (etag) res.setHeader('ETag', etag);
+    if (status === 204) return void res.status(204).end();
+    res.status(status);
     res.json(ok(entry.spec.output ? entry.spec.output.parse(data) : data, meta));
   };
 

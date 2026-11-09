@@ -32,8 +32,12 @@ export const siteFromDir = (dir: string, opts: SiteFromDirOptions): PagesSite =>
     e.isFile()
   );
   const site: Record<string, PagesEntry> = {};
+  const from: Record<string, string> = {};
   for (const file of files) {
-    const path = pathOf(relative(dir, join(file.parentPath, file.name)));
+    const name = relative(dir, join(file.parentPath, file.name));
+    const path = pathOf(name);
+    if (path in from) throw new Error(`siteFromDir: ${from[path]} and ${name} both map to ${path}`);
+    from[path] = name;
     const own = opts.types?.[path];
     const bytes = readFileSync(join(file.parentPath, file.name));
     site[path] = entryOf(bytes, own ?? typeOf(path), own !== undefined, rewrite, host);

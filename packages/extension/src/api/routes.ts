@@ -26,6 +26,8 @@ export interface RouteSpec<
   params?: Q;
   // The route sends an ETag and reads If-Match: the contract adds both headers and 412.
   etag?: true;
+  // The success status the contract documents; 200 when left out.
+  status?: 200 | 201 | 204;
 }
 
 // The {name} segments of a path, each a string.
@@ -39,6 +41,8 @@ export interface RouteRequest<I, P extends string, S extends Access = Access, Q 
   params: [Q] extends [never] ? ParamsOf<P> : Q;
   caller: S extends 'public' | 'optional' ? Caller | null : Caller;
   ifMatch?: string;
+  // A request header, case-insensitive.
+  header: (name: string) => string | undefined;
 }
 
 type Answer<T> = T | Reply<T>;

@@ -1,6 +1,6 @@
 import { extname } from 'node:path';
 
-// Content type by extension; a path without a known one is HTML.
+// Content type by extension; an extension-less path is HTML, an unknown extension is bytes.
 const TEXT_TYPES: Readonly<Record<string, string>> = {
   '.html': 'text/html',
   '.txt': 'text/plain',
@@ -12,6 +12,7 @@ const TEXT_TYPES: Readonly<Record<string, string>> = {
   '.css': 'text/css',
   '.svg': 'image/svg+xml',
   '.webmanifest': 'application/manifest+json',
+  '.map': 'application/json',
 };
 
 export const TYPES: Readonly<Record<string, string>> = {
@@ -24,9 +25,21 @@ export const TYPES: Readonly<Record<string, string>> = {
   '.ico': 'image/x-icon',
   '.mp4': 'video/mp4',
   '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
+  '.ttf': 'font/ttf',
+  '.avif': 'image/avif',
+  '.webm': 'video/webm',
 };
 
-// A text type is read as a string; every other type as bytes.
-export const isText = (type: string): boolean => Object.values(TEXT_TYPES).includes(type);
+const TEXT_APPLICATION = /^application\/(json|javascript|xml|manifest\+json)$|\+(json|xml)$/;
 
-export const typeOf = (path: string): string => TYPES[extname(path)] ?? 'text/html';
+// A text type is read as a string (parameters like charset ignored); every other type as bytes.
+export const isText = (type: string): boolean => {
+  const media = (type.split(';')[0] ?? '').trim().toLowerCase();
+  return media.startsWith('text/') || TEXT_APPLICATION.test(media);
+};
+
+export const typeOf = (path: string): string => {
+  const ext = extname(path);
+  return TYPES[ext] ?? (ext === '' ? 'text/html' : 'application/octet-stream');
+};

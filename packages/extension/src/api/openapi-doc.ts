@@ -23,7 +23,10 @@ const content = (description: string, schema: Json) => ({ description, content: 
 
 const STRING = { type: 'string' };
 
-const okResponse = ({ output, etag }: RouteEntry['spec']) => ({
+const okResponse = (spec: RouteEntry['spec']) =>
+  spec.status === 204 ? { description: 'no content' } : okBody(spec);
+
+const okBody = ({ output, etag }: RouteEntry['spec']) => ({
   ...content('the envelope', {
     type: 'object',
     properties: {
@@ -74,7 +77,7 @@ const parameters = (entry: RouteEntry): Json[] => [
 const responses = (entry: RouteEntry): Json => {
   const { input, params, scope, etag } = entry.spec;
   return {
-    '200': okResponse(entry.spec),
+    [entry.spec.status ?? 200]: okResponse(entry.spec),
     ...((input || params) && { '400': refusal('VALIDATION_ERROR') }),
     ...(scope !== 'public' && { '401': refusal('UNAUTHORIZED'), '403': refusal('FORBIDDEN') }),
     ...(entry.path.includes('{') && { '404': refusal('NOT_FOUND') }),
