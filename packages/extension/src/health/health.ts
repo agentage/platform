@@ -38,7 +38,7 @@ const settle = async (check: HealthCheck): Promise<HealthStatus> => {
   try {
     const status = await Promise.race([check(), expiry]);
     // A check answering anything but a status is not a healthy one.
-    return status in RANK ? status : 'unavailable';
+    return Object.hasOwn(RANK, status) ? status : 'unavailable';
   } catch {
     return 'unavailable';
   } finally {

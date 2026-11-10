@@ -34,10 +34,11 @@ const record = (level: Level, message: string): void => {
 };
 
 // ctx.log for a worker: the usual JSON line, and inside a run also the run's own log.
-export const runLog = (base: Log): Log => ({
+export const runLog = (base: Log, strict = false): Log => ({
   ...createLogger({
     extension: 'worker',
     part: 'worker',
+    strict,
     sink: (row) => {
       record(row.level, row.msg);
       base.row(row);

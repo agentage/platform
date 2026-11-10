@@ -168,6 +168,13 @@ describe('ctx.platform', () => {
     expect(test.exits).toHaveLength(1);
   });
 
+  it('the test log rethrows a row that fails, so a broken log call fails its test', () => {
+    const route = undefined as unknown as string;
+    expect(() =>
+      createTestContext().log.http({ method: 'GET', route, status: 200, ms: 1 })
+    ).toThrow();
+  });
+
   it('ctx.health adds a named check to the checks /health reads; a bad or taken name throws', async () => {
     const checks = {};
     const ctx = createContext({ ...BASE, pkg: validateManifest(API_MANIFEST), checks });
