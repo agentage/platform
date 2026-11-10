@@ -3,7 +3,7 @@ import { EventSchema, type Event, type EventInput, type Level } from './event.sc
 import { redact } from './redact.js';
 import { uuidv7 } from './uuidv7.js';
 
-export const MAX_BATCH_BYTES = 900_000;
+const MAX_BATCH_BYTES = 900_000;
 export const MAX_BATCH_ITEMS = 1000;
 
 export interface EventsClientOptions {

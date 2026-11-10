@@ -15,6 +15,4 @@ export const requestScope = new AsyncLocalStorage<RequestScope>();
 
 export const currentAgcid = (): string | undefined => requestScope.getStore()?.agcid;
 
-export const currentContext = (): RowContext | undefined => requestScope.getStore();
-
 export const TRACEPARENT_PATTERN = /^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$/;

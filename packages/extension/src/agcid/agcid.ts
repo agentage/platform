@@ -1,18 +1,9 @@
-import { randomBytes } from 'node:crypto';
+import { uuidv7 } from '@agentage/logs';
 import { TRACEPARENT_PATTERN } from './current.js';
 import { isAgcid } from './header.js';
 
 export { AGCID_HEADER, AGCID_PATTERN, isAgcid } from './header.js';
-
-// RFC 9562 UUIDv7 as 32 lowercase hex, a valid W3C trace id: 48-bit ms, version 7, variant 10.
-export const uuidv7 = (now: number = Date.now(), random: Buffer = randomBytes(10)): string => {
-  const bytes = Buffer.alloc(16);
-  bytes.writeUIntBE(now, 0, 6);
-  random.copy(bytes, 6, 0, 10);
-  bytes.writeUInt8((bytes.readUInt8(6) & 0x0f) | 0x70, 6);
-  bytes.writeUInt8((bytes.readUInt8(8) & 0x3f) | 0x80, 8);
-  return bytes.toString('hex');
-};
+export { uuidv7 };
 
 const DASHED = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const ZERO = '0'.repeat(32);
