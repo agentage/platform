@@ -1,5 +1,5 @@
 import { type Request, type RequestHandler, type Response } from 'express';
-import { requestScope } from '../agcid/current.js';
+import { requestScope, sigtermOnce } from '../agcid/current.js';
 import { type Log } from '../log/log.js';
 
 const MOUNTS = ['/api/v1', '/mcp', '/.well-known', '/ui'];
@@ -43,7 +43,7 @@ export const requestLine =
           errorType: localOf(res, 'errorType'),
           clientInfo: localOf(res, 'clientInfo'),
         });
-      if (scope?.exit) process.kill(process.pid, 'SIGTERM');
+      if (scope?.exit) sigtermOnce();
     });
     next();
   };

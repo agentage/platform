@@ -89,6 +89,21 @@ describe('parseLine', () => {
     });
     expect(json.msg.length).toBe(200);
   });
+
+  it('a valid event line is cut and redacted as the logger writes it; a bad source is unknown', () => {
+    const jwt = `eyJhbGciOiJSUzI1NiJ9.${'p'.repeat(40)}`;
+    const fields = { token: 'abc', note: `Bearer ${jwt}`, long: 'x'.repeat(300) };
+    const line = JSON.stringify({ ...base, kind: 'log', msg: 'm'.repeat(1500), fields });
+    const event = parseLine(line);
+    expect(event.msg).toHaveLength(200);
+    expect(event.fields).toEqual({
+      token: '[redacted]',
+      note: '[redacted]',
+      long: 'x'.repeat(200),
+    });
+    const raw = parseLine('hello', { extension: '', part: 'p'.repeat(100) });
+    expect([raw.extension, raw.part]).toEqual(['unknown', 'p'.repeat(64)]);
+  });
 });
 
 describe('redact', () => {
@@ -105,6 +120,51 @@ describe('redact', () => {
     expect([String(out['long']).length, String(out['exception.stacktrace']).length]).toEqual([
       200, 300,
     ]);
+  });
+});
+
+describe('redact, values', () => {
+  it('masks a JWT, an aga_ PAT and a Bearer credential under any key; prose survives', () => {
+    const out = redact({
+      a: 'eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c3IifQ.c2ln',
+      b: 'pat aga_0123456789abcdef here',
+      c: 'Authorization: Bearer AbcdEfgh12345678',
+      d: ['eyJhbGciOiJSUzI1NiJ9'],
+      e: 'the bearer of bad news',
+      f: 'no bearer credential found',
+    });
+    expect(out).toEqual({
+      a: '[redacted]',
+      b: 'pat [redacted] here',
+      c: 'Authorization: [redacted]',
+      d: ['[redacted]'],
+      e: 'the bearer of bad news',
+      f: 'no bearer credential found',
+    });
+    expect(redact(out)).toEqual(out);
+  });
+
+  it('leaves ordinary text alone: no left boundary, wrong case or no credential shape', () => {
+    const prose = [
+      'Eyjafjallajokull erupted',
+      'saga_controller started',
+      'heyJudeheyjude',
+      'omega_aga_value',
+      'bearer instrument_settlement_v2 matured',
+      'Bearer abc123',
+      'eyJshort',
+      'aga_unit',
+    ];
+    expect(prose.map((text) => redact({ text })['text'])).toEqual(prose);
+  });
+
+  it('cuts on a code point boundary: an emoji at 199 never leaves half a pair', () => {
+    const text = `${'m'.repeat(199)}\u{1F600}x`;
+    const out = String(redact({ text })['text']);
+    expect([out.length, out.isWellFormed()]).toEqual([199, true]);
+    const line = JSON.stringify({ ...base, kind: 'log', msg: text });
+    expect(parseLine(line).msg.isWellFormed()).toBe(true);
+    expect(parseLine(text).msg).toHaveLength(199);
   });
 });
 

@@ -1,6 +1,6 @@
 import { hostname } from 'node:os';
 import { EventSchema, type Event, type EventInput, type Level } from './event.schema.js';
-import { redact } from './redact.js';
+import { redact, scrub } from './redact.js';
 import { uuidv7 } from './uuidv7.js';
 
 const MAX_BATCH_BYTES = 900_000;
@@ -11,6 +11,8 @@ export interface EventsClientOptions {
   token: string;
   host?: string;
   timeoutMs?: number;
+  // The wait before the one retry of a network error, 429 or 5xx.
+  retryDelayMs?: number;
   fetch?: typeof fetch;
 }
 
@@ -22,15 +24,23 @@ export interface PostResult {
   rejected: number;
 }
 
-const complete = (event: PostEvent, host: string): Event => {
+// A row the schema refuses is dropped with a warning and counted as rejected; the rest still go.
+const complete = (event: PostEvent, host: string): Event | null => {
   const filled = { ts: new Date().toISOString(), level: 'info', agcid: uuidv7(), host, ...event };
-  return EventSchema.parse({ ...filled, fields: redact(event.fields ?? {}) });
+  const msg = typeof event.msg === 'string' ? scrub(event.msg) : event.msg;
+  const parsed = EventSchema.safeParse({ ...filled, msg, fields: redact(event.fields ?? {}) });
+  if (parsed.success) return parsed.data;
+  process.emitWarning(
+    `@agentage/logs: dropped an invalid row (${parsed.error.issues[0]?.path.join('.')})`
+  );
+  return null;
 };
 
 const sizeOf = (event: Event): number => Buffer.byteLength(JSON.stringify(event)) + 1;
 
 // A row alone over the batch limit would be a 413: it is dropped with a warning instead.
-const fitting = (event: Event): boolean => {
+const fitting = (event: Event | null): event is Event => {
+  if (event === null) return false;
   if (sizeOf(event) + 2 <= MAX_BATCH_BYTES) return true;
   process.emitWarning(`@agentage/logs: dropped a ${event.kind} row over 900 KB`);
   return false;
@@ -71,27 +81,35 @@ const sendOnce = async (o: EventsClientOptions, body: string): Promise<PostResul
     signal: AbortSignal.timeout(o.timeoutMs ?? 5000),
   });
   if (!res.ok) throw new IngestError(res.status);
-  const reply = (await res.json()) as { data?: PostResult };
+  // A 2xx was taken: an unreadable answer is never retried, it would post the rows twice.
+  const reply = (await res.json().catch(() => ({}))) as { data?: PostResult };
   return reply.data ?? { accepted: 0, rejected: 0 };
 };
 
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const send = (o: EventsClientOptions, body: string): Promise<PostResult> =>
-  sendOnce(o, body).catch((err: unknown) => {
+  sendOnce(o, body).catch(async (err: unknown) => {
     if (!retries(err)) throw err;
+    await pause(o.retryDelayMs ?? 1000);
     return sendOnce(o, body);
   });
 
+const post = async (o: EventsClientOptions, events: PostEvent[]): Promise<PostResult> => {
+  if (!o.url || !o.token)
+    throw new Error('@agentage/logs: the events client needs a url and a token');
+  const host = o.host ?? hostname();
+  const rows = events.map((event) => complete(event, host)).filter(fitting);
+  const total: PostResult = { accepted: 0, rejected: events.length - rows.length };
+  for (const batch of batchesOf(rows)) {
+    const result = await send(o, JSON.stringify(batch));
+    total.accepted += result.accepted;
+    total.rejected += result.rejected;
+  }
+  return total;
+};
+
 // Posts rows to the ingest; a refused or unreachable ingest rejects: the caller catches.
 export const createEventsClient = (o: EventsClientOptions) => ({
-  post: async (events: PostEvent[]): Promise<PostResult> => {
-    const host = o.host ?? hostname();
-    const total: PostResult = { accepted: 0, rejected: 0 };
-    const rows = events.map((event) => complete(event, host)).filter(fitting);
-    for (const batch of batchesOf(rows)) {
-      const result = await send(o, JSON.stringify(batch));
-      total.accepted += result.accepted;
-      total.rejected += result.rejected;
-    }
-    return total;
-  },
+  post: (events: PostEvent[]): Promise<PostResult> => post(o, events),
 });

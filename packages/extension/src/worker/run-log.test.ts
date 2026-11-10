@@ -48,4 +48,12 @@ describe('run log', () => {
     ]);
     expect(lines[1]).toMatchObject({ n: 1 });
   });
+
+  it('a value with no printable form logged in a run is a line, never a throw into the job', async () => {
+    const { log, lines } = recordedLog();
+    const buffer: RunBuffer = { text: '', truncated: false };
+    await withRunBuffer(buffer, async () => runLog(log).error(Object.create(null)));
+    expect(buffer.text).toBe('error [unprintable]\n');
+    expect(lines.map((line) => line['msg'])).toEqual(['Error: [unprintable]']);
+  });
 });

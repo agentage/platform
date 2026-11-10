@@ -58,6 +58,19 @@ describe('health', () => {
     expect(body).toMatchObject({ success: false, data: { status: 'unavailable' } });
     expect(body.data.checks).toEqual({ store: 'unavailable' });
     expect(worstOf([])).toBe('ok');
+    const odd = {
+      thrown: () => {
+        throw new Error('sync');
+      },
+      up: async () => 'up' as never,
+      proto: async () => 'toString' as never,
+    };
+    const refused = await healthBody({ ...OPTIONS, checks: odd });
+    expect(refused.data.checks).toEqual({
+      thrown: 'unavailable',
+      up: 'unavailable',
+      proto: 'unavailable',
+    });
   });
 
   it('a check still pending after CHECK_TIMEOUT_MS reads unavailable', async () => {

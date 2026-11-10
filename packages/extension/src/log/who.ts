@@ -19,13 +19,17 @@ const BOT = /bot|crawl|spider|slurp|scan|nikto|zgrab|masscan/i;
 const BOT_PATH = /\.(php|asp|aspx|env)$|^\/wp-|^\/\.git/i;
 const MACHINE = /^(curl|wget|node|undici|python|go-http|axios|java|okhttp|libwww)/i;
 
+// A header value as a line: control characters out (the length cut is the caller's).
+export const printable = (text: string | undefined): string =>
+  (text ?? '').replace(/[\u0000-\u001f\u007f]/g, '');
+
 export const declaredType = (header: Header): UserType | undefined => {
   const declared = header('x-client-type') as UserType | undefined;
   return declared && DECLARED.includes(declared) ? declared : undefined;
 };
 
 export const clientOf = (header: Header): string | null => {
-  const named = header('x-client')?.trim().toLowerCase().slice(0, 64);
+  const named = printable(header('x-client')).trim().toLowerCase().slice(0, 64);
   if (named) return named;
   const agent = header('user-agent') ?? '';
   return FAMILIES.find(([, pattern]) => pattern.test(agent))?.[0] ?? null;
@@ -45,6 +49,6 @@ export const userTypeOf = (header: Header, path: string): UserType => {
 export const whoOf = (header: Header, path: string) => ({
   user_type: userTypeOf(header, path),
   client: clientOf(header),
-  session: header('agsid')?.slice(0, 128) ?? null,
+  session: printable(header('agsid')).slice(0, 128) || null,
   sub: null,
 });

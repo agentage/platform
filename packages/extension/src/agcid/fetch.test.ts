@@ -44,4 +44,17 @@ describe('kitFetch', () => {
     expect(sent[1]?.has('traceparent')).toBe(false);
     expect(sent[2]?.get('agcid')).toBe('job-run-agcid');
   });
+
+  it('bounds every call with a timeout, keeping a caller signal', async () => {
+    const signals: (AbortSignal | null | undefined)[] = [];
+    const impl = (async (_url: string, init?: RequestInit) => {
+      signals.push(init?.signal);
+      return new Response('{}');
+    }) as typeof fetch;
+    const own = new AbortController().signal;
+    await kitFetch('http://x', {}, impl);
+    await kitFetch('http://x', { signal: own }, impl);
+    expect(signals[0]).toBeInstanceOf(AbortSignal);
+    expect(signals[1]).toBe(own);
+  });
 });

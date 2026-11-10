@@ -52,7 +52,7 @@ describe('createEventsClient', () => {
   it('retries a network error or 5xx once, never a 4xx, then gives up with the status', async () => {
     const once = fake(['throw', 200]);
     const client = (impl: typeof fetch) =>
-      createEventsClient({ url: 'https://logs.test', token: 't', fetch: impl });
+      createEventsClient({ url: 'https://logs.test', token: 't', fetch: impl, retryDelayMs: 0 });
     expect(
       await client(once.impl).post([{ kind: 'log', msg: 'a', extension: 'x', part: 'y' }])
     ).toEqual({ accepted: 1, rejected: 0 });
@@ -99,5 +99,64 @@ describe('createEventsClient', () => {
     expect(warn).toHaveBeenCalledOnce();
     expect(bodies[0]).toMatchObject([{ msg: 'small', fields: { password: '[redacted]' } }]);
     warn.mockRestore();
+  });
+
+  const log = { kind: 'log' as const, msg: 'a', extension: 'x', part: 'y' };
+  const quick = (impl: typeof fetch, timeoutMs?: number) =>
+    createEventsClient({
+      url: 'https://logs.test',
+      token: 't',
+      fetch: impl,
+      retryDelayMs: 0,
+      timeoutMs,
+    });
+
+  it('retries a 429 once; a 2xx with an unreadable body is never retried', async () => {
+    const limited = fake([429, 200]);
+    expect(await quick(limited.impl).post([log])).toEqual({ accepted: 1, rejected: 0 });
+    expect(limited.bodies).toHaveLength(2);
+    let calls = 0;
+    const garbled = (async () => {
+      calls++;
+      return new Response('not json', { status: 200 });
+    }) as typeof fetch;
+    expect(await quick(garbled).post([log])).toEqual({ accepted: 0, rejected: 0 });
+    expect(calls).toBe(1);
+  });
+
+  it('a hung ingest times out: two attempts, then a rejection', async () => {
+    let calls = 0;
+    const hung = ((_url: string, init?: RequestInit) => {
+      calls++;
+      return new Promise((_resolve, reject) =>
+        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason as Error))
+      );
+    }) as typeof fetch;
+    await expect(quick(hung, 10).post([log])).rejects.toThrow(/timeout|abort/i);
+    expect(calls).toBe(2);
+  });
+
+  it('drops an invalid row with a warning, counts it rejected, and sends the rest', async () => {
+    const { impl, bodies } = fake([200]);
+    const warn = vi.spyOn(process, 'emitWarning').mockImplementation(() => undefined);
+    const bad = { ...log, kind: 'metric' as never };
+    expect(await quick(impl).post([bad, log])).toEqual({ accepted: 1, rejected: 1 });
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/dropped an invalid row \(kind\)/));
+    expect(bodies[0]).toHaveLength(1);
+    warn.mockRestore();
+  });
+
+  it('cuts msg at 200 and masks credential values before sending; no token, no request', async () => {
+    const { impl, bodies } = fake([200]);
+    const jwt = `eyJhbGciOiJSUzI1NiJ9.${'p'.repeat(40)}.${'s'.repeat(40)}`;
+    await quick(impl).post([{ ...log, msg: `${jwt} ${'m'.repeat(3000)}`, fields: { note: jwt } }]);
+    expect(bodies[0]?.[0]).toMatchObject({ fields: { note: '[redacted]' } });
+    expect((bodies[0]?.[0] as { msg: string }).msg).toMatch(/^\[redacted\] m{189}$/);
+    await quick(impl).post([{ ...log, msg: `${'m'.repeat(199)}\u{1F600}` }]);
+    expect((bodies[1]?.[0] as { msg: string }).msg).toBe('m'.repeat(199));
+    const none = fake([200]);
+    const client = createEventsClient({ url: 'https://logs.test', token: '', fetch: none.impl });
+    await expect(client.post([log])).rejects.toThrow(/url and a token/);
+    expect(none.bodies).toHaveLength(0);
   });
 });

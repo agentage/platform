@@ -113,7 +113,7 @@ const identityOf = (options: TestContextOptions) => {
 
 const serverContext = (options: TestContextOptions): TestContext => {
   const logs: LogEntry[] = [];
-  const log = runLog(recordingLog(logs));
+  const log = runLog(recordingLog(logs), true);
   const spans: SpanRecord[] = [];
   const { extension, ...open } = identityOf(options);
   const store = testStore(open.store, recordingLog([]));
