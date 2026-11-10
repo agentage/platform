@@ -44,4 +44,24 @@ describe('serve', () => {
     await expect(listen(express(), port, '127.0.0.1')).rejects.toThrow(/EADDRINUSE/);
     first.close();
   });
+
+  it('a second stop or signal mid-drain is one drain and one exit', async () => {
+    const ctx = createTestContext();
+    const exit = vi.fn();
+    const server = await listen(express(), 0);
+    const close = vi.spyOn(server, 'close');
+    const stop = shutdownOn(server, {
+      app: express(),
+      port: 0,
+      log: ctx.log,
+      exit,
+      signals: ['SIGUSR2'],
+    });
+    stop();
+    process.emit('SIGUSR2');
+    expect(process.listenerCount('SIGUSR2')).toBe(1);
+    await vi.waitFor(() => expect(exit).toHaveBeenCalledOnce());
+    expect([close.mock.calls.length, ctx.logs.length]).toEqual([1, 1]);
+    process.removeAllListeners('SIGUSR2');
+  });
 });

@@ -160,6 +160,8 @@ describe('ctx.platform', () => {
     expect([scope.exit, kill.mock.calls.length]).toEqual([true, 0]);
     ctx.exit();
     expect(kill).toHaveBeenCalledWith(process.pid, 'SIGTERM');
+    ctx.exit();
+    expect(kill).toHaveBeenCalledOnce();
     kill.mockRestore();
     const test = createTestContext();
     test.exit();

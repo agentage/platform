@@ -36,7 +36,9 @@ const settle = async (check: HealthCheck): Promise<HealthStatus> => {
     timer = setTimeout(() => resolve('unavailable'), CHECK_TIMEOUT_MS).unref();
   });
   try {
-    return await Promise.race([check(), expiry]);
+    const status = await Promise.race([check(), expiry]);
+    // A check answering anything but a status is not a healthy one.
+    return status in RANK ? status : 'unavailable';
   } catch {
     return 'unavailable';
   } finally {

@@ -85,4 +85,22 @@ describe('request line', () => {
     await settle();
     expect(lines).toEqual([]);
   });
+
+  it('an absurd agcid, x-client, agsid or traceparent never reaches a line unbounded', async () => {
+    const { requests } = await start();
+    const send = (headers: Record<string, string>) =>
+      fetch(`${served?.url}/api/v1/items/1`, { headers });
+    const big = 'a'.repeat(10_000);
+    await send({ agcid: big });
+    // Other control characters never pass: the HTTP parser answers 400 before the kit.
+    await send({ 'x-client': `ob\tsid\tian${'x'.repeat(10_000)}` });
+    await send({ agsid: `\t${'s'.repeat(8_000)}`, traceparent: `00-${big.slice(4_000)}-01` });
+    await settle();
+    const [first, second, third] = requests();
+    expect(requests()).toHaveLength(3);
+    expect(first?.['agcid']).toMatch(/^[0-9a-f]{12}7[0-9a-f]{19}$/);
+    expect(second?.['client']).toBe(`obsidian${'x'.repeat(56)}`);
+    expect(String(third?.['session'])).toMatch(/^s{128}$/);
+    expect(requests().every((line) => JSON.stringify(line).length < 2000)).toBe(true);
+  });
 });

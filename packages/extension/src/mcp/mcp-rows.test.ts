@@ -78,7 +78,7 @@ describe('mcp rows', () => {
 
   it('initialize and tools/list leave an http row; initialize names the client', async () => {
     const { post, lines } = await start();
-    const clientInfo = { name: 'claude-code', version: '2.1.0' };
+    const clientInfo = { name: 'claude-code\u0000\n', version: '2.1.0' };
     await post('initialize', { protocolVersion: '2025-11-25', capabilities: {}, clientInfo });
     await post('tools/list', {});
     await settle();

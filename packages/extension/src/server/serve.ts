@@ -20,15 +20,24 @@ export const listen = (app: Express, port: number, host?: string): Promise<Serve
   });
 
 // SIGTERM drains: no new connections, idle ones closed, a hard exit after the grace period.
+// Listening stays on: a second signal mid-drain must not fall to the default handler and kill.
 export const shutdownOn = (server: Server, options: ServeOptions): (() => void) => {
-  const exit = options.exit ?? ((code: number) => process.exit(code));
+  const exitWith = options.exit ?? ((code: number) => process.exit(code));
+  let [stopping, exited] = [false, false];
+  const exit = (code: number): void => {
+    if (exited) return;
+    exited = true;
+    exitWith(code);
+  };
   const stop = (): void => {
+    if (stopping) return;
+    stopping = true;
     options.log.info('shutting down');
     server.close(() => exit(0));
     server.closeIdleConnections();
     setTimeout(() => exit(0), GRACE_MS).unref();
   };
-  for (const signal of options.signals ?? ['SIGTERM', 'SIGINT']) process.once(signal, stop);
+  for (const signal of options.signals ?? ['SIGTERM', 'SIGINT']) process.on(signal, stop);
   return stop;
 };
 

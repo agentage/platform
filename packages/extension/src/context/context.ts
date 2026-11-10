@@ -1,4 +1,4 @@
-import { requestScope } from '../agcid/current.js';
+import { requestScope, sigtermOnce } from '../agcid/current.js';
 import { callerOf, type Caller } from '../auth/token-check.js';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
 import { storeOf } from '../manifest/parts.js';
@@ -63,7 +63,7 @@ export const healthRegistrar =
 const exitAfterAnswer = (): void => {
   const scope = requestScope.getStore();
   if (scope) scope.exit = true;
-  else process.kill(process.pid, 'SIGTERM');
+  else sigtermOnce();
 };
 
 // ctx.store is always there; without a store part in the manifest it says so on first use.

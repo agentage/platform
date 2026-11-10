@@ -6,7 +6,7 @@ import { createMcpHandler, type McpHttpHandler } from '@modelcontextprotocol/ser
 import { requestScope } from '../agcid/current.js';
 import { setCaller, strongest, type Access } from '../auth/token-check.js';
 import { fail } from '../envelope/envelope.js';
-import { declaredType } from '../log/who.js';
+import { declaredType, printable } from '../log/who.js';
 import { BODY_LIMIT, createPartApp, PUBLIC_CORS, type PartAppBase } from '../server/app.js';
 import { serverFactory } from './server.js';
 import { prefixed, type ToolEntry } from './tools.js';
@@ -80,7 +80,7 @@ const markRow = (options: McpAppOptions, req: Request, res: Response, body: unkn
     if (scope) scope.user_type = declaredType((name) => req.get(name)) ?? 'agent';
   }
   const name = messages.find((m) => m?.method === 'initialize')?.params?.clientInfo?.name;
-  if (typeof name === 'string') res.locals['clientInfo'] = name.slice(0, 64);
+  if (typeof name === 'string') res.locals['clientInfo'] = printable(name).slice(0, 64);
 };
 
 const webRequest = (req: Request, body: Buffer): globalThis.Request => {
