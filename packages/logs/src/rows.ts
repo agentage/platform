@@ -1,4 +1,5 @@
 import { type Fields, type Kind, type Level } from './event.schema.js';
+import { MAX_STRING } from './redact.js';
 
 export interface Row {
   kind: Kind;
@@ -34,7 +35,7 @@ export interface JobRow {
 
 const HEALTH = /^\/(health|healthz|livez|readyz)$/;
 
-export const typeOf = (err: unknown): string => (err instanceof Error ? err.name : 'Error');
+const typeOf = (err: unknown): string => (err instanceof Error ? err.name : 'Error');
 
 const failed = (err: unknown): Fields => (err === undefined ? {} : { 'error.type': typeOf(err) });
 
@@ -44,7 +45,7 @@ const httpLevel = (status: number, ms: number): Level =>
 // Health probes leave no row (logs-events Q2).
 export const httpRow = (o: HttpRow): Row | null => {
   if (HEALTH.test(o.route)) return null;
-  const route = o.route.slice(0, 200);
+  const route = o.route.slice(0, MAX_STRING);
   const fields: Fields = {
     'http.request.method': o.method,
     'http.route': route,
@@ -96,3 +97,12 @@ export const eventRow = (name: string, fields: Fields, msg = name): Row => ({
   msg,
   fields: { 'event.name': name, ...fields },
 });
+
+// where: the route, tool or job; an author's agentage.fingerprint passes through (Q11 A).
+export const errorRow = (err: unknown, where?: string | Fields): Row => {
+  const own = typeof where === 'string' ? { 'agentage.where': where } : (where ?? {});
+  const [type, message] = err instanceof Error ? [err.name, err.message] : ['Error', String(err)];
+  const stack = err instanceof Error ? { 'exception.stacktrace': err.stack ?? '' } : {};
+  const fields = { 'exception.type': type, 'exception.message': message, ...stack, ...own };
+  return { kind: 'error', level: 'error', msg: `${type}: ${message}`, fields };
+};

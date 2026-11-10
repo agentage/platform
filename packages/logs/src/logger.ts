@@ -1,7 +1,7 @@
 import { type Fields, type UserType } from './event.schema.js';
-import { errorRow } from './error-row.js';
 import { MAX_STRING, redact } from './redact.js';
 import {
+  errorRow,
   eventRow,
   httpRow,
   jobRow,

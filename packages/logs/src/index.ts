@@ -1,5 +1,4 @@
 export {
-  AGCID_HEX,
   EventSchema,
   KINDS,
   LEVELS,
@@ -12,6 +11,7 @@ export {
   type UserType,
 } from './event.schema.js';
 export { parseLine, type LineSource } from './parse-line.js';
+export { uuidv7 } from './uuidv7.js';
 export { createLogger, type Logger, type LoggerOptions, type RowContext } from './logger.js';
 export { type HttpRow, type JobRow, type McpRow, type Row } from './rows.js';
 export {

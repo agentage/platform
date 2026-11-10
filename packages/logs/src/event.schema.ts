@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const KINDS = ['http', 'mcp', 'job', 'span', 'error', 'event', 'log'] as const;
 export const LEVELS = ['info', 'warn', 'error'] as const;
 export const USER_TYPES = ['user', 'agent', 'automation', 'service', 'test', 'bot'] as const;
-export const AGCID_HEX = /^[0-9a-f]{32}$/;
+const AGCID_HEX = /^[0-9a-f]{32}$/;
 
 export type Kind = (typeof KINDS)[number];
 export type Level = (typeof LEVELS)[number];

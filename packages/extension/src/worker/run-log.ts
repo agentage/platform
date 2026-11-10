@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { createLogger } from '@agentage/logs';
-import { messageOf, type Log, type LogLevel } from '../log/log.js';
+import { createLogger, type Level } from '@agentage/logs';
+import { messageOf, type Log } from '../log/log.js';
 
 export const LOG_CAP_BYTES = 64 * 1024;
 
@@ -28,7 +28,7 @@ export const append = (buffer: RunBuffer, line: string): void => {
   buffer.truncated = true;
 };
 
-const record = (level: LogLevel, message: string): void => {
+const record = (level: Level, message: string): void => {
   const buffer = current.getStore();
   if (buffer) append(buffer, `${level} ${message}`);
 };
