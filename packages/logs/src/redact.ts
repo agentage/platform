@@ -2,7 +2,7 @@ import { type Fields } from './event.schema.js';
 
 const SECRET = /token|secret|password|key|authorization|cookie/i;
 // A credential in a value: a JWT (also cut after its first part), an aga_ PAT, a Bearer credential.
-const CREDENTIAL = /eyJ[\w-]{8,}(\.[\w-]*){0,2}|aga_[\w.-]{4,}|bearer\s+[\w.~+/=-]{8,}/gi;
+const CREDENTIAL = /eyJ[\w-]{8,}(\.[\w-]*){0,2}|aga_[\w.-]{4,}|bearer\s+[\w.~+/=-]{16,}/gi;
 export const MAX_STRING = 200;
 const MAX_STACK = 2000;
 const MAX_DEPTH = 3;

@@ -131,6 +131,7 @@ describe('redact, values', () => {
       c: 'Authorization: Bearer abcdefgh12345678',
       d: ['eyJhbGciOiJSUzI1NiJ9'],
       e: 'the bearer of bad news',
+      f: 'no bearer credential found',
     });
     expect(out).toEqual({
       a: '[redacted]',
@@ -138,6 +139,7 @@ describe('redact, values', () => {
       c: 'Authorization: [redacted]',
       d: ['[redacted]'],
       e: 'the bearer of bad news',
+      f: 'no bearer credential found',
     });
     expect(redact(out)).toEqual(out);
   });
