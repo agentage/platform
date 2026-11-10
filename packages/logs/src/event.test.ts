@@ -89,6 +89,21 @@ describe('parseLine', () => {
     });
     expect(json.msg.length).toBe(200);
   });
+
+  it('a valid event line is cut and redacted as the logger writes it; a bad source is unknown', () => {
+    const jwt = `eyJhbGciOiJSUzI1NiJ9.${'p'.repeat(40)}`;
+    const fields = { token: 'abc', note: `Bearer ${jwt}`, long: 'x'.repeat(300) };
+    const line = JSON.stringify({ ...base, kind: 'log', msg: 'm'.repeat(1500), fields });
+    const event = parseLine(line);
+    expect(event.msg).toHaveLength(200);
+    expect(event.fields).toEqual({
+      token: '[redacted]',
+      note: '[redacted]',
+      long: 'x'.repeat(200),
+    });
+    const raw = parseLine('hello', { extension: '', part: 'p'.repeat(100) });
+    expect([raw.extension, raw.part]).toEqual(['unknown', 'p'.repeat(64)]);
+  });
 });
 
 describe('redact', () => {
@@ -105,6 +120,26 @@ describe('redact', () => {
     expect([String(out['long']).length, String(out['exception.stacktrace']).length]).toEqual([
       200, 300,
     ]);
+  });
+});
+
+describe('redact, values', () => {
+  it('masks a JWT, an aga_ PAT and a Bearer credential under any key; prose survives', () => {
+    const out = redact({
+      a: 'eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c3IifQ.c2ln',
+      b: 'pat aga_0123456789abcdef here',
+      c: 'Authorization: Bearer abcdefgh12345678',
+      d: ['eyJhbGciOiJSUzI1NiJ9'],
+      e: 'the bearer of bad news',
+    });
+    expect(out).toEqual({
+      a: '[redacted]',
+      b: 'pat [redacted] here',
+      c: 'Authorization: [redacted]',
+      d: ['[redacted]'],
+      e: 'the bearer of bad news',
+    });
+    expect(redact(out)).toEqual(out);
   });
 });
 

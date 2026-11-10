@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { createLogger, type RowContext } from './logger.js';
+import { describe, expect, it, vi } from 'vitest';
+import { createLogger, MAX_LINE_BYTES, type RowContext } from './logger.js';
 
 const capture = (context?: RowContext) => {
   const lines: Record<string, unknown>[] = [];
@@ -97,5 +97,93 @@ describe('createLogger', () => {
     expect(first).toMatchObject({ 'exception.type': 'Error', 'agentage.where': '/api/v1/emit' });
     expect(Object.keys(first).filter((k) => /cause|frame|fingerprint|code/.test(k))).toEqual([]);
     expect(lines[1]?.['fields']).toMatchObject({ 'agentage.fingerprint': 'mine' });
+  });
+
+  it('never throws into the caller: circular, bigint, a throwing getter, huge, a failing write', () => {
+    const { log, lines } = capture();
+    const circular: Record<string, unknown> = { a: 1 };
+    circular['self'] = circular;
+    const getter = Object.defineProperty({}, 'boom', {
+      enumerable: true,
+      get: () => {
+        throw new Error('getter');
+      },
+    });
+    log.info('circular', circular);
+    log.info('bigint', { n: 10n });
+    log.info('getter', getter);
+    log.error(Object.create(null));
+    log.info('huge', { list: Array(1000).fill('y'.repeat(200)) });
+    expect(lines.map((l) => l['msg'])).toEqual([
+      'circular',
+      'bigint',
+      'getter',
+      'Error: [unprintable]',
+      'huge',
+    ]);
+    expect(lines[0]?.['fields']).toEqual({ a: 1, self: { a: 1, self: { a: 1, self: '[depth]' } } });
+    expect([lines[1]?.['fields'], lines[2]?.['fields']]).toEqual([
+      { n: '10' },
+      { boom: '[unreadable]' },
+    ]);
+    expect(lines[4]?.['fields']).toEqual({ 'agentage.dropped': 'fields over 64 KB' });
+    expect(JSON.stringify(lines[4]).length).toBeLessThan(MAX_LINE_BYTES);
+    const failing = createLogger({
+      extension: 'x',
+      part: 'y',
+      write: () => {
+        throw new Error('EPIPE');
+      },
+    });
+    expect(() => failing.info('lost')).not.toThrow();
+    expect(() =>
+      failing.http({ method: 'GET', route: undefined as never, status: 200, ms: 1 })
+    ).not.toThrow();
+  });
+
+  it('a closed stderr (EPIPE) never crashes the part', () => {
+    const write = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const before = process.stderr.listenerCount('error');
+    createLogger({ extension: 'x', part: 'y' }).info('first');
+    expect(process.stderr.listenerCount('error')).toBe(before + 1);
+    const epipe = Object.assign(new Error('write EPIPE'), { code: 'EPIPE' });
+    expect(() => process.stderr.emit('error', epipe)).not.toThrow();
+    write.mockImplementation(() => {
+      throw new Error('ERR_STREAM_DESTROYED');
+    });
+    expect(() => createLogger({ extension: 'x', part: 'y' }).warn('second')).not.toThrow();
+    write.mockRestore();
+  });
+
+  it('masks credential values in msg, exception.message, the stack and innocent fields', () => {
+    const jwt = `eyJhbGciOiJSUzI1NiJ9.${'p'.repeat(40)}.${'s'.repeat(40)}`;
+    const { log, lines } = capture();
+    log.info(`call failed with Bearer ${jwt}`, {
+      note: `aga_${jwt}`,
+      header: `bearer ${'z'.repeat(20)}`,
+    });
+    log.error(new Error(`refused ${jwt}`));
+    log.info(`${'m'.repeat(180)} ${jwt}`);
+    const text = JSON.stringify(lines);
+    expect(text).not.toMatch(/eyJ|aga_|zzzz/);
+    expect(lines[0]).toMatchObject({
+      msg: 'call failed with [redacted]',
+      fields: { note: '[redacted]', header: '[redacted]' },
+    });
+    expect(lines[1]?.['fields']).toMatchObject({ 'exception.message': 'refused [redacted]' });
+    expect(String(lines[2]?.['msg'])).toHaveLength(191);
+  });
+
+  it('cuts msg at 200 and bounds the header columns, without control characters', () => {
+    const { log, lines } = capture({
+      client: `ob\nsid\u0000ian${'x'.repeat(10_000)}`,
+      session: 's'.repeat(10_000),
+      sub: '\u0007',
+    });
+    log.info('m'.repeat(5000));
+    expect(String(lines[0]?.['msg'])).toHaveLength(200);
+    expect(lines[0]?.['client']).toBe(`obsidian${'x'.repeat(56)}`);
+    expect(String(lines[0]?.['session'])).toHaveLength(128);
+    expect(lines[0]?.['sub']).toBeNull();
   });
 });

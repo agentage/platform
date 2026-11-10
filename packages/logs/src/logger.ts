@@ -1,5 +1,5 @@
 import { type Fields, type UserType } from './event.schema.js';
-import { MAX_STRING, redact } from './redact.js';
+import { redact, scrub, stringOf } from './redact.js';
 import {
   errorRow,
   eventRow,
@@ -60,44 +60,80 @@ const timed = async <T>(fn: () => T | Promise<T>, end: (ms: number, err?: unknow
   }
 };
 
-// Every method is a row; row is the one sink, so a wrapper replaces only it.
-const loggerOf = (row: (r: Row) => void): Logger => ({
-  info: (msg, fields = {}) => row({ kind: 'log', level: 'info', msg, fields }),
-  warn: (msg, fields = {}) => row({ kind: 'log', level: 'warn', msg, fields }),
-  error: (err, where) => row(errorRow(err, where)),
-  http: (o) => {
-    const r = httpRow(o);
-    if (r) row(r);
-  },
-  mcp: (o) => row(mcpRow(o)),
-  job: (o) => row(jobRow(o)),
-  span: (name, fn) => timed(fn, (ms, err) => row(spanRow(name, ms, err))),
-  event: (name, fields = {}, msg) => row(eventRow(name, fields, msg)),
-  row,
-});
+// Builds and writes a row; a row that cannot be built or written is dropped, never thrown at the caller.
+const guarded =
+  (row: (r: Row) => void) =>
+  (build: () => Row | null): void => {
+    try {
+      const r = build();
+      if (r) row(r);
+    } catch {
+      // the caller's unit of work outranks its log line
+    }
+  };
 
-const lineOf = (o: LoggerOptions, r: Row): string => {
+// Every method is a row; row is the one sink, so a wrapper replaces only it.
+const loggerOf = (row: (r: Row) => void): Logger => {
+  const emit = guarded(row);
+  return {
+    info: (msg, fields = {}) => emit(() => ({ kind: 'log', level: 'info', msg, fields })),
+    warn: (msg, fields = {}) => emit(() => ({ kind: 'log', level: 'warn', msg, fields })),
+    error: (err, where) => emit(() => errorRow(err, where)),
+    http: (o) => emit(() => httpRow(o)),
+    mcp: (o) => emit(() => mcpRow(o)),
+    job: (o) => emit(() => jobRow(o)),
+    span: (name, fn) => timed(fn, (ms, err) => emit(() => spanRow(name, ms, err))),
+    event: (name, fields = {}, msg) => emit(() => eventRow(name, fields, msg)),
+    row: (r) => emit(() => r),
+  };
+};
+
+const CONTROL = /[\u0000-\u001f\u007f]/g;
+
+// A line over this is written without its fields: a shipper splits longer lines.
+export const MAX_LINE_BYTES = 64 * 1024;
+
+// The columns the kit sets from request headers and tokens, bounded as the schema bounds them.
+const columnsOf = (o: LoggerOptions, r: Row) => {
   const c = o.context?.() ?? {};
-  const event = {
+  const text = (value: string | null | undefined, max: number) =>
+    value == null ? null : scrub(stringOf(value).replace(CONTROL, ''), max) || null;
+  return {
     ts: new Date().toISOString(),
     level: r.level,
     kind: r.kind,
-    msg: r.msg.slice(0, MAX_STRING),
+    msg: scrub(r.msg),
     extension: o.extension,
     part: o.part,
     version: o.version ?? '',
     ...(o.host ? { host: o.host } : {}),
     agcid: c.agcid ?? null,
-    sub: c.sub ?? null,
-    session: c.session ?? null,
+    sub: text(c.sub, 128),
+    session: text(c.session, 128),
     user_type: c.user_type ?? 'service',
-    client: c.client ?? null,
-    fields: redact({ ...o.base, ...r.fields }),
+    client: text(c.client, 64),
   };
-  return `${JSON.stringify(event)}\n`;
 };
 
-const stderr = (line: string): void => void process.stderr.write(line);
+const lineOf = (o: LoggerOptions, r: Row): string => {
+  const columns = columnsOf(o, r);
+  const line = JSON.stringify({
+    ...columns,
+    fields: { ...redact(o.base ?? {}), ...redact(r.fields) },
+  });
+  if (Buffer.byteLength(line) <= MAX_LINE_BYTES) return `${line}\n`;
+  return `${JSON.stringify({ ...columns, fields: { 'agentage.dropped': 'fields over 64 KB' } })}\n`;
+};
+
+let quiet = false;
+// A closed stderr (EPIPE) emits an error event; with no listener that would crash the part.
+const stderr = (line: string): void => {
+  if (!quiet) {
+    process.stderr.on('error', () => undefined);
+    quiet = true;
+  }
+  process.stderr.write(line);
+};
 
 // One JSON line per unit of work on stderr; the host ships it.
 export const createLogger = (o: LoggerOptions): Logger =>

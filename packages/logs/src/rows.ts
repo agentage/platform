@@ -1,5 +1,5 @@
 import { type Fields, type Kind, type Level } from './event.schema.js';
-import { MAX_STRING } from './redact.js';
+import { MAX_STRING, stringOf } from './redact.js';
 
 export interface Row {
   kind: Kind;
@@ -101,8 +101,11 @@ export const eventRow = (name: string, fields: Fields, msg = name): Row => ({
 // where: the route, tool or job; an author's agentage.fingerprint passes through (Q11 A).
 export const errorRow = (err: unknown, where?: string | Fields): Row => {
   const own = typeof where === 'string' ? { 'agentage.where': where } : (where ?? {});
-  const [type, message] = err instanceof Error ? [err.name, err.message] : ['Error', String(err)];
-  const stack = err instanceof Error ? { 'exception.stacktrace': err.stack ?? '' } : {};
+  const error = err instanceof Error;
+  const [type, message] = error
+    ? [stringOf(err.name), stringOf(err.message)]
+    : ['Error', stringOf(err)];
+  const stack = error ? { 'exception.stacktrace': stringOf(err.stack ?? '') } : {};
   const fields = { 'exception.type': type, 'exception.message': message, ...stack, ...own };
   return { kind: 'error', level: 'error', msg: `${type}: ${message}`, fields };
 };
