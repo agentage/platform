@@ -45,6 +45,8 @@ export interface LoggerOptions {
   sink?: (row: Row) => void;
   // Fields on every row (a command's name).
   base?: Fields;
+  // A test log: a row that fails to build or write throws, so a sink's assertion fails its test.
+  strict?: boolean;
 }
 
 const timed = async <T>(fn: () => T | Promise<T>, end: (ms: number, err?: unknown) => void) => {
@@ -60,21 +62,21 @@ const timed = async <T>(fn: () => T | Promise<T>, end: (ms: number, err?: unknow
   }
 };
 
-// Builds and writes a row; a row that cannot be built or written is dropped, never thrown at the caller.
+// Builds and writes a row; outside a strict log, a failed row is dropped, never thrown at the caller.
 const guarded =
-  (row: (r: Row) => void) =>
+  (row: (r: Row) => void, strict: boolean) =>
   (build: () => Row | null): void => {
     try {
       const r = build();
       if (r) row(r);
-    } catch {
-      // the caller's unit of work outranks its log line
+    } catch (err) {
+      if (strict) throw err;
     }
   };
 
 // Every method is a row; row is the one sink, so a wrapper replaces only it.
-const loggerOf = (row: (r: Row) => void): Logger => {
-  const emit = guarded(row);
+const loggerOf = (row: (r: Row) => void, strict = false): Logger => {
+  const emit = guarded(row, strict);
   return {
     info: (msg, fields = {}) => emit(() => ({ kind: 'log', level: 'info', msg, fields })),
     warn: (msg, fields = {}) => emit(() => ({ kind: 'log', level: 'warn', msg, fields })),
@@ -93,19 +95,16 @@ const CONTROL = /[\u0000-\u001f\u007f]/g;
 // A line over this is written without its fields: a shipper splits longer lines.
 export const MAX_LINE_BYTES = 64 * 1024;
 
+const text = (value: string | null | undefined, max: number) =>
+  value == null ? null : scrub(stringOf(value).replace(CONTROL, ''), max) || null;
+
 // The columns the kit sets from request headers and tokens, bounded as the schema bounds them.
 const columnsOf = (o: LoggerOptions, r: Row) => {
   const c = o.context?.() ?? {};
-  const text = (value: string | null | undefined, max: number) =>
-    value == null ? null : scrub(stringOf(value).replace(CONTROL, ''), max) || null;
+  const { extension, part, version = '' } = o;
+  const [level, kind, msg] = [r.level, r.kind, scrub(r.msg)];
   return {
-    ts: new Date().toISOString(),
-    level: r.level,
-    kind: r.kind,
-    msg: scrub(r.msg),
-    extension: o.extension,
-    part: o.part,
-    version: o.version ?? '',
+    ...{ ts: new Date().toISOString(), level, kind, msg, extension, part, version },
     ...(o.host ? { host: o.host } : {}),
     agcid: c.agcid ?? null,
     sub: text(c.sub, 128),
@@ -137,4 +136,4 @@ const stderr = (line: string): void => {
 
 // One JSON line per unit of work on stderr; the host ships it.
 export const createLogger = (o: LoggerOptions): Logger =>
-  loggerOf(o.sink ?? ((r) => (o.write ?? stderr)(lineOf(o, r))));
+  loggerOf(o.sink ?? ((r) => (o.write ?? stderr)(lineOf(o, r))), o.strict);

@@ -1,13 +1,20 @@
 import { type Fields } from './event.schema.js';
 
 const SECRET = /token|secret|password|key|authorization|cookie/i;
-// A credential in a value: a JWT (also cut after its first part), an aga_ PAT, a Bearer credential.
-const CREDENTIAL = /eyJ[\w-]{8,}(\.[\w-]*){0,2}|aga_[\w.-]{4,}|bearer\s+[\w.~+/=-]{16,}/gi;
+// A JWT (three parts, or a token-length first part a cut left), an aga_ PAT, a Bearer credential.
+const JWT = String.raw`(?<![\w-])eyJ(?:[\w-]{8,}\.[\w-]+\.[\w-]*|[\w-]{17,}(?:\.[\w-]*)?)`;
+const PAT = String.raw`(?<![\w-])aga_[\w.-]{16,}`;
+// An opaque Bearer value is mixed case with a digit, or 32 characters and more.
+const OPAQUE = String.raw`(?=[\w.~+/=-]*\d)(?=[\w.~+/=-]*[A-Z])[\w.~+/=-]{16,}|[\w.~+/=-]{32,}`;
+const BEARER = String.raw`\b[Bb]earer\s+(?:${OPAQUE})`;
+const CREDENTIAL = new RegExp(`${JWT}|${PAT}|${BEARER}`, 'g');
 export const MAX_STRING = 200;
 const MAX_STACK = 2000;
 const MAX_DEPTH = 3;
 
-const cut = (text: string, max: number): string => (text.length > max ? text.slice(0, max) : text);
+// On a code point boundary: a cut never leaves half a surrogate pair.
+export const cut = (text: string, max: number): string =>
+  text.length > max ? text.slice(0, max).replace(/[\uD800-\uDBFF]$/, '') : text;
 
 export const stringOf = (value: unknown): string => {
   try {
@@ -21,7 +28,7 @@ export const stringOf = (value: unknown): string => {
 export const scrub = (text: unknown, max = MAX_STRING): string =>
   cut(stringOf(text).replace(CREDENTIAL, '[redacted]'), max);
 
-const read = (value: object, key: string): unknown => {
+export const read = (value: object, key: string): unknown => {
   try {
     return Reflect.get(value, key) as unknown;
   } catch {

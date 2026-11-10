@@ -128,7 +128,7 @@ describe('redact, values', () => {
     const out = redact({
       a: 'eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c3IifQ.c2ln',
       b: 'pat aga_0123456789abcdef here',
-      c: 'Authorization: Bearer abcdefgh12345678',
+      c: 'Authorization: Bearer AbcdEfgh12345678',
       d: ['eyJhbGciOiJSUzI1NiJ9'],
       e: 'the bearer of bad news',
       f: 'no bearer credential found',
@@ -142,6 +142,29 @@ describe('redact, values', () => {
       f: 'no bearer credential found',
     });
     expect(redact(out)).toEqual(out);
+  });
+
+  it('leaves ordinary text alone: no left boundary, wrong case or no credential shape', () => {
+    const prose = [
+      'Eyjafjallajokull erupted',
+      'saga_controller started',
+      'heyJudeheyjude',
+      'omega_aga_value',
+      'bearer instrument_settlement_v2 matured',
+      'Bearer abc123',
+      'eyJshort',
+      'aga_unit',
+    ];
+    expect(prose.map((text) => redact({ text })['text'])).toEqual(prose);
+  });
+
+  it('cuts on a code point boundary: an emoji at 199 never leaves half a pair', () => {
+    const text = `${'m'.repeat(199)}\u{1F600}x`;
+    const out = String(redact({ text })['text']);
+    expect([out.length, out.isWellFormed()]).toEqual([199, true]);
+    const line = JSON.stringify({ ...base, kind: 'log', msg: text });
+    expect(parseLine(line).msg.isWellFormed()).toBe(true);
+    expect(parseLine(text).msg).toHaveLength(199);
   });
 });
 

@@ -1,5 +1,5 @@
 import { type Fields, type Kind, type Level } from './event.schema.js';
-import { MAX_STRING, stringOf } from './redact.js';
+import { cut, MAX_STRING, read, stringOf } from './redact.js';
 
 export interface Row {
   kind: Kind;
@@ -45,7 +45,7 @@ const httpLevel = (status: number, ms: number): Level =>
 // Health probes leave no row (logs-events Q2).
 export const httpRow = (o: HttpRow): Row | null => {
   if (HEALTH.test(o.route)) return null;
-  const route = o.route.slice(0, MAX_STRING);
+  const route = cut(o.route, MAX_STRING);
   const fields: Fields = {
     'http.request.method': o.method,
     'http.route': route,
@@ -102,10 +102,9 @@ export const eventRow = (name: string, fields: Fields, msg = name): Row => ({
 export const errorRow = (err: unknown, where?: string | Fields): Row => {
   const own = typeof where === 'string' ? { 'agentage.where': where } : (where ?? {});
   const error = err instanceof Error;
-  const [type, message] = error
-    ? [stringOf(err.name), stringOf(err.message)]
-    : ['Error', stringOf(err)];
-  const stack = error ? { 'exception.stacktrace': stringOf(err.stack ?? '') } : {};
+  const text = (key: string) => stringOf(read(err as object, key) ?? '');
+  const [type, message] = error ? [text('name'), text('message')] : ['Error', stringOf(err)];
+  const stack = error ? { 'exception.stacktrace': text('stack') } : {};
   const fields = { 'exception.type': type, 'exception.message': message, ...stack, ...own };
   return { kind: 'error', level: 'error', msg: `${type}: ${message}`, fields };
 };

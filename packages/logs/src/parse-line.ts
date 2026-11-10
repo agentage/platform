@@ -1,5 +1,5 @@
 import { EventSchema, type Event, type Fields } from './event.schema.js';
-import { redact, scrub } from './redact.js';
+import { cut, redact, scrub } from './redact.js';
 
 const RAW_ERROR = /\b(ERROR|FATAL)\b/;
 
@@ -19,7 +19,7 @@ export interface LineSource {
 const isObject = (value: unknown): value is Fields =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const nameOf = (value: string | undefined): string => value?.slice(0, 64) || 'unknown';
+const nameOf = (value: string | undefined): string => cut(value ?? '', 64) || 'unknown';
 
 // Not a valid event: a raw log row, a JSON object keeping its keys; both redacted as the logger does.
 export const parseLine = (text: string, source: LineSource = {}): Event => {

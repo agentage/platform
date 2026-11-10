@@ -160,7 +160,7 @@ describe('createLogger', () => {
     const { log, lines } = capture();
     log.info(`call failed with Bearer ${jwt}`, {
       note: `aga_${jwt}`,
-      header: `bearer ${'z'.repeat(20)}`,
+      header: `bearer ${'z'.repeat(40)}`,
     });
     log.error(new Error(`refused ${jwt}`));
     log.info(`${'m'.repeat(180)} ${jwt}`);
@@ -185,5 +185,25 @@ describe('createLogger', () => {
     expect(lines[0]?.['client']).toBe(`obsidian${'x'.repeat(56)}`);
     expect(String(lines[0]?.['session'])).toHaveLength(128);
     expect(lines[0]?.['sub']).toBeNull();
+  });
+
+  it('a strict log rethrows a failed row; an error with throwing getters still writes its row', () => {
+    const sink = () => {
+      throw new Error('assertion in a sink');
+    };
+    expect(() => createLogger({ extension: 'x', part: 'y', sink }).info('a')).not.toThrow();
+    const strict = createLogger({ extension: 'x', part: 'y', sink, strict: true });
+    expect(() => strict.info('a')).toThrow(/assertion in a sink/);
+    const hostile = new Error('x');
+    Object.defineProperty(hostile, 'message', {
+      get: () => {
+        throw new Error('getter');
+      },
+    });
+    const { log, lines } = capture();
+    log.error(hostile);
+    log.info(`${'m'.repeat(199)}\u{1F600}`);
+    expect(lines[0]?.['fields']).toMatchObject({ 'exception.message': '[unreadable]' });
+    expect(String(lines[1]?.['msg']).isWellFormed()).toBe(true);
   });
 });

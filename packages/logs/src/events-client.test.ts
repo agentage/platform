@@ -152,6 +152,8 @@ describe('createEventsClient', () => {
     await quick(impl).post([{ ...log, msg: `${jwt} ${'m'.repeat(3000)}`, fields: { note: jwt } }]);
     expect(bodies[0]?.[0]).toMatchObject({ fields: { note: '[redacted]' } });
     expect((bodies[0]?.[0] as { msg: string }).msg).toMatch(/^\[redacted\] m{189}$/);
+    await quick(impl).post([{ ...log, msg: `${'m'.repeat(199)}\u{1F600}` }]);
+    expect((bodies[1]?.[0] as { msg: string }).msg).toBe('m'.repeat(199));
     const none = fake([200]);
     const client = createEventsClient({ url: 'https://logs.test', token: '', fetch: none.impl });
     await expect(client.post([log])).rejects.toThrow(/url and a token/);
