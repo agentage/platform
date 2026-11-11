@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AUTH, DAY_MS, USER, fakeAuth, wire } from './test-support/fake-auth.js';
+import { AUTH, HOUR_MS, USER, fakeAuth, wire } from './test-support/fake-auth.js';
 import { createIdentity, type IdentityOptions, type TokenSummary } from './index.js';
 
 const identity = (auth: ReturnType<typeof fakeAuth>, extra: Partial<IdentityOptions> = {}) =>
@@ -56,7 +56,7 @@ describe('token()', () => {
     const auth = fakeAuth();
     const token = identity(auth).token();
     expect(await token()).toBe('aga_1');
-    vi.setSystemTime(Date.now() + DAY_MS);
+    vi.setSystemTime(Date.now() + HOUR_MS);
     expect(await token()).toBe('aga_2');
   });
 
@@ -66,16 +66,16 @@ describe('token()', () => {
     const token = identity(auth).token();
     const mintedAt = Date.now();
     expect(await token()).toBe('aga_1');
-    vi.setSystemTime(mintedAt + DAY_MS - 61_000);
+    vi.setSystemTime(mintedAt + HOUR_MS - 61_000);
     expect(await token()).toBe('aga_1');
-    vi.setSystemTime(mintedAt + DAY_MS - 59_000);
+    vi.setSystemTime(mintedAt + HOUR_MS - 59_000);
     expect(await token()).toBe('aga_2');
   });
 
-  it('keeps one token per day when the client clock runs ahead of auth', async () => {
+  it('keeps one token per hour when the client clock runs ahead of auth', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     const behind = (): [number, unknown] => {
-      const expiresAt = new Date(Date.now() - DAY_MS).toISOString();
+      const expiresAt = new Date(Date.now() - HOUR_MS).toISOString();
       return [201, { success: true, data: { id: 'tok_1', token: 'aga_1', expiresAt } }];
     };
     const auth = fakeAuth({ 'POST /account/pat': behind });

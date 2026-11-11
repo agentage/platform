@@ -1,6 +1,6 @@
 # @agentage/identity
 
-The identity client for an agentage browser page: sign in at auth, a one-day token for the
+The identity client for an agentage browser page: sign in at auth, a one-hour token for the
 parts, sign out. It runs in the page and talks to auth with credentialed requests.
 
 ```ts
@@ -18,7 +18,7 @@ await id.signOut(); // revokes the token, then ends the session
 
 - `signIn()` resolves with the account when a session exists. Without one, the page goes to
   `<authUrl>/sign-in?next=<this page>` and comes back after sign-in; call `signIn()` again on load.
-- `token()` returns `() => Promise<string | undefined>`. The first call mints a one-day PAT
+- `token()` returns `() => Promise<string | undefined>`. The first call mints a one-hour PAT (`expiresInMinutes: 60`)
   (`POST /account/pat`, `format: 'jwt'`, label `browser`); it stays in page memory only and is
   minted again after it expires. Without a session it gives `undefined`.
 - `signOut()` deletes that PAT (`DELETE /account/pat/{id}`; the parts refuse it within 60 s),
