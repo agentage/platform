@@ -27,5 +27,10 @@ false); `file` and `line` are there only when a problem has them:
 }
 ```
 
+Secrets: `agentage.secrets` lists names, never values. A plain name is mounted in every part
+but ui; `{ "name": "github-app-key", "parts": ["worker"] }` only in the parts it names. Any
+other part starts without it, and a read of `ctx.secrets.githubAppKey` there throws. A test
+takes a part's view with `createTestContext({ extension: { part: 'worker' } })`.
+
 See the [platform README](https://github.com/agentage/platform#readme) for every part kind, the
 manifest, the tool and how a part image runs.
