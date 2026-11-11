@@ -53,6 +53,20 @@ describe('up secrets', () => {
     expect(await writeUpSecrets(dir, validateManifest(API_MANIFEST), {})).toBeUndefined();
   });
 
+  it('writes a scoped secret too: the parts choose its mount, not its value', async () => {
+    const dir = await tempPackage({});
+    const secrets = ['github-read', { name: 'smtp-pass', parts: ['api'] }];
+    const pkg = validateManifest({
+      ...API_MANIFEST,
+      agentage: { ...API_MANIFEST.agentage, secrets },
+    });
+    const env = { AGENTAGE_SECRET_GITHUB_READ: 'a', AGENTAGE_SECRET_SMTP_PASS: 'b' };
+    expect(Object.keys((await writeUpSecrets(dir, pkg, env)) ?? {})).toEqual([
+      'github-read',
+      'smtp-pass',
+    ]);
+  });
+
   it('stops up before any docker call when a declared secret has no value', async () => {
     const dir = await probeDir({
       ...PROBE,

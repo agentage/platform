@@ -1,6 +1,6 @@
 import { formatIssues, readJsonIfExists } from '../manifest/read-manifest.js';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
-import { normalizeParts } from '../manifest/parts.js';
+import { normalizeParts, scopedSecrets } from '../manifest/parts.js';
 import { type ImagePartKind } from '../manifest/primitives.schema.js';
 import { ExtensionRecordSchema, type ExtensionRecord } from './discovery.schema.js';
 
@@ -36,7 +36,8 @@ export const recordOf = (
   images: PartImages,
   extras: RecordExtras = {}
 ): ExtensionRecord => {
-  const { id, commands, secrets } = pkg.agentage;
+  const { id, commands } = pkg.agentage;
+  const secrets = (pkg.agentage.secrets ?? []).filter((s) => typeof s === 'string');
   const { commit, buildTime } = build;
   const parts = partsOf(pkg, images, extras.migrations);
   const record: ExtensionRecord = { id, version: pkg.version, commit, buildTime, parts };
@@ -44,7 +45,8 @@ export const recordOf = (
   if (extras.tools) record.tools = extras.tools;
   if (commands) record.commands = commands.map((command) => command.name);
   if (extras.widgets) record.widgets = extras.widgets;
-  if (secrets?.length) record.secrets = secrets;
+  if (secrets.length) record.secrets = secrets;
+  if (Object.keys(scopedSecrets(pkg)).length) record.secretParts = scopedSecrets(pkg);
   return record;
 };
 
@@ -63,5 +65,6 @@ export const loadRecord = async (file: string): Promise<ExtensionRecord | null> 
 export const discoveryDocument = (record: ExtensionRecord, host: string) => {
   const { id, version, commit, buildTime, ...rest } = record;
   delete rest.secrets;
+  delete rest.secretParts;
   return { id, version, commit, buildTime, host, ...rest };
 };

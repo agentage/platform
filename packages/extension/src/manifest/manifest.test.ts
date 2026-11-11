@@ -3,7 +3,16 @@ import cloud from '../test-support/fixtures/neg-package-commands-no-cli.json' wi
 import memory from '../test-support/fixtures/package-memory.json' with { type: 'json' };
 import { API_MANIFEST, json, SPEC_MANIFEST, tempPackage } from '../test-support/packages.js';
 import { PackageSchema } from './manifest.schema.js';
-import { entryOf, hasStore, imageParts, migratesStore, normalizeParts } from './parts.js';
+import {
+  entryOf,
+  hasStore,
+  imageParts,
+  migratesStore,
+  normalizeParts,
+  scopedSecrets,
+  secretNames,
+  mountedIn,
+} from './parts.js';
 import { SERVED_KINDS, STORE_KINDS } from './primitives.schema.js';
 import { readManifest, validateManifest } from './read-manifest.js';
 
@@ -86,6 +95,27 @@ describe('manifest schema', () => {
     expect(issuesOf(withAgentage({ settings: outside }))).toEqual(['default is not one of enum']);
   });
 
+  it('takes a secret for every part or for the parts it names, never ui or a missing part', () => {
+    const mixed = withAgentage({ secrets: ['resend', { name: 'app-key', parts: ['api'] }] });
+    expect(issuesOf(mixed)).toEqual([]);
+    const scoped = (parts: string[]) => withAgentage({ secrets: [{ name: 'app-key', parts }] });
+    expect(issuesOf(scoped(['ui']))).not.toEqual([]);
+    expect(issuesOf(scoped([]))).not.toEqual([]);
+    const twice = (...secrets: unknown[]) => issuesOf(withAgentage({ secrets }));
+    expect(twice('app-key', { name: 'app-key', parts: ['api'] })).toEqual([
+      'secret names must be unique',
+    ]);
+    expect(twice({ name: 'k', parts: ['api'] }, { name: 'k', parts: ['api'] })).toEqual([
+      'secret names must be unique',
+    ]);
+    expect(twice({ name: 'key-1', parts: ['api'] }, 'key1')).toEqual([
+      'secret names must be unique',
+    ]);
+    expect(issuesOf(scoped(['worker']))).toEqual([
+      'secret app-key names a part the extension does not have',
+    ]);
+  });
+
   it('keeps first-party ids to the @agentage scope', () => {
     const squat = { ...withAgentage({ id: 'memory' }), name: 'extension-memory' };
     expect(issuesOf(squat)).toContain('a first-party id is claimed only by an @agentage/ package');
@@ -112,6 +142,27 @@ describe('manifest schema', () => {
 });
 
 describe('parts', () => {
+  it('gives a plain secret to every part but ui and a scoped one to its parts only', () => {
+    const secrets = ['resend', { name: 'app-key', parts: ['worker'] }];
+    const full = validateManifest({
+      ...SPEC_MANIFEST,
+      agentage: { ...SPEC_MANIFEST.agentage, secrets },
+    });
+    expect(secretNames(full)).toEqual(['resend', 'app-key']);
+    expect(mountedIn(full, 'worker')).toEqual(['resend', 'app-key']);
+    expect(mountedIn(full, 'api')).toEqual(['resend']);
+    expect(mountedIn(full, 'ui')).toEqual([]);
+    expect(scopedSecrets(full)).toEqual({ 'app-key': ['worker'] });
+    expect(scopedSecrets(API_MANIFEST)).toEqual({});
+    const proto = ['constructor', { name: 'to-string', parts: ['worker'] }];
+    const keys = validateManifest({
+      ...SPEC_MANIFEST,
+      agentage: { ...SPEC_MANIFEST.agentage, secrets: proto },
+    });
+    expect(mountedIn(keys, 'api')).toEqual(['constructor']);
+    expect(mountedIn(keys, 'worker')).toEqual(['constructor', 'to-string']);
+  });
+
   it('normalizes both forms to one shape', () => {
     expect(normalizeParts(SPEC_MANIFEST.agentage.parts as never)).toEqual({
       code: { pages: {}, ui: {}, api: {}, mcp: {}, worker: {}, cli: {} },

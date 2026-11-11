@@ -6,6 +6,7 @@ import {
   IMAGE_PART_KINDS,
   PrefixedToolNameSchema,
   SecretNameSchema,
+  SecretPartSchema,
   StoreKindSchema,
   VersionSchema,
 } from '../manifest/primitives.schema.js';
@@ -76,11 +77,24 @@ const imagesNameTheirExtension = (doc: { id: string; parts: z.infer<typeof Parts
 
 const IMAGE_RULE = { message: 'every image is {id}-{part}', path: ['parts'] };
 
+// A scoped name lives only in secretParts, so an estate that does not read it mounts nothing.
+const scoped = (name: string) =>
+  `secret ${name}: one or more parts, none repeated, and never also in secrets`;
+
 // The build record: written by `build --push` into the package and the release asset; no host.
-// Secret names are for the estate's mounts only; discovery leaves them out.
+// Secret names and scoped parts are for the estate's mounts only; discovery leaves them out.
 export const ExtensionRecordSchema = z
-  .strictObject({ ...recordShape, secrets: z.array(SecretNameSchema).min(1).optional() })
-  .refine(imagesNameTheirExtension, IMAGE_RULE);
+  .strictObject({
+    ...recordShape,
+    secrets: z.array(SecretNameSchema).min(1).optional(),
+    secretParts: z.record(SecretNameSchema, z.array(SecretPartSchema)).optional(),
+  })
+  .refine(imagesNameTheirExtension, IMAGE_RULE)
+  .superRefine((doc, ctx) => {
+    for (const [name, parts] of Object.entries(doc.secretParts ?? {}))
+      if (!parts.length || new Set(parts).size !== parts.length || doc.secrets?.includes(name))
+        ctx.addIssue({ code: 'custom', path: ['secretParts', name], message: scoped(name) });
+  });
 
 // What a deployment serves at /.well-known/agentage-extension.json: the record plus its host.
 export const DiscoveryDocumentSchema = z

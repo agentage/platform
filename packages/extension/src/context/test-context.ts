@@ -20,7 +20,8 @@ import {
   type PartContext,
   type SettingValue,
 } from './context.js';
-import { packageExtension } from './package-extension.js';
+import { packageExtension, packageManifest } from './package-extension.js';
+import { withAbsent } from './secrets.js';
 import { recordingLog, type LogEntry } from './recording-log.js';
 import {
   commandContext,
@@ -129,7 +130,7 @@ const serverContext = (options: TestContextOptions): TestContext => {
     spans,
     settings: { ...options.settings },
     store: store ?? NO_STORE,
-    secrets: Object.freeze({ ...options.secrets }),
+    secrets: Object.freeze(withAbsent({ ...options.secrets }, extension.part, packageManifest())),
     platform: Object.freeze({ ...(options.platform ?? NO_PLATFORM) }),
     exits,
     exit: () => void exits.push(Date.now()),
