@@ -2,7 +2,12 @@
   "request": {
     "method": "POST",
     "path": "/account/pat",
-    "body": { "format": "jwt", "label": "browser", "expiresInDays": 1, "scopes": ["probe:read"] }
+    "body": {
+      "format": "jwt",
+      "label": "browser",
+      "expiresInMinutes": 60,
+      "scopes": ["probe:read"]
+    }
   },
   "response": {
     "status": 201,

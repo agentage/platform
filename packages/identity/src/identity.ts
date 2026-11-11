@@ -13,9 +13,9 @@ export interface IdentityOptions {
 
 // A token this close to its expiry is minted again, so a call never carries a dying one.
 const SKEW_MS = 60_000;
-// The browser token's label and lifetime; the shell token replaces them.
-const BROWSER = { format: 'jwt', label: 'browser', expiresInDays: 1 } as const;
-const DAY_MS = BROWSER.expiresInDays * 86_400_000;
+// The browser token's label and lifetime; the token() cache mints again when it nears expiry.
+const BROWSER = { format: 'jwt', label: 'browser', expiresInMinutes: 60 } as const;
+const LIFE_MS = BROWSER.expiresInMinutes * 60_000;
 
 // Late-binds the global, so a fetch patched after createIdentity is still the one called.
 const globalFetch: FetchLike = (url, init) => fetch(url, init);
@@ -23,7 +23,7 @@ const globalFetch: FetchLike = (url, init) => fetch(url, init);
 // From the local mint time, so a client clock off from auth's cannot force a mint per call.
 const deadline = (pat: MintedPat, startedAt: number) => {
   const life = Date.parse(pat.expiresAt) - startedAt;
-  const trusted = life > SKEW_MS ? Math.min(life, DAY_MS) : DAY_MS;
+  const trusted = life > SKEW_MS ? Math.min(life, LIFE_MS) : LIFE_MS;
   return startedAt + trusted - SKEW_MS;
 };
 

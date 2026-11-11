@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { vi } from 'vitest';
 
 export const AUTH = 'https://auth.example.test';
-export const DAY_MS = 86_400_000;
+export const HOUR_MS = 3_600_000;
 
 export type Route = (init: RequestInit) => [number, unknown];
 interface Pair<T = unknown> {
@@ -28,13 +28,13 @@ const reply = ({ response }: Pair): [number, unknown] => [response.status, respo
 const { user } = wire.session.response.body;
 export const USER = { id: user.id, email: user.email, name: user.name };
 
-// One mint per call, numbered, expiring a day after now.
+// One mint per call, numbered, expiring an hour after now.
 const mintRoute =
   (count: () => number): Route =>
   () => {
     const n = count();
     const data = { ...wire.mint.response.body.data, id: `tok_${n}`, token: `aga_${n}` };
-    const expiresAt = new Date(Date.now() + DAY_MS).toISOString();
+    const expiresAt = new Date(Date.now() + HOUR_MS).toISOString();
     return [
       wire.mint.response.status,
       { ...wire.mint.response.body, data: { ...data, expiresAt } },
