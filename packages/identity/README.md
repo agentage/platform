@@ -20,7 +20,7 @@ await id.signOut(); // revokes the token, then ends the session
   `<authUrl>/sign-in?next=<this page>` and comes back after sign-in; call `signIn()` again on load.
 - `token()` returns `() => Promise<string | undefined>`. The first call mints a one-hour PAT (`expiresInMinutes: 60`)
   (`POST /account/pat`, `format: 'jwt'`, label `browser`); it stays in page memory only and is
-  minted again after it expires. Without a session it gives `undefined`.
+  minted again after it expires (0.2.x minted a one-day token). Without a session it gives `undefined`.
 - `signOut()` deletes that PAT (`DELETE /account/pat/{id}`; the parts refuse it within 60 s),
   then ends the auth session.
 - `account()` is the signed-in account or `null`; `tokens()` lists the account's PATs.
