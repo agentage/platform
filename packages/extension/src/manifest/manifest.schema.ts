@@ -126,6 +126,8 @@ function crossFieldRules(manifest: z.infer<typeof AgentageBaseSchema>, ctx: z.Re
   for (const s of manifest.secrets ?? [])
     if (typeof s === 'object' && s.parts.some((part) => !isOn(manifest.parts[part])))
       issue(`secret ${s.name} names a part the extension does not have`, ['secrets']);
+  const secrets = (manifest.secrets ?? []).map((s) => (typeof s === 'string' ? s : s.name));
+  if (new Set(secrets).size !== secrets.length) issue('secret names must be unique', ['secrets']);
   if (manifest.settings?.['mcp.listing'] && !isOn(manifest.parts.mcp)) {
     issue('mcp.listing needs the mcp part', ['settings', 'mcp.listing']);
   }

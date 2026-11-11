@@ -18,9 +18,11 @@ import {
   type ExtensionInfo,
   type PlatformInfo,
   type PartContext,
+  type ServerPartKind,
   type SettingValue,
 } from './context.js';
-import { packageExtension } from './package-extension.js';
+import { packageExtension, packageManifest } from './package-extension.js';
+import { withAbsent } from './secrets.js';
 import { recordingLog, type LogEntry } from './recording-log.js';
 import {
   commandContext,
@@ -111,6 +113,11 @@ const identityOf = (options: TestContextOptions) => {
   return { store, extension: { ...extension, ...options.extension } };
 };
 
+const testSecrets = (options: TestContextOptions, part: ServerPartKind) => {
+  const pkg = packageManifest();
+  return pkg ? withAbsent({ ...options.secrets }, pkg, part) : { ...options.secrets };
+};
+
 const serverContext = (options: TestContextOptions): TestContext => {
   const logs: LogEntry[] = [];
   const log = runLog(recordingLog(logs), true);
@@ -129,7 +136,7 @@ const serverContext = (options: TestContextOptions): TestContext => {
     spans,
     settings: { ...options.settings },
     store: store ?? NO_STORE,
-    secrets: Object.freeze({ ...options.secrets }),
+    secrets: Object.freeze(testSecrets(options, extension.part)),
     platform: Object.freeze({ ...(options.platform ?? NO_PLATFORM) }),
     exits,
     exit: () => void exits.push(Date.now()),

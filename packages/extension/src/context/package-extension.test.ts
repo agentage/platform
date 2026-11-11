@@ -37,6 +37,23 @@ describe('createTestContext reads ./package.json', () => {
     expect(ctx.extension).toMatchObject({ id: 'other', version: '9.0.0' });
   });
 
+  it('gives a part only the secrets it mounts; a read of another one throws', async () => {
+    const secrets = ['resend', { name: 'app-key', parts: ['worker'] }];
+    await inPackage({ ...SPEC_MANIFEST, agentage: { ...SPEC_MANIFEST.agentage, secrets } });
+    const given = { resend: 'r', appKey: 'k' };
+    const worker = createTestContext({
+      store: false,
+      secrets: given,
+      extension: { part: 'worker' },
+    });
+    expect(worker.secrets).toEqual(given);
+    const api = createTestContext({ store: false, secrets: given });
+    expect({ ...api.secrets }).toEqual({ resend: 'r' });
+    expect(() => (api.secrets as Record<string, string>)['appKey']).toThrow(
+      'secret app-key is not mounted in api'
+    );
+  });
+
   it('keeps a store kind the test store does not serve, and falls back outside an extension', async () => {
     const git = {
       ...SPEC_MANIFEST,

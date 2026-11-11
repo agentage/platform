@@ -101,6 +101,13 @@ describe('manifest schema', () => {
     const scoped = (parts: string[]) => withAgentage({ secrets: [{ name: 'app-key', parts }] });
     expect(issuesOf(scoped(['ui']))).not.toEqual([]);
     expect(issuesOf(scoped([]))).not.toEqual([]);
+    const twice = (...secrets: unknown[]) => issuesOf(withAgentage({ secrets }));
+    expect(twice('app-key', { name: 'app-key', parts: ['api'] })).toEqual([
+      'secret names must be unique',
+    ]);
+    expect(twice({ name: 'k', parts: ['api'] }, { name: 'k', parts: ['api'] })).toEqual([
+      'secret names must be unique',
+    ]);
     expect(issuesOf(scoped(['worker']))).toEqual([
       'secret app-key names a part the extension does not have',
     ]);
