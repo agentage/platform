@@ -1,6 +1,6 @@
 {
   "name": "@agentage/identity",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "The agentage identity client for browser pages: sign in at auth, a one-hour token for the parts, sign out",
   "type": "module",
   "sideEffects": false,
