@@ -41,16 +41,19 @@ export const entryOf = (pkg: ExtensionPackage, part: ImagePartKind | 'cli'): str
 export const secretNames = (pkg: ExtensionPackage): string[] =>
   (pkg.agentage.secrets ?? []).map((s) => (typeof s === 'string' ? s : s.name));
 
-// Only the scoped names with their parts; every other name goes to every part but ui.
-export const scopedSecrets = (pkg: ExtensionPackage) =>
-  Object.fromEntries(
-    (pkg.agentage.secrets ?? []).flatMap((s) =>
-      typeof s === 'string' ? [] : [[s.name, s.parts] as const]
-    )
-  );
+const scopedOf = (pkg: ExtensionPackage) =>
+  (pkg.agentage.secrets ?? []).flatMap((s) => (typeof s === 'string' ? [] : [s]));
 
-export const mountedIn = (pkg: ExtensionPackage, part: ImagePartKind, names = secretNames(pkg)) =>
-  names.filter((n) => part !== 'ui' && (scopedSecrets(pkg)[n]?.some((p) => p === part) ?? true));
+export const scopedSecrets = (pkg: ExtensionPackage) =>
+  Object.fromEntries(scopedOf(pkg).map((s) => [s.name, s.parts]));
+
+export const mountedIn = (pkg: ExtensionPackage, part: ImagePartKind, names = secretNames(pkg)) => {
+  const scoped = new Map(scopedOf(pkg).map((s) => [s.name, s.parts as string[]]));
+  return names.filter((n) => part !== 'ui' && (scoped.get(n)?.includes(part) ?? true));
+};
+
+export const unmountedIn = (pkg: ExtensionPackage | undefined, part: ImagePartKind): string[] =>
+  pkg ? secretNames(pkg).filter((n) => !mountedIn(pkg, part).includes(n)) : [];
 
 export const storeOf = (pkg: ExtensionPackage): StoreKind | undefined =>
   normalizeParts(pkg.agentage.parts).store;

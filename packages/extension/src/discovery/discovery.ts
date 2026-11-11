@@ -1,6 +1,6 @@
 import { formatIssues, readJsonIfExists } from '../manifest/read-manifest.js';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
-import { normalizeParts, scopedSecrets, secretNames } from '../manifest/parts.js';
+import { normalizeParts, scopedSecrets } from '../manifest/parts.js';
 import { type ImagePartKind } from '../manifest/primitives.schema.js';
 import { ExtensionRecordSchema, type ExtensionRecord } from './discovery.schema.js';
 
@@ -37,7 +37,7 @@ export const recordOf = (
   extras: RecordExtras = {}
 ): ExtensionRecord => {
   const { id, commands } = pkg.agentage;
-  const secrets = secretNames(pkg);
+  const secrets = (pkg.agentage.secrets ?? []).filter((s) => typeof s === 'string');
   const { commit, buildTime } = build;
   const parts = partsOf(pkg, images, extras.migrations);
   const record: ExtensionRecord = { id, version: pkg.version, commit, buildTime, parts };

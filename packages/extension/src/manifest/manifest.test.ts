@@ -108,6 +108,9 @@ describe('manifest schema', () => {
     expect(twice({ name: 'k', parts: ['api'] }, { name: 'k', parts: ['api'] })).toEqual([
       'secret names must be unique',
     ]);
+    expect(twice({ name: 'key-1', parts: ['api'] }, 'key1')).toEqual([
+      'secret names must be unique',
+    ]);
     expect(issuesOf(scoped(['worker']))).toEqual([
       'secret app-key names a part the extension does not have',
     ]);
@@ -151,6 +154,13 @@ describe('parts', () => {
     expect(mountedIn(full, 'ui')).toEqual([]);
     expect(scopedSecrets(full)).toEqual({ 'app-key': ['worker'] });
     expect(scopedSecrets(API_MANIFEST)).toEqual({});
+    const proto = ['constructor', { name: 'to-string', parts: ['worker'] }];
+    const keys = validateManifest({
+      ...SPEC_MANIFEST,
+      agentage: { ...SPEC_MANIFEST.agentage, secrets: proto },
+    });
+    expect(mountedIn(keys, 'api')).toEqual(['constructor']);
+    expect(mountedIn(keys, 'worker')).toEqual(['constructor', 'to-string']);
   });
 
   it('normalizes both forms to one shape', () => {

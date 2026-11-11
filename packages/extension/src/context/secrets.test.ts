@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { type ExtensionPackage } from '../manifest/manifest.schema.js';
 import { API_MANIFEST, tempPackage } from '../test-support/packages.js';
 import { type PartContext } from './context.js';
-import { camelName, readSecrets } from './secrets.js';
+import { camelName } from '../manifest/primitives.schema.js';
+import { readSecrets } from './secrets.js';
 
 type Declared = NonNullable<ExtensionPackage['agentage']['secrets']>;
 const declaring = (...secrets: Declared): ExtensionPackage => ({
@@ -33,6 +34,9 @@ describe('secrets', () => {
     const dir = await tempPackage({ 'smtp-pass': 'hunter2' });
     await expect(readSecrets(declaring('smtp-pass', 'github-read'), 'mcp', dir)).rejects.toThrow(
       /^mcp refused to start: secret github-read has no value$/
+    );
+    await expect(readSecrets(declaring('constructor'), 'api', dir)).rejects.toThrow(
+      'api refused to start: secret constructor has no value'
     );
     await writeFile(join(dir, 'github-read'), '\n');
     await expect(readSecrets(declaring('github-read'), 'api', dir)).rejects.toThrow(

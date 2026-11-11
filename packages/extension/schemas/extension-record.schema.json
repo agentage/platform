@@ -201,7 +201,6 @@
         "pattern": "^[a-z][a-z0-9-]*$"
       },
       "additionalProperties": {
-        "minItems": 1,
         "type": "array",
         "items": {
           "type": "string",
