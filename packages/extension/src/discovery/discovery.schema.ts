@@ -6,6 +6,7 @@ import {
   IMAGE_PART_KINDS,
   PrefixedToolNameSchema,
   SecretNameSchema,
+  SecretPartSchema,
   StoreKindSchema,
   VersionSchema,
 } from '../manifest/primitives.schema.js';
@@ -77,9 +78,13 @@ const imagesNameTheirExtension = (doc: { id: string; parts: z.infer<typeof Parts
 const IMAGE_RULE = { message: 'every image is {id}-{part}', path: ['parts'] };
 
 // The build record: written by `build --push` into the package and the release asset; no host.
-// Secret names are for the estate's mounts only; discovery leaves them out.
+// Secret names and scoped parts are for the estate's mounts only; discovery leaves them out.
 export const ExtensionRecordSchema = z
-  .strictObject({ ...recordShape, secrets: z.array(SecretNameSchema).min(1).optional() })
+  .strictObject({
+    ...recordShape,
+    secrets: z.array(SecretNameSchema).min(1).optional(),
+    secretParts: z.record(SecretNameSchema, z.array(SecretPartSchema).min(1)).optional(),
+  })
   .refine(imagesNameTheirExtension, IMAGE_RULE);
 
 // What a deployment serves at /.well-known/agentage-extension.json: the record plus its host.

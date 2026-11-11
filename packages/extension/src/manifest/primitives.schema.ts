@@ -83,4 +83,6 @@ export const IMAGE_PART_KINDS = ['pages', 'ui', 'api', 'mcp', 'worker'] as const
 
 export type ImagePartKind = (typeof IMAGE_PART_KINDS)[number];
 
+export const SecretPartSchema = z.enum(['pages', 'api', 'mcp', 'worker']);
+
 export type StoreKind = keyof typeof STORE_KINDS;

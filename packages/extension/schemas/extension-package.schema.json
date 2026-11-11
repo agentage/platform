@@ -288,9 +288,41 @@
         "secrets": {
           "type": "array",
           "items": {
-            "type": "string",
-            "maxLength": 48,
-            "pattern": "^[a-z][a-z0-9-]*$"
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 48,
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 48,
+                    "pattern": "^[a-z][a-z0-9-]*$"
+                  },
+                  "parts": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "pages",
+                        "api",
+                        "mcp",
+                        "worker"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "name",
+                  "parts"
+                ],
+                "additionalProperties": false
+              }
+            ]
           }
         }
       },

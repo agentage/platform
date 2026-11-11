@@ -192,6 +192,27 @@
         "maxLength": 48,
         "pattern": "^[a-z][a-z0-9-]*$"
       }
+    },
+    "secretParts": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "maxLength": 48,
+        "pattern": "^[a-z][a-z0-9-]*$"
+      },
+      "additionalProperties": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string",
+          "enum": [
+            "pages",
+            "api",
+            "mcp",
+            "worker"
+          ]
+        }
+      }
     }
   },
   "required": [

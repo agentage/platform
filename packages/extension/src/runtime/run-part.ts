@@ -136,8 +136,7 @@ export const runPart = async (options: RunPartOptions): Promise<Server> => {
   const part = partOf(pkg, options.part);
   const log = createLog({ extension: pkg.agentage.id, part, version: pkg.version });
   running = log;
-  const names = part === 'ui' ? [] : (pkg.agentage.secrets ?? []);
-  const secrets = await readSecrets(names, options.secretsDir ?? SECRETS_DIR, part);
+  const secrets = await readSecrets(pkg, part, options.secretsDir ?? SECRETS_DIR);
   const start = { pkg, part, env: options.env, log, secrets };
   const { app, stop } = await RUNNERS[part](await inputFor(options, start));
   if (stop)

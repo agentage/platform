@@ -126,6 +126,23 @@ describe('composeFile', () => {
     expect(composeFile({ pkg: FULL, tags: TAGS, ...FILES })).not.toHaveProperty('secrets');
   });
 
+  it('mounts a scoped secret only on the parts it names', () => {
+    const secrets = ['resend', { name: 'app-key', parts: ['worker'] }];
+    const pkg = validateManifest({
+      ...SPEC_MANIFEST,
+      agentage: { ...SPEC_MANIFEST.agentage, secrets },
+    });
+    const secretFiles = { resend: '/x/r', 'app-key': '/x/a' };
+    const services = composeFile({ pkg, tags: TAGS, ...FILES, secretFiles }).services as Record<
+      string,
+      Service
+    >;
+    expect(services['worker']?.['secrets']).toEqual(['resend', 'app-key']);
+    for (const part of ['pages', 'api', 'mcp'])
+      expect(services[part]?.['secrets']).toEqual(['resend']);
+    expect(services['ui']).not.toHaveProperty('secrets');
+  });
+
   it('without a store has no store, no migrate, no volume and no store env', () => {
     const file = composeFile({ pkg: API_MANIFEST, tags: { api: TAGS['api'] ?? '' }, ...FILES });
     const services = file.services as Record<string, Service>;

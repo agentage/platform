@@ -1,6 +1,7 @@
 import { chmod, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { type ExtensionPackage } from '../../manifest/manifest.schema.js';
+import { secretNames } from '../../manifest/parts.js';
 import { readJsonIfExists } from '../../manifest/read-manifest.js';
 import { type Env } from '../../runtime/build-info.js';
 import { LOCAL_DIR } from './local-record.js';
@@ -30,7 +31,7 @@ const valueOf = (name: string, env: Env, file: Record<string, unknown>): string 
 
 // Each value as a file compose mounts at /run/secrets/<name>; the env wins over the file.
 export const writeUpSecrets = async (dir: string, pkg: ExtensionPackage, env: Env) => {
-  const names = pkg.agentage.secrets ?? [];
+  const names = secretNames(pkg);
   if (names.length === 0) return undefined;
   const file = await fileValues(dir);
   const files = names.map((name) => ({

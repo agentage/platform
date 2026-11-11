@@ -6,6 +6,7 @@ import {
   PackageNameSchema,
   PackagePathSchema,
   SecretNameSchema,
+  SecretPartSchema,
   SemverRangeSchema,
   SettingKeySchema,
   StoreKindSchema,
@@ -68,12 +69,18 @@ const SettingSchema = z
     message: 'default is not one of enum',
   });
 
+// A plain name goes to every part but ui; the object form to the parts it names only.
+const SecretSchema = z.union([
+  SecretNameSchema,
+  z.strictObject({ name: SecretNameSchema, parts: z.array(SecretPartSchema).min(1) }),
+]);
+
 const AgentageBaseSchema = z.strictObject({
   id: ExtensionIdSchema,
   parts: PartsSchema,
   commands: z.array(CommandSchema).min(1).optional(),
   settings: z.record(SettingKeySchema, SettingSchema).optional(),
-  secrets: z.array(SecretNameSchema).optional(),
+  secrets: z.array(SecretSchema).optional(),
 });
 
 const AgentageSchema = AgentageBaseSchema.superRefine(crossFieldRules);
@@ -116,6 +123,9 @@ function crossFieldRules(manifest: z.infer<typeof AgentageBaseSchema>, ctx: z.Re
   if (hasCli && !manifest.commands) issue('the cli part needs commands', ['parts', 'cli']);
   const names = (manifest.commands ?? []).map((command) => command.name);
   if (new Set(names).size !== names.length) issue('command names must be unique', ['commands']);
+  for (const s of manifest.secrets ?? [])
+    if (typeof s === 'object' && s.parts.some((part) => !isOn(manifest.parts[part])))
+      issue(`secret ${s.name} names a part the extension does not have`, ['secrets']);
   if (manifest.settings?.['mcp.listing'] && !isOn(manifest.parts.mcp)) {
     issue('mcp.listing needs the mcp part', ['settings', 'mcp.listing']);
   }

@@ -94,10 +94,9 @@ describe('runPart', () => {
 
 describe('runPart secrets', () => {
   it('fills ctx.secrets and ctx.platform, and refuses to start without one', async () => {
-    const manifest = {
-      ...API_MANIFEST,
-      agentage: { ...API_MANIFEST.agentage, secrets: ['github-read'] },
-    };
+    const secrets = ['github-read', { name: 'app-key', parts: ['worker'] }];
+    const parts = { ...API_MANIFEST.agentage.parts, worker: true };
+    const manifest = { ...API_MANIFEST, agentage: { ...API_MANIFEST.agentage, parts, secrets } };
     const dir = await tempPackage({ 'package.json': json(manifest) });
     const env = {
       PORT: '0',
@@ -129,6 +128,9 @@ describe('runPart secrets', () => {
       { githubRead: 'ghp_x' },
       { issuer: 'https://127.0.0.1:9', audience: '*.agentage.io' },
     ]);
+    expect(() => (seen[0] as Record<string, string>)['appKey']).toThrow(
+      'secret app-key is not mounted in api'
+    );
   });
 });
 

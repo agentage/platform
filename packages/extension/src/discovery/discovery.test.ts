@@ -45,6 +45,22 @@ describe('build record', () => {
     expect(DiscoveryDocumentSchema.safeParse(doc).success).toBe(true);
   });
 
+  it('lists the parts of a scoped secret for the estate, and discovery shows neither', () => {
+    const secrets = ['resend', { name: 'app-key', parts: ['api'] }];
+    const pkg = validateManifest({
+      ...API_MANIFEST,
+      agentage: { ...API_MANIFEST.agentage, secrets },
+    });
+    const record = validateRecord(recordOf(pkg, BUILD, { api: API_IMAGE }));
+    expect(record.secrets).toEqual(['resend', 'app-key']);
+    expect(record.secretParts).toEqual({ 'app-key': ['api'] });
+    const plain = { ...API_MANIFEST, agentage: { ...API_MANIFEST.agentage, secrets: ['resend'] } };
+    expect(recordOf(plain, BUILD, { api: API_IMAGE })).not.toHaveProperty('secretParts');
+    const doc = discoveryDocument(record, 'https://probe.next.agentage.io');
+    expect(Object.keys(doc).filter((key) => key.startsWith('secret'))).toEqual([]);
+    expect(DiscoveryDocumentSchema.safeParse(doc).success).toBe(true);
+  });
+
   it('refuses images by tag, a short commit and an image of another extension', () => {
     const tag = recordOf(API_MANIFEST, BUILD, { api: 'ghcr.io/agentage/probe-api:0.1.0' });
     expect(() => validateRecord(tag)).toThrow(/parts\.api\.image/);

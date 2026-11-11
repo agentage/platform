@@ -1,5 +1,5 @@
 import { type ExtensionPackage } from '../../manifest/manifest.schema.js';
-import { hasStore, imageParts } from '../../manifest/parts.js';
+import { hasStore, imageParts, mountedIn } from '../../manifest/parts.js';
 import { type ImagePartKind } from '../../manifest/primitives.schema.js';
 import { DEV_AUDIENCE, DEV_ISSUER, UP_ISSUER } from './dev-issuer-app.js';
 import { GATEWAY_PORT, ISSUER_PORT, PART_PORT, TRAEFIK_COMMAND, TRAEFIK_IMAGE } from './gateway.js';
@@ -55,11 +55,13 @@ const dependsOn = (pkg: ExtensionPackage, part: ImagePartKind) => ({
   ...(part === 'api' || part === 'mcp' ? { issuer: HEALTHY } : {}),
 });
 
+const withSecrets = (names: string[]) => (names.length ? { secrets: names } : {});
+
 const partService = (input: ComposeInput, part: ImagePartKind) => ({
   image: input.tags[part],
   environment: partEnv(input.pkg, part),
   volumes: [`${input.recordFile}:${RECORD_TARGET}:ro`],
-  ...(part !== 'ui' && input.secretFiles ? { secrets: Object.keys(input.secretFiles) } : {}),
+  ...withSecrets(mountedIn(input.pkg, part, Object.keys(input.secretFiles ?? {}))),
   depends_on: dependsOn(input.pkg, part),
 });
 
