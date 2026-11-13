@@ -1,30 +1,35 @@
 # CLAUDE.md - agentage/platform
 
-Public repo. The extension kit and its build tool, and the widget kit; no product code. Standards: the engineering
-standards batch (repo-baseline, typescript, monorepo, code-style, testing, ci-cd, docker-deploy,
-security, backend); this file only adds what the tree does not say. Words (part, kit, tool,
-agcid, record, sealing), the tool's behavior and the part-image settings are in
-[README.md](README.md); this file does not repeat them.
+Public repo. The extension kit and its build tool, and the widget kit; no product code. Standards: the
+engineering standards batch (repo-baseline, typescript, monorepo, code-style, testing, ci-cd,
+docker-deploy, security, backend); this file only adds what the tree does not say. Words: [README.md](README.md)
+"Words used here" (record, sealing: `docs/tool.md`); this file does not repeat the docs listed below.
 
 ## Where facts live
 
-- A part's `create(ctx)`, the manifest, store, workers, spans, test helpers: `README.md` "Write the parts" and its "Store", "Workers and commands", "Logs and spans", "Tests".
-- Build steps, the six check rules, `up`, `token`: `README.md` "The tool: build, up, token".
-- Part image entry, port, `AGENTAGE_*` settings: `README.md` "Run a part image".
+- `create(ctx)`, part kinds, pages map and redirects: `docs/parts.md` "Write the parts" (proof: `src/pages/`, `src/manifest/`).
+- Migrations, seeds, store timeouts: `docs/parts.md` "Store" (proof: `src/store/migrations.ts`, `src/store/store.ts`).
+- Job runs, command output, exit codes: `docs/parts.md` "Workers and commands" (proof: `src/worker/`, `src/command/`).
+- Spans, log rows, agcid, `ctx.exit`, `ctx.health`: `docs/parts.md` "Logs and spans".
+- Test helpers: `docs/parts.md` "Tests" (proof: `src/context/test-context.ts`, `src/testing/`).
+- Build steps, six rules, image recipe, `up`, `down`, `token`, timeouts: `docs/tool.md` (proof: `src/tool/`).
+- Part image entry, port, `AGENTAGE_*` settings: `docs/part-image.md` (proof: `src/runtime/`, `src/auth/part-auth.ts`).
 - Manifest, record, discovery, `/health` and envelope schemas: `packages/extension/schemas/*.json` (generated, never edit by hand).
-- The check report JSON and secrets: `packages/extension/README.md`.
-- Widget imports, bundle output, harness page: `packages/widget/README.md`. Shell calls and installation document: `packages/shell/README.md`.
-- CI jobs: `.github/workflows/ci.yml`. Coverage floor: `vitest.config.ts`. Release rules: `.github/workflows/release.yml`, `README.md` "Release".
+- Check report JSON, secrets: `packages/extension/README.md`.
+- Event line kinds, redaction and limits, events client: `packages/logs/README.md` (proof: `packages/logs/src/`).
+- Widget: `packages/widget/README.md` "Imports", "Bundle output", "The harness page", "Rules the code enforces".
+- Shell calls, mount errors, installation document: `packages/shell/README.md` "The calls", "The installation document".
+- Sign in, page token, `mintToken`, `revokeToken`, sign out: `packages/identity/README.md`.
+- CI jobs: `.github/workflows/ci.yml`. Coverage floor: `vitest.config.ts`. Release rules: `README.md` "Release" (proof: `.github/workflows/release.yml`).
 
-Read the file named here before you read `src/`.
+Read the file named here before you read `src/` (`src/` = `packages/extension/src`).
 
 ## Commands
 
 - `npm run verify` - type-check (`tsc -b` + the test tsconfig), lint, format, tests with coverage, build
 - `npm run build && npm run schemas` - regenerate `packages/extension/schemas/*.json` from Zod; a
   test fails when the committed files drift
-- The tool: `node packages/extension/dist/tool/cli.js build|up|down|token` (`tool/main.ts`).
-  Details: README.md, "The tool".
+- The tool: `node packages/extension/dist/tool/cli.js build|up|down|token`; details `docs/tool.md`.
 - One package's tests: `npx vitest run packages/<p>`; its type-check:
   `npx tsc -p packages/<p>/tsconfig.eslint.json --noEmit`
 - A version bump touches the package's `package.json`; widget also `src/host/version.ts`; extension

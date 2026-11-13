@@ -56,7 +56,7 @@ The root export also has `hostError(code, message)` (the error a bridge call thr
 and `TokenSource`. The `@agentage/widget/register` subpath has `registerWidgets(id, widgets)`:
 a shell page calls it with a loaded bundle's map to define the elements.
 
-Rules:
+## Rules the code enforces
 
 - An extension id and a widget name are lowercase kebab-case, at most 32 characters.
 - `agentage-widget bundle [--dir <ext>]` exits 0 on success, 1 on failure, 2 on a usage error.
