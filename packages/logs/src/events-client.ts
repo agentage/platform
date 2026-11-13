@@ -46,7 +46,7 @@ const fitting = (event: Event | null): event is Event => {
   return false;
 };
 
-// Each batch under 1 MB and at most 1000 rows (the ingest wire, C3).
+// Each batch under 1 MB and at most 1000 rows (the ingest wire).
 export const batchesOf = (events: Event[]): Event[][] => {
   const batches: Event[][] = [];
   let batch: Event[] = [];
