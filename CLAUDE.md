@@ -2,14 +2,18 @@
 
 Public repo. The extension kit and its build tool, and the widget kit; no product code. Standards: the engineering
 standards batch (repo-baseline, typescript, monorepo, code-style, testing, ci-cd, docker-deploy,
-security, backend); this file only adds what the tree does not say.
+security, backend); this file only adds what the tree does not say. Words (part, kit, tool,
+agcid, record, sealing), the tool's behavior and the part-image settings are in
+[README.md](README.md); this file does not repeat them.
 
 ## Commands
 
 - `npm run verify` - type-check (`tsc -b` + the test tsconfig), lint, format, tests with coverage, build
 - `npm run build && npm run schemas` - regenerate `packages/extension/schemas/*.json` from Zod; a
   test fails when the committed files drift
-- `node packages/extension/dist/tool/cli.js build [--push] [--dir <ext>] [--registry <host/owner>]`
+- The tool: `node packages/extension/dist/tool/cli.js build|up|down|token` (`tool/main.ts`).
+  `up` serves the gateway on `localhost:4280`; `token --scope <id>:<verb>` needs `--scope` and
+  mints an `aga_` token from the dev issuer on `:4281`. Details: README.md, "The tool".
 - One package's tests: `npx vitest run packages/<p>`; its type-check:
   `npx tsc -p packages/<p>/tsconfig.eslint.json --noEmit`
 - A version bump touches the package's `package.json`; widget also `src/host/version.ts`; extension
@@ -66,7 +70,7 @@ security, backend); this file only adds what the tree does not say.
   (bundled to `dist/ui/harness.js`; the template is `harness/harness.html`)
 - `e2e/` Playwright: bundles the fixture, serves it under the ui CSP with a stub `/mcp`, an axe
   WCAG A/AA sweep (it reaches into the shadow root) and screenshots in light and dark;
-  `src/test-support/fixture` is the probe's echo widget (C7 text); widget `.tsx` lints with
+  `src/test-support/fixture` is the probe's echo widget; widget `.tsx` lints with
   jsx-a11y and react-hooks (`overrides` lets jsx-a11y run on ESLint 10)
 
 ## Layout (`packages/logs`)
@@ -93,14 +97,13 @@ security, backend); this file only adds what the tree does not say.
 - Browser code uses `zod/mini` with `import * as z`: full `zod` or a named import puts about
   400 KB into every widget bundle.
 - The bundler resolves `@agentage/widget/*` to its own copy, so one bundle has one runtime.
-
 - `express` is an optional peer: extensions declare it, the cli (tool only) does not get it.
 - The record is mounted into the container at deploy time: an image cannot carry its own digest.
 - `/health` checks the socket's local address, so a published Docker port answers 404 by design;
   use `--network host` or `docker exec` to read it.
 - `ctx.store` is always present; without a store part it throws on first use.
-- The pages part is a kit-served static map in 0.2 (Next.js pages are a later kit).
-- Tokens are on from kit 0.3 in every api and mcp part (`auth/part-auth.ts`): no
+- The pages part is a kit-served static map; the kit serves no Next.js pages.
+- Tokens are on in every api and mcp part (`auth/part-auth.ts`): no
   `AGENTAGE_ISSUER`, or a host off `AGENTAGE_AUDIENCE`, and the part does not start. Each route asks
   for its OpenAPI operation's access, each `tools/call` for its tool's `scope` (read when
   undeclared). The test servers (`startTestServer`, `startTestMcp`) run without a check and
@@ -113,3 +116,4 @@ security, backend); this file only adds what the tree does not say.
   when one exists), installs the packed packages it uses and runs `up`: a probe change can turn
   this CI red, and a kit change that breaks the probe never reaches npm.
 - Public repo: no secrets, no internal hosts, no provider names, no roadmap in code or docs.
+- Docs: sentences of 25 words or fewer, no em dash, no plan ids a reader cannot open.

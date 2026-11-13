@@ -23,12 +23,25 @@ await mountWidgets(layout, {
 
 ## The calls
 
-| Call                                                                            | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `readInstallation(rootUrl, target, { token?, fetch? })`                         | `GET {rootUrl}/api/v1/installations/{target}`, reads the `{ success, data }` envelope, validates `data` and resolves `{ installation, etag }` (`etag` from the `ETag` header, `undefined` when root sends none). Rejects on an HTTP error or a document outside the shape.                                                                                                                                                                                                                                                                                                          |
-| `readOverlay(rootUrl, target, { token, fetch? })`                               | `GET .../installations/{target}/overlay`: the caller's own route changes on that target, `{ overlay, etag }`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| `writeOverlay(rootUrl, target, overlay, { token, ifMatch, fetch? })`            | `PUT .../installations/{target}/overlay` with `If-Match: ifMatch`; resolves the stored `{ overlay, etag }`. A stale `ifMatch` rejects with `PRECONDITION_FAILED` (412).                                                                                                                                                                                                                                                                                                                                                                                                             |
-| `mountWidgets(layout, { host, container, deployments, importModule?, fetch? })` | Takes the layout of one route. Builds the layout boxes in `container` in layout order. For each widget node it reads `{deployment.url}/.well-known/agentage-extension.json` (once per deployment), finds the widget by `name`, imports its `module`, creates its `element`, sets `el.host` to `host(deployment)` (called once per deployment) and puts it in its place. Resolves the placed elements; never rejects: a widget that fails becomes one `<p role="alert">` with the reason. `importModule(url)` (default `import(url)`) and `fetch` (default the global) are optional. |
+- `readInstallation(rootUrl, target, { token?, fetch? })`: `GET {rootUrl}/api/v1/installations/{target}`.
+  It reads the `{ success, data }` envelope, validates `data` and resolves `{ installation, etag }`.
+  `etag` is `undefined` when root sends none. It rejects on an HTTP error or a bad document.
+- `readOverlay(rootUrl, target, { token, fetch? })`: `GET .../installations/{target}/overlay`.
+  It resolves the caller's own route changes on that target: `{ overlay, etag }`.
+- `writeOverlay(rootUrl, target, overlay, { token, ifMatch, fetch? })`:
+  `PUT .../installations/{target}/overlay` with `If-Match: ifMatch`. It resolves the stored
+  `{ overlay, etag }`. A stale `ifMatch` rejects with `PRECONDITION_FAILED` (412).
+- `mountWidgets(layout, { host, container, deployments, importModule?, fetch? })`: takes the layout
+  of one route and builds its boxes in `container`, in layout order. For each widget node it does
+  these steps:
+  1. Read `{deployment.url}/.well-known/agentage-extension.json` (once per deployment).
+  2. Find the widget by `name` and import its `module`.
+  3. Create its `element` and set `el.host` to `host(deployment)` (called once per deployment).
+  4. Put the element in its place.
+
+  It resolves the placed elements and never rejects. A widget that fails becomes one
+  `<p role="alert">` with the reason. `importModule(url)` (default `import(url)`) and `fetch`
+  (default the global) are optional.
 
 ## The installation document
 
