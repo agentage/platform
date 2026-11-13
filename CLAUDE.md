@@ -6,14 +6,25 @@ security, backend); this file only adds what the tree does not say. Words (part,
 agcid, record, sealing), the tool's behavior and the part-image settings are in
 [README.md](README.md); this file does not repeat them.
 
+## Where facts live
+
+- A part's `create(ctx)`, the manifest, store, workers, spans, test helpers: `README.md` "Write the parts" and its "Store", "Workers and commands", "Logs and spans", "Tests".
+- Build steps, the six check rules, `up`, `token`: `README.md` "The tool: build, up, token".
+- Part image entry, port, `AGENTAGE_*` settings: `README.md` "Run a part image".
+- Manifest, record, discovery, `/health` and envelope schemas: `packages/extension/schemas/*.json` (generated, never edit by hand).
+- The check report JSON and secrets: `packages/extension/README.md`.
+- Widget imports, bundle output, harness page: `packages/widget/README.md`. Shell calls and installation document: `packages/shell/README.md`.
+- CI jobs: `.github/workflows/ci.yml`. Coverage floor: `vitest.config.ts`. Release rules: `.github/workflows/release.yml`, `README.md` "Release".
+
+Read the file named here before you read `src/`.
+
 ## Commands
 
 - `npm run verify` - type-check (`tsc -b` + the test tsconfig), lint, format, tests with coverage, build
 - `npm run build && npm run schemas` - regenerate `packages/extension/schemas/*.json` from Zod; a
   test fails when the committed files drift
 - The tool: `node packages/extension/dist/tool/cli.js build|up|down|token` (`tool/main.ts`).
-  `up` serves the gateway on `localhost:4280`; `token --scope <id>:<verb>` needs `--scope` and
-  mints an `aga_` token from the dev issuer on `:4281`. Details: README.md, "The tool".
+  Details: README.md, "The tool".
 - One package's tests: `npx vitest run packages/<p>`; its type-check:
   `npx tsc -p packages/<p>/tsconfig.eslint.json --noEmit`
 - A version bump touches the package's `package.json`; widget also `src/host/version.ts`; extension
