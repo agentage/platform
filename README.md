@@ -2,8 +2,8 @@
 
 agentage is a small platform that runs extensions. An extension is one npm package that adds pages,
 widgets, an API, MCP tools, jobs or CLI commands. This repo holds the kit, the library every
-extension is built on. Extension authors use it, and so do the agentage cli and the web pages that
-show widgets. It holds no product code.
+extension is built on. Extension authors, the agentage cli and the web pages that show widgets use
+it, and it holds no product code.
 
 ## Start
 
@@ -12,13 +12,13 @@ To write an extension, make one from the template. You need Node 22+, npm 10+ an
 
 ```bash
 npx @agentage/cli@latest extension create <id> [part...]   # makes ./extension-<id>
-cd extension-<id>
-npm ci && npm run build
-git init -b master && git add -A && git commit -m "feat: <id> extension"
-npx agentage extension up                                  # runs it on localhost:4280
+cd extension-<id> && npm ci                                # installs the cli the project pins
+git init -q && git add -A && git commit -qm init           # up needs one commit
+npx agentage extension up                                  # builds and runs it on localhost:4280
 ```
 
-No part named means all parts. `up` needs one git commit and the ports 4280 and 4281 free. The template and its guide are in
+No part named means all parts. `up` runs the package build itself. It needs the ports 4280 and
+4281 free. The template and its guide are in
 [extension-template](https://github.com/agentage/extension-template).
 
 To work on this repo, you need Node 22+ and npm 10+:
@@ -78,7 +78,7 @@ Run each command as `npx agentage extension <command>` inside the extension fold
 
 - `check`: runs the six check rules. `--write` first rewrites the committed contracts.
 - `build`: checks, then builds one image per server part. `--push` pushes the images. Needs Docker
-  and a committed, clean git tree.
+  and a committed, clean git tree (the cli checks this).
 - `up`: runs the extension on Docker, with a store, a gateway on `localhost:4280` and a dev token
   issuer on `localhost:4281`.
 - `down`: removes what `up` started. `--keep-data` keeps the store volume.

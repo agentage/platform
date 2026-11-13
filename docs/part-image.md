@@ -1,7 +1,7 @@
 # Run a part image
 
 A part image is the container image `build` makes for one part. A deployment sets these values
-when it runs the image. The audience (`AGENTAGE_AUDIENCE`) is the set of hosts a token is valid for.
+when it runs the image. The audience (`AGENTAGE_AUDIENCE`) is the host a token is valid for: one host, or `*.{domain}`.
 
 | Setting                                                   | Meaning                                                                                                                      |
 | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
