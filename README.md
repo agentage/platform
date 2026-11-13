@@ -1,14 +1,39 @@
 # platform
 
-The kit for writing an agentage extension. Authors of extensions use it; so do the cli and the
-shell pages that run them. It holds no product code.
+agentage is a small platform that runs extensions. An extension is one npm package that adds pages,
+widgets, an API, MCP tools, jobs or CLI commands. This repo holds the kit, the library every
+extension is built on. Extension authors use it; so do the agentage cli and the shell pages.
 
-Words used here:
+## Start
+
+To write an extension, make one from the template. You need Node 22+, npm 10+ and git. `build` and
+`up` also need Docker.
+
+```bash
+npx @agentage/cli@latest extension create <id> [part...]   # makes ./extension-<id>
+cd extension-<id>
+npx agentage extension up                                  # runs it on localhost:4280
+```
+
+No part named means all parts. The template and its guide are in
+[extension-template](https://github.com/agentage/extension-template).
+
+To work on this repo, you need Node 22+ and npm 10+:
+
+```bash
+npm ci
+npm run build
+npm run verify
+```
+
+## Words used here
 
 - **Extension**: one npm package whose `package.json` has an `agentage` block (the manifest).
-- **Part**: one folder of an extension: `pages`, `ui`, `api`, `mcp`, `worker` or `cli`. It exports only `create(ctx)`.
-- **Kit**: the library that runs a part. `@agentage/extension` is the kit; it owns servers, ports, `/health`, discovery, the envelope, the store and the scheduler.
-- **Tool**: the build and local-run program in the kit (`build`, `up`, `down`, `token`). The cli runs it as `agentage extension ...`.
+- **Part**: one folder of an extension: `pages`, `ui`, `api`, `mcp`, `worker` or `cli`. A
+  postgres `store` is a part with no code folder.
+- **Kit**: the library that runs a part. It owns servers, ports, `/health`, discovery, the
+  envelope, the store and the scheduler.
+- **Tool**: the build and local-run program in the kit. The cli runs it as `agentage extension`.
 - **agcid**: the request id. It is 32 hex characters.
 
 ## Packages
@@ -23,13 +48,51 @@ Words used here:
 - [`@agentage/identity`](packages/identity): the identity client for browser pages. Sign in at
   auth, get a one-hour token for the parts, `mintToken`, `revokeToken`, sign out.
 
-## Work on this repo
+## Write the parts
 
-```bash
-npm ci
-npm run build
-npm run verify
+Each part exports only `create(ctx)`. Part code never reads `process.env` or starts a server.
+
+```ts
+// src/mcp/index.ts: tools served as {id}__{name} on POST /mcp
+export function create(ctx: McpContext) {
+  ctx.tool('echo', { description, input, output }, async ({ msg }) => ({ msg: `pong ${msg}` }));
+}
 ```
+
+- `pages`: a map of paths to pages, files or redirects.
+- `ui`: a `widgets` map of React components.
+- `api`: an Express router mounted at `/api/v1/`.
+- `mcp`: MCP tools, as above.
+- `worker`: jobs on a five-field cron. A job never runs twice at once.
+- `cli`: one handler per command in `agentage.commands`.
+
+[extension-probe](https://github.com/agentage/extension-probe) has every part kind.
+
+More: [docs/parts.md](docs/parts.md) (the store, workers, logs and spans, test helpers).
+
+## The tool: build, up, token
+
+Inside an extension, run `npx agentage extension <command>`. The extension folder is the current
+folder by default.
+
+- `check`: runs the six check rules. `--write` first rewrites the committed contracts, such as
+  `{id}.mcpc.json`.
+- `build`: checks, then builds one image per part. `--push` pushes the images. Needs Docker and a
+  committed, clean git tree.
+- `up`: runs the extension on Docker, with a store, a gateway on `localhost:4280` and a dev token
+  issuer on `localhost:4281`.
+- `down`: removes what `up` started. `--keep-data` keeps the store volume.
+- `token --scope <id>:<verb>`: prints a dev token for the parts that `up` started.
+
+More: [docs/tool.md](docs/tool.md) (build steps, the six rules, the image, `up`, tokens).
+
+## Run a part image
+
+An image starts with `node node_modules/@agentage/extension/dist/runtime/main.js <part>`. It
+listens on port 3000. `PORT` changes the port. The `AGENTAGE_*` variables set the origin, the
+store, settings and tokens.
+
+More: [docs/part-image.md](docs/part-image.md) (every setting, the JSON Schemas).
 
 ## Write a widget
 
@@ -54,3 +117,13 @@ version not yet on npm, using OIDC trusted publishing with provenance, and skips
 Before that, CI builds [extension-probe](https://github.com/agentage/extension-probe) on the
 packed packages, runs `up`, and checks every part image and the served discovery document. A kit
 change is proven in containers before it ships.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
+
+## Documentation
+
+- [docs/parts.md](docs/parts.md): write each part, the store, workers, logs and spans, tests.
+- [docs/tool.md](docs/tool.md): build, check, up, down and token in detail.
+- [docs/part-image.md](docs/part-image.md): run a part image in a deployment, every setting.

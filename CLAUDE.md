@@ -2,15 +2,15 @@
 
 Public repo. The extension kit and its build tool, and the widget kit; no product code. Standards: the engineering
 standards batch (repo-baseline, typescript, monorepo, code-style, testing, ci-cd, docker-deploy,
-security, backend); this file only adds what the tree does not say. Words (part, kit, tool,
-agcid, record, sealing), the tool's behavior and the part-image settings are in
-[README.md](README.md); this file does not repeat them.
+security, backend); this file only adds what the tree does not say. Words are in
+[README.md](README.md) (record, sealing in `docs/tool.md`), the tool's behavior in `docs/tool.md`,
+the part-image settings in `docs/part-image.md`; this file does not repeat them.
 
 ## Where facts live
 
-- A part's `create(ctx)`, the manifest, store, workers, spans, test helpers: `README.md` "Write the parts" and its "Store", "Workers and commands", "Logs and spans", "Tests".
-- Build steps, the six check rules, `up`, `token`: `README.md` "The tool: build, up, token".
-- Part image entry, port, `AGENTAGE_*` settings: `README.md` "Run a part image".
+- A part's `create(ctx)`, the manifest, store, workers, spans, test helpers: `docs/parts.md` and its "Store", "Workers and commands", "Logs and spans", "Tests".
+- Build steps, the six check rules, `up`, `token`: `docs/tool.md` (summary: `README.md` "The tool: build, up, token").
+- Part image entry, port, `AGENTAGE_*` settings: `docs/part-image.md` (summary: `README.md` "Run a part image").
 - Manifest, record, discovery, `/health` and envelope schemas: `packages/extension/schemas/*.json` (generated, never edit by hand).
 - The check report JSON and secrets: `packages/extension/README.md`.
 - Widget imports, bundle output, harness page: `packages/widget/README.md`. Shell calls and installation document: `packages/shell/README.md`.
@@ -24,7 +24,7 @@ Read the file named here before you read `src/`.
 - `npm run build && npm run schemas` - regenerate `packages/extension/schemas/*.json` from Zod; a
   test fails when the committed files drift
 - The tool: `node packages/extension/dist/tool/cli.js build|up|down|token` (`tool/main.ts`).
-  Details: README.md, "The tool".
+  Details: `docs/tool.md`.
 - One package's tests: `npx vitest run packages/<p>`; its type-check:
   `npx tsc -p packages/<p>/tsconfig.eslint.json --noEmit`
 - A version bump touches the package's `package.json`; widget also `src/host/version.ts`; extension

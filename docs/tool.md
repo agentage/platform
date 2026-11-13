@@ -5,10 +5,9 @@ Words used here:
 - **Record**: the build file that lists a release's images by digest (`.agentage/record.json`).
 - **Sealing**: the check rule that part code may not read `process.env`, call `listen()` or name an absolute agentage URL.
 
-The paths below are relative to the root of this repo. Pass `--dir <ext>` to name the extension
-folder (the default is the current folder); inside an extension, `npx agentage extension <command>`
-runs the same tool. `build` and `up` need Docker, and the extension must be a git checkout with a
-commit.
+The paths below are relative to the root of this repo. `--dir <ext>` names the extension folder.
+The default is the current folder. Inside an extension, `npx agentage extension <command>` runs the
+same tool. `build` and `up` need Docker. The extension must be a git checkout with a commit.
 
 ```bash
 node packages/extension/dist/tool/cli.js build [--push] [--dir <ext>] [--registry <host/owner>]
@@ -61,6 +60,6 @@ project only; `--keep-data` keeps the store volume.
 is required. The parts of `up` check it like a deployment's. The issuer also takes `ttlSeconds`,
 `aud` and `POST /revoke { jti }`.
 
-Every docker, git and npm call has a timeout (`tool/timeouts.ts`). None retries, so a re-run is
-safe. The cli runs the same code as `agentage extension check|build|up|down|token` through
+Every docker, git and npm call has a timeout (`tool/timeouts.ts`). No call retries, so a re-run
+is safe. The cli runs the same code as `agentage extension check|build|up|down|token` through
 `@agentage/extension/tool`.
