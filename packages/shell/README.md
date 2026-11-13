@@ -40,7 +40,9 @@ await mountWidgets(layout, {
   4. Put the element in its place.
 
   It resolves the placed elements and never rejects. A widget that fails becomes one
-  `<p role="alert">` with the reason. `importModule(url)` (default `import(url)`) and `fetch`
+  `<p role="alert">` with the reason. Its text is `{extension} {name}: {reason}`, and the reason
+  is `no deployment for {extension}` or `{extension} serves no widget {name}`. A module that does
+  not define its element gives `{module} defines no {element}`. `importModule(url)` (default `import(url)`) and `fetch`
   (default the global) are optional.
 
 ## The installation document

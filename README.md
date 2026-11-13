@@ -17,7 +17,7 @@ git init -q && git add -A && git commit -qm init           # up needs one commit
 npx agentage extension up                                  # builds and runs it on localhost:4280
 ```
 
-No part named means all parts. `up` runs the package build itself. It needs the ports 4280 and
+No part named means all parts. `up` runs the package's `build` script itself. It needs the ports 4280 and
 4281 free. The template and its guide are in
 [extension-template](https://github.com/agentage/extension-template).
 
