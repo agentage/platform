@@ -17,7 +17,7 @@ docker-deploy, security, backend); this file only adds what the tree does not sa
 - Manifest, record, discovery, `/health` and envelope schemas: `packages/extension/schemas/*.json` (generated, never edit by hand).
 - Check report JSON, secrets: `packages/extension/README.md`.
 - Event line kinds, redaction and limits, events client: `packages/logs/README.md` (proof: `packages/logs/src/`).
-- Widget imports, bundle output, harness page, name rules: `packages/widget/README.md` "Rules the code enforces".
+- Widget: `packages/widget/README.md` "Imports", "Bundle output", "The harness page", "Rules the code enforces".
 - Shell calls, mount errors, installation document: `packages/shell/README.md` "The calls", "The installation document".
 - Sign in, page token, `mintToken`, `revokeToken`, sign out: `packages/identity/README.md`.
 - CI jobs: `.github/workflows/ci.yml`. Coverage floor: `vitest.config.ts`. Release rules: `README.md` "Release" (proof: `.github/workflows/release.yml`).
