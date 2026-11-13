@@ -2,7 +2,7 @@
 
 Each part of an extension package exports only `create(ctx)`. The kit owns servers, ports,
 `/health`, discovery, the envelope, the store connection, the scheduler and argument parsing. The
-envelope is the kit's standard JSON shape for every answer.
+envelope is the kit's standard JSON answer shape: `{ success, data }` or `{ success: false, error }`.
 
 ```ts
 // src/api/index.ts: an Express router mounted at /api/v1/
@@ -38,8 +38,8 @@ export const create = (ctx: PagesContext): PagesSite => ({ '/': versionPage(ctx)
 
 The pages part maps each path to a page:
 
-- A value is text or bytes. Its content type comes from the path's extension. A path with no
-  extension is HTML.
+- A value is text or bytes. Its content type comes from the path's extension. A path without a
+  known extension is HTML.
 - `siteFromDir(dir, { origin: ctx.extension.origin })` serves a static export instead of a map.
 - A `{ redirect: url }` value answers 308.
 - A key that ends in `/*` covers every path under it. The rest of the path and the query are added
