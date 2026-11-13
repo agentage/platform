@@ -33,8 +33,8 @@ Names inside `fields` follow OpenTelemetry where a stable name exists (`http.rou
 Redaction and limits:
 
 - A key that matches `token|secret|password|key|authorization|cookie` is redacted.
-- A string that holds a JWT, an `aga_` token (16 or more characters after the prefix) or a
-  `Bearer` value becomes `[redacted]`.
+- In a string, the part that matches a JWT, an `aga_` token (16 or more characters after the
+  prefix) or a `Bearer` value becomes `[redacted]`; the rest stays.
 - Strings are cut at 200 characters and nesting at depth 3.
 
 MIT.

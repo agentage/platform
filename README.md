@@ -3,9 +3,6 @@
 The kit for writing an agentage extension. Authors of extensions use it; so do the cli and the
 shell pages that run them. It holds no product code.
 
-Start an extension: `npm install @agentage/extension express zod`. Work on this repo:
-`npm ci && npm run build` (Node 22 or later, npm 10 or later).
-
 Words used here:
 
 - **Extension**: one npm package whose `package.json` has an `agentage` block (the manifest).
@@ -87,7 +84,8 @@ A postgres store adds two folders:
 
 - `migrations/NNN-name.sql`: applied in order, each once, and recorded in `_migrations`. A failing
   file is named and rolled back.
-- `seeds/`: applied once, only on a store with no ledger row and no table but the kit's.
+- `seeds/`: applied once, only on a store with no ledger row and no table but the kit's. They stay
+  owed after a failed first run, so a later run still seeds.
 
 `ctx.store` is a ready pool. A query gets 10 s, a connection 5 s. A store that cannot answer is
 `UNAVAILABLE` (503, `Retry-After`), never a 500.
@@ -121,8 +119,10 @@ A postgres store adds two folders:
 
 ## The tool: build, up, token
 
-Run these from the extension's folder, or pass `--dir <ext>`. `build` and `up` need Docker, and
-the extension must be a git checkout with a commit.
+The paths below are relative to the root of this repo. Pass `--dir <ext>` to name the extension
+folder (the default is the current folder); inside an extension, `npx agentage extension <command>`
+runs the same tool. `build` and `up` need Docker, and the extension must be a git checkout with a
+commit.
 
 ```bash
 node packages/extension/dist/tool/cli.js build [--push] [--dir <ext>] [--registry <host/owner>]

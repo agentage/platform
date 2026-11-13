@@ -103,8 +103,8 @@ agcid, record, sealing), the tool's behavior and the part-image settings are in
   use `--network host` or `docker exec` to read it.
 - `ctx.store` is always present; without a store part it throws on first use.
 - The pages part is a kit-served static map; the kit serves no Next.js pages.
-- Tokens are on in every api and mcp part (`auth/part-auth.ts`): no
-  `AGENTAGE_ISSUER`, or a host off `AGENTAGE_AUDIENCE`, and the part does not start. Each route asks
+- Tokens are on in every api and mcp part (`auth/part-auth.ts`). Without `AGENTAGE_ISSUER`, or
+  with a host off `AGENTAGE_AUDIENCE`, the part does not start. Each route asks
   for its OpenAPI operation's access, each `tools/call` for its tool's `scope` (read when
   undeclared). The test servers (`startTestServer`, `startTestMcp`) run without a check and
   `createTestContext` gives a fixed caller. Under `up` the tokens name the issuer
