@@ -8,21 +8,27 @@ const shadow = (doc: Document = document) =>
 
 // The sheets are cached per document, so their text is recorded before the first one is built.
 const texts = new WeakMap<CSSStyleSheet, string>();
-const replaceSync = CSSStyleSheet.prototype.replaceSync;
-vi.spyOn(CSSStyleSheet.prototype, 'replaceSync').mockImplementation(function (
-  this: CSSStyleSheet,
-  text: string
-) {
-  texts.set(this, text);
-  replaceSync.call(this, text);
-});
+const recordTexts = (view: Window & typeof globalThis) => {
+  const replaceSync = view.CSSStyleSheet.prototype.replaceSync;
+  vi.spyOn(view.CSSStyleSheet.prototype, 'replaceSync').mockImplementation(function (
+    this: CSSStyleSheet,
+    text: string
+  ) {
+    texts.set(this, text);
+    replaceSync.call(this, text);
+  });
+};
+recordTexts(window);
 const cssOf = (sheet: CSSStyleSheet | undefined) => sheet && texts.get(sheet);
 
 describe('the widget sheet', () => {
   // A document of its own: the sheets are cached per document, so no other test's order counts.
   it('adds only the @property block to the document, once, after the page sheets', () => {
-    const doc = document.implementation.createHTMLDocument('');
-    const page = new CSSStyleSheet();
+    const frame = document.body.appendChild(document.createElement('iframe'));
+    const doc = frame.contentDocument as Document;
+    const view = frame.contentWindow as Window & typeof globalThis;
+    recordTexts(view);
+    const page = new view.CSSStyleSheet();
     doc.adoptedStyleSheets = [page];
     adoptWidgetStyles(shadow(doc));
     adoptWidgetStyles(shadow(doc));

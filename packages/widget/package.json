@@ -55,7 +55,7 @@
     "prepublishOnly": "npm run verify"
   },
   "dependencies": {
-    "@agentage/design-system": "^0.19.2",
+    "@agentage/design-system": "^0.19.3",
     "esbuild": "^0.28.2",
     "zod": "^4.2.0"
   },
