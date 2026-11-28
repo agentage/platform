@@ -21,9 +21,9 @@
       "store": "postgres",
       "settings": {
         "market": "https://core.next.agentage.io",
-        "repo": "agentage/estate",
+        "repo": "example/deploy",
         "appId": "1",
-        "apphosts": "agentage/apphosts",
+        "apphosts": "example/app-host",
         "watch": "on"
       },
       "expose": { "api": "public", "mcp": "public" }

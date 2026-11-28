@@ -1,4 +1,4 @@
-// The stub router's pages.test.mjs (apphosts), ported: the site route, the reserved paths, D82.
+// The stub router's pages.test.mjs (app host repo), ported: the site route, the reserved paths, D82.
 import { describe, expect, it } from 'vitest';
 import { normalPath } from './cloud-guards.js';
 import { partRoute, type Route, routeOf } from './route-of.js';

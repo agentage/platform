@@ -5,7 +5,7 @@ import {
   type CloudRow,
 } from './cloud-installation.js';
 
-// The rules of C2 one file can break alone (apphosts scripts/lib/installation.mjs, ported).
+// The rules of C2 one file can break alone (app host repo scripts/lib/installation.mjs, ported).
 interface Refusal {
   path: string;
   message: string;

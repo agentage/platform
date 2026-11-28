@@ -34,7 +34,7 @@ const withRow = (extra: object) => (doc: Record<string, unknown>) => ({
   extensions: [...(doc['extensions'] as object[]), row(extra)],
 });
 
-describe('--check DIR on the host files of apphosts master, in the new form', () => {
+describe('--check DIR on the host files of app host repo master, in the new form', () => {
   it.each(HOSTS)('%s passes: exit 0, no line', async (host) => {
     expect(await check(join(FIXTURES, host))).toEqual({ code: 0, lines: [] });
   });

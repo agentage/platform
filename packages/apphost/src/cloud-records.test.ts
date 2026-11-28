@@ -1,4 +1,4 @@
-// The stub router's records.test.mjs (apphosts), ported to the cloud host.
+// The stub router's records.test.mjs (app host repo), ported to the cloud host.
 import { type ServerResponse } from 'node:http';
 import { afterEach, describe, expect, it } from 'vitest';
 import { exchangesOf, fakeAuth, SESSION } from './test-support/cloud-host.js';

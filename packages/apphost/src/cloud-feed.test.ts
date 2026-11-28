@@ -1,4 +1,4 @@
-// The stub router's feed.test.mjs (apphosts) cases 38, 46, 71, ported: the feed names the host document.
+// The stub router's feed.test.mjs (app host repo) cases 38, 46, 71, ported: the feed names the host document.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { docId } from './shell-events.js';
 import {

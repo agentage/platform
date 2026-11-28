@@ -6,7 +6,7 @@ import { portOf, type Run, type Runner, type RunState } from './runner.js';
 // An origin only: scheme, host and port; no user, password, path, query or fragment.
 const ORIGIN = /^https?:\/\/[^/?#@]+$/;
 
-// One row of an app host's upstreams.json (agentage/apphosts): a running service of one extension.
+// One row of an app host's upstreams.json (the app host repo): a running service of one extension.
 export const UpstreamSchema = z.strictObject({
   id: z.string().regex(/^[a-z][a-z0-9-]*$/),
   service: z.string().min(1),

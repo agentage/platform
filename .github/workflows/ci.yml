@@ -325,8 +325,8 @@ jobs:
           done
           echo "branch=$branch" >> "$GITHUB_OUTPUT"
 
-      # The same rule for agentage/e2e: head, a non-default base, vars.E2E_REF, master.
-      - name: Pick the agentage/e2e branch
+      # The same rule for the e2e repo: head, a non-default base, vars.E2E_REF, master.
+      - name: Pick the e2e repo branch
         id: e2e-ref
         if: github.actor != 'dependabot[bot]'
         env:
@@ -354,8 +354,8 @@ jobs:
       - name: Find the probe folder
         run: echo "PROBE_DIR=$(node platform/scripts/probe-dir.mjs "$PWD/probe")" >> "$GITHUB_ENV"
 
-      # agentage/e2e is private; the org PAT_TOKEN reads it. Dependabot runs get no secrets.
-      - name: Checkout agentage/e2e
+      # The e2e repo is private; the org PAT_TOKEN reads it. Dependabot runs get no secrets.
+      - name: Checkout the e2e repo
         if: github.actor != 'dependabot[bot]'
         uses: actions/checkout@v7
         with:
@@ -401,7 +401,7 @@ jobs:
         # The kit's own tool, not the agentage bin: the probe's @agentage/cli bundles the released kit.
         run: node node_modules/@agentage/extension/dist/tool/cli.js up
 
-      - name: e2e gate on docker (agentage/e2e, probe gate docker)
+      - name: e2e gate on docker (the e2e repo, probe gate docker)
         if: github.actor != 'dependabot[bot]'
         working-directory: e2e-suite
         run: |
@@ -557,8 +557,8 @@ jobs:
           fi
           npx playwright install chromium
 
-      # agentage/e2e is private (the org PAT_TOKEN reads it); Dependabot and fork runs get no secrets.
-      - name: Checkout agentage/e2e
+      # The e2e repo is private (the org PAT_TOKEN reads it); Dependabot and fork runs get no secrets.
+      - name: Checkout the e2e repo
         if: env.SECRETS_OK == 'true'
         uses: actions/checkout@v7
         with:
@@ -567,7 +567,7 @@ jobs:
           token: ${{ secrets.PAT_TOKEN }}
           persist-credentials: false
 
-      - name: Install agentage/e2e (the candidate kit validates when the kit changed)
+      - name: Install the e2e repo (the candidate kit validates when the kit changed)
         if: env.SECRETS_OK == 'true'
         working-directory: e2e-suite
         run: |
@@ -587,7 +587,7 @@ jobs:
         working-directory: template
         run: npm run test:e2e
 
-      - name: e2e gate on docker (agentage/e2e, the template row)
+      - name: e2e gate on docker (the e2e repo, the template row)
         if: env.SECRETS_OK == 'true'
         working-directory: e2e-suite
         run: env "TEMPLATE_DIR=$GITHUB_WORKSPACE/template" npm run e2e -- template gate docker

@@ -6,7 +6,7 @@ export interface CloudEnv {
   // new URL(AGENTAGE_URL).origin: the origin of this host's own pages.
   own: string;
   issuer: string | null;
-  // LOCAL_FLAG=1: the local run of an app host (apphosts scripts/local.mjs); never in a stack.
+  // LOCAL_FLAG=1: the local run of an app host (app host repo scripts/local.mjs); never in a stack.
   local: boolean;
   port: number;
   installationFile: string;
@@ -14,7 +14,7 @@ export interface CloudEnv {
   build: { version: string; commit: string; buildTime: string };
 }
 
-// The stub router's name: apphosts check-stacks already refuses it in every stack.
+// The stub router's name: app host repo check-stacks already refuses it in every stack.
 export const LOCAL_FLAG = 'STUB_LOOPBACK_HTTP';
 const MOUNTED = '/run/agentage';
 const LOOPBACK = /^(localhost|127\.0\.0\.1|[a-z0-9-]+\.localhost)$/;

@@ -1,4 +1,4 @@
-// The stub router's discovery.test.mjs (apphosts), ported: the limits of the document read.
+// The stub router's discovery.test.mjs (app host repo), ported: the limits of the document read.
 import { type ServerResponse } from 'node:http';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createCloudDiscovery } from './cloud-discovery.js';

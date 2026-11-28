@@ -58,8 +58,8 @@ jobs:
           npm ci
           npx playwright install chromium
 
-      # agentage/e2e is private (the org PAT_TOKEN reads it); Dependabot and fork runs get no secrets.
-      - name: Checkout agentage/e2e
+      # The e2e repo is private (the org PAT_TOKEN reads it); Dependabot and fork runs get no secrets.
+      - name: Checkout the e2e repo
         if: github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.fork != true
         uses: actions/checkout@v7
         with:
@@ -68,7 +68,7 @@ jobs:
           token: ${{ secrets.PAT_TOKEN }}
           persist-credentials: false
 
-      - name: Install agentage/e2e
+      - name: Install the e2e repo
         if: github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.fork != true
         run: |
           npm ci --prefix e2e-suite --no-audit --no-fund
@@ -82,7 +82,7 @@ jobs:
         run: npm run test:e2e
 
       # {ID}_DIR lets the gate read the contracts from this checkout; the name follows the id.
-      - name: e2e gate on docker (agentage/e2e, a row in its extensions.json)
+      - name: e2e gate on docker (the e2e repo, a row in its extensions.json)
         if: github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.fork != true
         working-directory: e2e-suite
         run: |

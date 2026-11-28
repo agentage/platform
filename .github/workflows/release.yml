@@ -96,6 +96,14 @@ jobs:
       - name: Publish to npm (skips a version already published)
         run: |
           set -euo pipefail
+          release_create() {
+            for try in 1 2 3; do
+              gh release view "$1" >/dev/null 2>&1 && return 0
+              gh release create "$@" && return 0
+              [ "$try" = 3 ] || sleep $(( try == 1 ? 10 : 30 ))
+            done
+            gh release view "$1" >/dev/null
+          }
           held=()
           # Dependencies first: logs, the kit, the shell package (apphost depends on it), then the rest.
           first='packages/logs/package.json packages/extension/package.json packages/shell-dashboard/package.json'
@@ -151,7 +159,7 @@ jobs:
             if [ -n "$prev" ]; then range="${prev}..HEAD"; else range="-30"; fi
             notes=$(git log --oneline "$range" -- "$dir")
             # The apphost-image job can create the same release first: "already exists" is fine.
-            gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --target "$GITHUB_SHA" --title "${name}@${version}" --notes "${notes:-No changes under ${dir}}" || gh release view "$tag" >/dev/null
+            release_create "$tag" --target "$GITHUB_SHA" --title "${name}@${version}" --notes "${notes:-No changes under ${dir}}"
           done
           # A green run means everything shipped; anything held turns it red with the reason.
           for line in "${held[@]}"; do
@@ -267,6 +275,14 @@ jobs:
           if [ -n "$prev" ]; then range="${prev}..HEAD"; else range="-30"; fi
           notes=$(git log --oneline "$range" -- packages/apphost)
           # The publish job can create the same release first: "already exists" is fine.
-          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --target "$GITHUB_SHA" --title "$tag" --notes "${notes:-No changes under packages/apphost}" || gh release view "$tag" >/dev/null
+          release_create() {
+            for try in 1 2 3; do
+              gh release view "$1" >/dev/null 2>&1 && return 0
+              gh release create "$@" && return 0
+              [ "$try" = 3 ] || sleep $(( try == 1 ? 10 : 30 ))
+            done
+            gh release view "$1" >/dev/null
+          }
+          release_create "$tag" --target "$GITHUB_SHA" --title "$tag" --notes "${notes:-No changes under packages/apphost}"
           gh release upload "$tag" agentage-apphost.json
           echo "record on ${tag}: $(jq -r .image agentage-apphost.json)" >> "$GITHUB_STEP_SUMMARY"

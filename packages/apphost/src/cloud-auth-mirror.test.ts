@@ -1,4 +1,4 @@
-// The stub router's well-known.test.mjs (apphosts), ported: the auth server metadata mirror.
+// The stub router's well-known.test.mjs (app host repo), ported: the auth server metadata mirror.
 import express from 'express';
 import { afterEach, describe, expect, it } from 'vitest';
 import { errorHandler, startOn, type TestServer } from '@agentage/extension/internal';
